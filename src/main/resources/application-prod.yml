@@ -1,0 +1,16 @@
+# 운영 — Cloudtype 에 배포되고 Supabase(Session pooler)에 연결된다.
+# 모든 값은 CD 워크플로가 GitHub Secrets 에서 환경 변수로 주입한다.
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      # Supabase 무료 플랜의 pooler 연결 수 제한을 고려해 작게 유지
+      maximum-pool-size: ${DB_POOL_SIZE:5}
+      minimum-idle: 1
+      connection-timeout: 10000
+
+logging:
+  level:
+    root: info
