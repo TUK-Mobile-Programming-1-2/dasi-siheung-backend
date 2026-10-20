@@ -29,7 +29,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: 소스 가져오기
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: PostgreSQL + PostGIS 준비
         uses: ./.github/actions/setup-postgis
@@ -84,7 +84,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: 소스 가져오기
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: PostgreSQL + PostGIS 준비
         uses: ./.github/actions/setup-postgis
