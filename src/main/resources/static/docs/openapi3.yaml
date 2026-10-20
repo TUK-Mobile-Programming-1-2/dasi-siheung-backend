@@ -1,0 +1,55 @@
+openapi: 3.0.1
+info:
+  title: "다시, 시흥 API"
+  description: Spring REST Docs 테스트를 통과한 API만 담긴 명세입니다.
+  version: 0.0.1-SNAPSHOT
+servers:
+- url: /
+tags: []
+paths:
+  /api/v1/system/ping:
+    get:
+      tags:
+      - System
+      summary: 서버 연결 확인
+      description: 앱·관리자 웹이 백엔드와 통신할 수 있는지 확인합니다. 인증 없이 호출할 수 있습니다.
+      operationId: system-ping
+      responses:
+        "200":
+          description: "200"
+          content:
+            application/json;charset=UTF-8:
+              schema:
+                $ref: "#/components/schemas/api-v1-system-ping318687861"
+              examples:
+                system-ping:
+                  value: |-
+                    {
+                      "success" : true,
+                      "data" : {
+                        "status" : "OK",
+                        "serverTime" : "2026-10-20T21:00:00+09:00"
+                      }
+                    }
+components:
+  schemas:
+    api-v1-system-ping318687861:
+      required:
+      - success
+      type: object
+      properties:
+        data:
+          required:
+          - serverTime
+          - status
+          type: object
+          properties:
+            serverTime:
+              type: string
+              description: "서버 시각 (ISO-8601, Asia/Seoul)"
+            status:
+              type: string
+              description: 서버 상태 (정상이면 OK)
+        success:
+          type: boolean
+          description: 요청 성공 여부
