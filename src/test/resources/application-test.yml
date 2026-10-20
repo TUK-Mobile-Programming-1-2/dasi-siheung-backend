@@ -1,0 +1,14 @@
+# 테스트 — 통합 테스트용 PostgreSQL/PostGIS 접속 정보 (CI 는 워크플로가 주입)
+spring:
+  datasource:
+    url: ${TEST_DB_URL:jdbc:postgresql://localhost:5432/dasi_siheung}
+    username: ${TEST_DB_USERNAME:dasi}
+    password: ${TEST_DB_PASSWORD:dasi}
+  jpa:
+    properties:
+      hibernate:
+        format_sql: true
+
+logging:
+  level:
+    org.hibernate.SQL: debug
