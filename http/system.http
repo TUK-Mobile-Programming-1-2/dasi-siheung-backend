@@ -1,0 +1,29 @@
+### 서버 연결 확인 (ping)
+# 인증: 불필요
+# 기대값: 200 OK
+# {
+#   "success": true,
+#   "data": {
+#     "status": "OK",
+#     "serverTime": "2026-10-20T21:00:00+09:00"   ← 호출 시각, 항상 +09:00
+#   }
+# }
+GET {{baseUrl}}/api/v1/system/ping
+Accept: application/json
+
+> {%
+    client.test("200 OK", () => {
+        client.assert(response.status === 200, `기대 200, 실제 ${response.status}`);
+    });
+    client.test("성공 응답 형식", () => {
+        client.assert(response.body.success === true, "success 가 true 여야 합니다");
+        client.assert(response.body.error === undefined, "성공 응답에는 error 가 없어야 합니다");
+    });
+    client.test("data.status = OK", () => {
+        client.assert(response.body.data.status === "OK", `실제 ${response.body.data.status}`);
+    });
+    client.test("data.serverTime 은 서울 기준 ISO-8601", () => {
+        client.assert(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?\+09:00$/.test(response.body.data.serverTime),
+            `실제 ${response.body.data.serverTime}`);
+    });
+%}

@@ -1,0 +1,53 @@
+### 헬스 체크 (DB 연결 포함)
+# 인증: 불필요
+# 기대값: 200 OK
+# { "status": "UP", ... }
+GET {{baseUrl}}/actuator/health
+
+> {%
+    client.test("200 OK + UP", () => {
+        client.assert(response.status === 200, `기대 200, 실제 ${response.status}`);
+        client.assert(response.body.status === "UP", `실제 ${response.body.status}`);
+    });
+%}
+
+### 보호된 API 를 인증 없이 호출 → 401
+# 인증: 없음 (의도적으로 생략)
+# 기대값: 401 Unauthorized
+# {
+#   "success": false,
+#   "error": { "code": "UNAUTHORIZED", "message": "인증이 필요합니다." }
+# }
+GET {{baseUrl}}/api/v1/spaces
+Accept: application/json
+
+> {%
+    client.test("401 + 공통 오류 형식", () => {
+        client.assert(response.status === 401, `기대 401, 실제 ${response.status}`);
+        client.assert(response.body.success === false, "success 가 false 여야 합니다");
+        client.assert(response.body.error.code === "UNAUTHORIZED", `실제 ${response.body.error.code}`);
+        client.assert(response.body.data === undefined, "실패 응답에는 data 가 없어야 합니다");
+    });
+%}
+
+### 실시간 OpenAPI 명세 (springdoc)
+# 기대값: 200 OK, JSON 의 openapi 필드가 3.x
+GET {{baseUrl}}/v3/api-docs
+
+> {%
+    client.test("200 OK + OpenAPI 3", () => {
+        client.assert(response.status === 200, `기대 200, 실제 ${response.status}`);
+        client.assert(String(response.body.openapi).startsWith("3."), `실제 ${response.body.openapi}`);
+    });
+%}
+
+### 테스트 검증 OpenAPI 명세 (REST Docs)
+# 기대값: 200 OK, 본문에 /api/v1/system/ping 경로 포함
+GET {{baseUrl}}/docs/openapi3.yaml
+
+> {%
+    client.test("200 OK + ping 경로 포함", () => {
+        client.assert(response.status === 200, `기대 200, 실제 ${response.status}`);
+        client.assert(String(response.body).includes("/api/v1/system/ping"), "명세에 ping 경로가 없습니다");
+    });
+%}
