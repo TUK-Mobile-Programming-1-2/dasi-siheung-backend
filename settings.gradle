@@ -1,0 +1,9 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        // restdocs-api-spec 플러그인의 생성기 모듈은 Maven Central 에만 배포된다
+        mavenCentral()
+    }
+}
+
+rootProject.name = 'dasi-siheung-backend'
