@@ -1,0 +1,88 @@
+name: CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cd-production
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: 배포 전 검증
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    name: Cloudtype 배포
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    steps:
+      - name: 배포 설정 확인
+        id: guard
+        env:
+          CLOUDTYPE_TOKEN: ${{ secrets.CLOUDTYPE_TOKEN }}
+          GHP_TOKEN: ${{ secrets.GHP_TOKEN }}
+          DB_URL: ${{ secrets.DB_URL }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          CLOUDTYPE_PROJECT: ${{ vars.CLOUDTYPE_PROJECT }}
+        run: |
+          missing=()
+          for name in CLOUDTYPE_TOKEN GHP_TOKEN DB_URL DB_USERNAME DB_PASSWORD CLOUDTYPE_PROJECT; do
+            [ -z "${!name}" ] && missing+=("$name")
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::warning title=배포 건너뜀::설정되지 않은 값: ${missing[*]} (README 의 '배포 준비' 참고)"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 소스 가져오기
+        if: steps.guard.outputs.ready == 'true'
+        uses: actions/checkout@v4
+
+      - name: Cloudtype 저장소 연결
+        if: steps.guard.outputs.ready == 'true'
+        uses: cloudtype-github-actions/connect@v1
+        with:
+          token: ${{ secrets.CLOUDTYPE_TOKEN }}
+          ghtoken: ${{ secrets.GHP_TOKEN }}
+
+      - name: Cloudtype 배포 요청
+        if: steps.guard.outputs.ready == 'true'
+        uses: cloudtype-github-actions/deploy@v1
+        with:
+          token: ${{ secrets.CLOUDTYPE_TOKEN }}
+          project: ${{ vars.CLOUDTYPE_PROJECT }}
+          stage: ${{ vars.CLOUDTYPE_STAGE || 'main' }}
+          yaml: |
+            name: dasi-siheung-backend
+            app: java@21
+            options:
+              ports: 8080
+              env:
+                - name: SPRING_PROFILES_ACTIVE
+                  value: prod
+                - name: TZ
+                  value: Asia/Seoul
+                - name: DB_URL
+                  value: "${{ secrets.DB_URL }}"
+                - name: DB_USERNAME
+                  value: "${{ secrets.DB_USERNAME }}"
+                - name: DB_PASSWORD
+                  value: "${{ secrets.DB_PASSWORD }}"
+                - name: CORS_ALLOWED_ORIGINS
+                  value: "${{ vars.CORS_ALLOWED_ORIGINS }}"
+            context:
+              git:
+                url: git@github.com:${{ github.repository }}.git
+                ref: ${{ github.ref }}
+              preset: java-springboot

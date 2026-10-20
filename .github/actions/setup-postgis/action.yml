@@ -1,0 +1,38 @@
+name: PostgreSQL + PostGIS 준비
+description: 러너에 기본 설치된 PostgreSQL 에 PostGIS 를 추가하고 테스트용 DB·계정을 만든다.
+
+inputs:
+  database:
+    description: 만들 데이터베이스 이름
+    default: dasi_siheung
+  username:
+    description: 접속 계정
+    default: dasi
+  password:
+    description: 접속 비밀번호
+    default: dasi
+
+runs:
+  using: composite
+  steps:
+    - name: PostGIS 설치 · DB 생성
+      shell: bash
+      env:
+        DB_NAME: ${{ inputs.database }}
+        DB_USER: ${{ inputs.username }}
+        DB_PASSWORD: ${{ inputs.password }}
+      run: |
+        set -euo pipefail
+        PG_MAJOR="$(ls /usr/lib/postgresql | sort -V | tail -n 1)"
+        echo "PostgreSQL ${PG_MAJOR} 에 PostGIS 를 설치합니다."
+
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq "postgresql-${PG_MAJOR}-postgis-3"
+        sudo systemctl start postgresql.service
+
+        # PostGIS 확장 생성(Flyway V1)에는 슈퍼유저 권한이 필요하다
+        sudo -u postgres psql -v ON_ERROR_STOP=1 \
+          -c "CREATE ROLE ${DB_USER} WITH LOGIN SUPERUSER PASSWORD '${DB_PASSWORD}';"
+        sudo -u postgres createdb -O "${DB_USER}" "${DB_NAME}"
+
+        pg_isready -h localhost -p 5432
