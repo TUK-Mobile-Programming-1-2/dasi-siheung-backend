@@ -28,13 +28,12 @@ jobs:
         id: guard
         env:
           CLOUDTYPE_TOKEN: ${{ secrets.CLOUDTYPE_TOKEN }}
-          GHP_TOKEN: ${{ secrets.GHP_TOKEN }}
           DB_URL: ${{ secrets.DB_URL }}
           DB_USERNAME: ${{ secrets.DB_USERNAME }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
         run: |
           missing=()
-          for name in CLOUDTYPE_TOKEN GHP_TOKEN DB_URL DB_USERNAME DB_PASSWORD; do
+          for name in CLOUDTYPE_TOKEN DB_URL DB_USERNAME DB_PASSWORD; do
             [ -z "${!name}" ] && missing+=("$name")
           done
           if [ ${#missing[@]} -gt 0 ]; then
@@ -44,19 +43,9 @@ jobs:
             echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: 소스 가져오기
-        if: steps.guard.outputs.ready == 'true'
-        uses: actions/checkout@v7
-
-      - name: Cloudtype 저장소 연결
-        if: steps.guard.outputs.ready == 'true'
-        uses: cloudtype-github-actions/connect@v1
-        with:
-          token: ${{ secrets.CLOUDTYPE_TOKEN }}
-          ghtoken: ${{ secrets.GHP_TOKEN }}
-
       # 설정값은 Cloudtype 대시보드의 CLI 탭(dasi-siheung-backend.yaml)과 같게 유지한다.
       # 여기 값이 배포 때마다 대시보드 설정을 덮어쓴다.
+      # 소스는 Cloudtype GitHub 앱 권한으로 가져온다. (조직 정책상 Deploy key 를 쓸 수 없어 connect 단계는 쓰지 않음)
       - name: Cloudtype 배포 요청
         if: steps.guard.outputs.ready == 'true'
         uses: cloudtype-github-actions/deploy@v1
@@ -88,5 +77,5 @@ jobs:
               buildenv: []
             context:
               git:
-                url: git@github.com:${{ github.repository }}.git
-                ref: ${{ github.ref }}
+                url: https://github.com/${{ github.repository }}.git
+                branch: main

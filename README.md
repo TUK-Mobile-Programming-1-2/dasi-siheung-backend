@@ -263,7 +263,6 @@ CI 는 러너에 기본 설치된 PostgreSQL 에 PostGIS 를 apt 로 추가해 �
 | Secret | 값 |
 | --- | --- |
 | `CLOUDTYPE_TOKEN` | Cloudtype API 키 |
-| `GHP_TOKEN` | GitHub 개인 액세스 토큰 (classic, `repo` 권한, 저장소 관리자 계정) |
 | `DB_URL` | `jdbc:postgresql://<pooler-host>:5432/postgres?sslmode=require` (운영 Supabase) |
 | `DB_USERNAME` | `postgres.<project-ref>` (운영 Supabase) |
 | `DB_PASSWORD` | 운영 Supabase DB 비밀번호 |
@@ -306,9 +305,11 @@ CD 는 배포할 때마다 Cloudtype 설정을 `cd.yml` 내용으로 덮어쓰�
 CD 연결 순서
 
 1. Cloudtype 계정 설정에서 **API 키 발급** → `CLOUDTYPE_TOKEN`
-2. GitHub 개인 액세스 토큰(classic, `repo`) 발급 → `GHP_TOKEN` (Cloudtype 이 저장소에 배포 키를 등록할 때 사용)
-3. [GitHub 설정값](#github-설정값) 5개를 등록하고 `main` 에 푸시 (또는 Actions 에서 CD 수동 실행)
-4. 배포 후 `http/*.http` 를 `prod` 환경으로 실행해 운영 서버를 확인
+2. [GitHub 설정값](#github-설정값) 4개를 등록하고 `main` 에 푸시 (또는 Actions 에서 CD 수동 실행)
+3. 배포 후 `http/*.http` 를 `prod` 환경으로 실행해 운영 서버를 확인
+
+> 조직 정책상 저장소 Deploy key 를 쓸 수 없어서, 소스는 Cloudtype GitHub 앱 권한(https)으로 가져옵니다.
+> 그래서 `cloudtype-github-actions/connect` 단계와 GitHub 개인 액세스 토큰은 쓰지 않습니다.
 
 ## 문제 해결
 
