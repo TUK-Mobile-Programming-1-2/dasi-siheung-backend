@@ -88,6 +88,11 @@ tasks.named('jar') {
     enabled = false
 }
 
+// 배포 시작 명령이 버전에 영향받지 않도록 실행 파일 이름을 고정한다 (build/libs/app.jar)
+tasks.named('bootJar') {
+    archiveFileName = 'app.jar'
+}
+
 // REST Docs 테스트 → OpenAPI 명세
 openapi3 {
     server = '/'
