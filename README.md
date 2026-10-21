@@ -5,6 +5,14 @@
 시흥 정왕동·거북섬·배곧의 빈 상가와 팝업·전시·체험 공간이 필요한 대학생, 예비 창업자, 지역 창작자를 연결합니다.
 이 저장소는 모바일 앱(Kotlin)과 관리자 웹(React)이 함께 사용하는 **API 서버**입니다.
 
+| 운영 서버 | 주소 |
+| --- | --- |
+| API 기본 주소 | https://port-0-dasi-siheung-backend-mvi7gzqc5a140e65.sel3.cloudtype.app |
+| Swagger UI | https://port-0-dasi-siheung-backend-mvi7gzqc5a140e65.sel3.cloudtype.app/swagger-ui.html |
+| 연결 확인 | https://port-0-dasi-siheung-backend-mvi7gzqc5a140e65.sel3.cloudtype.app/api/v1/system/ping |
+
+> Cloudtype 프리티어라 하루 한 번 서버가 중지됩니다. 응답이 없으면 백엔드 담당자에게 알려주세요.
+
 | 핵심 기능 (P0) | 백엔드 책임 |
 | --- | --- |
 | 공간 등록 · 관리자 검수 | 권한 증빙 제출, 검수 결과(공개 승인 / 수정 요청 / 공개 보류) |
@@ -252,16 +260,16 @@ CI 는 러너에 기본 설치된 PostgreSQL 에 PostGIS 를 apt 로 추가해 �
 
 `Settings → Secrets and variables → Actions` 에 등록합니다.
 
-| 종류 | 이름 | 값 |
-| --- | --- | --- |
-| Secret | `CLOUDTYPE_TOKEN` | Cloudtype API 키 |
-| Secret | `GHP_TOKEN` | GitHub 개인 액세스 토큰 (`repo` 권한, 저장소 관리자 계정) |
-| Secret | `DB_URL` | `jdbc:postgresql://<pooler-host>:5432/postgres?sslmode=require` |
-| Secret | `DB_USERNAME` | `postgres.<project-ref>` |
-| Secret | `DB_PASSWORD` | Supabase DB 비밀번호 |
-| Variable | `CLOUDTYPE_PROJECT` | `<스페이스 이름>/<프로젝트 이름>` |
-| Variable | `CLOUDTYPE_STAGE` | 배포 스테이지 (생략 시 `main`) |
-| Variable | `CORS_ALLOWED_ORIGINS` | 관리자 웹 주소 (쉼표로 여러 개) |
+| Secret | 값 |
+| --- | --- |
+| `CLOUDTYPE_TOKEN` | Cloudtype API 키 |
+| `GHP_TOKEN` | GitHub 개인 액세스 토큰 (classic, `repo` 권한, 저장소 관리자 계정) |
+| `DB_URL` | `jdbc:postgresql://<pooler-host>:5432/postgres?sslmode=require` (운영 Supabase) |
+| `DB_USERNAME` | `postgres.<project-ref>` (운영 Supabase) |
+| `DB_PASSWORD` | 운영 Supabase DB 비밀번호 |
+
+배포 대상(`wonjongwoo01/dasi-siheung-backend`, 스테이지 `main`)과 실행 옵션은 `cd.yml` 에 적혀 있습니다.
+CD 는 배포할 때마다 Cloudtype 설정을 `cd.yml` 내용으로 덮어쓰므로, 설정 변경은 대시보드가 아니라 `cd.yml` 에서 합니다.
 
 ## 배포 준비 (Supabase · Cloudtype)
 
@@ -282,15 +290,25 @@ CI 는 러너에 기본 설치된 PostgreSQL 에 PostGIS 를 apt 로 추가해 �
 
 ### 2. Cloudtype (서버)
 
-1. 스페이스·프로젝트 생성 → 이름을 `CLOUDTYPE_PROJECT` 변수에 `스페이스/프로젝트` 형식으로 등록
-2. 내 계정 설정에서 **API 키 발급** → `CLOUDTYPE_TOKEN`
-3. GitHub 에서 개인 액세스 토큰 발급 → `GHP_TOKEN` (Cloudtype 이 저장소에 배포 키를 등록할 때 사용)
-4. 위 [GitHub 설정값](#github-설정값) 을 모두 등록하고 `main` 에 푸시 (또는 Actions 에서 CD 수동 실행)
-5. 배포 후 Cloudtype 서비스 설정에서 헬스 체크 경로를 `/actuator/health/readiness` 로 지정
-6. 발급된 도메인을 `http/http-client.env.json` 의 `prod.baseUrl` 에 넣고 `.http` 로 운영 서버를 확인
+서비스는 대시보드에서 아래 설정으로 처음 만들고, 이후 배포는 CD 가 담당합니다.
 
-> 배포 설정(`cd.yml` 의 `yaml:`)은 Java 21 + Spring Boot 프리셋(`java@21`, `java-springboot`) 기준입니다.
-> 첫 배포 후 Cloudtype 대시보드의 배포 설정과 다르면 대시보드 값에 맞춰 `cd.yml` 을 조정하세요.
+| 항목 | 값 |
+| --- | --- |
+| 언어 · 버전 | JVM · `java` · 21 |
+| Port | `8080` |
+| Build command | `./gradlew clean bootJar` |
+| Start command | `java -XX:MaxRAMPercentage=75 -jar build/libs/app.jar` |
+| Health Check | `/actuator/health/readiness` |
+| Initial Delay Seconds | `180` (프리티어는 기동에 2~3분 걸림) |
+| Update strategy | `recreate` (프리티어는 인스턴스 1개) |
+| 환경 변수 | `SPRING_PROFILES_ACTIVE=prod`, `TZ=Asia/Seoul`, `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` |
+
+CD 연결 순서
+
+1. Cloudtype 계정 설정에서 **API 키 발급** → `CLOUDTYPE_TOKEN`
+2. GitHub 개인 액세스 토큰(classic, `repo`) 발급 → `GHP_TOKEN` (Cloudtype 이 저장소에 배포 키를 등록할 때 사용)
+3. [GitHub 설정값](#github-설정값) 5개를 등록하고 `main` 에 푸시 (또는 Actions 에서 CD 수동 실행)
+4. 배포 후 `http/*.http` 를 `prod` 환경으로 실행해 운영 서버를 확인
 
 ## 문제 해결
 

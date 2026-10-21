@@ -32,14 +32,13 @@ jobs:
           DB_URL: ${{ secrets.DB_URL }}
           DB_USERNAME: ${{ secrets.DB_USERNAME }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          CLOUDTYPE_PROJECT: ${{ vars.CLOUDTYPE_PROJECT }}
         run: |
           missing=()
-          for name in CLOUDTYPE_TOKEN GHP_TOKEN DB_URL DB_USERNAME DB_PASSWORD CLOUDTYPE_PROJECT; do
+          for name in CLOUDTYPE_TOKEN GHP_TOKEN DB_URL DB_USERNAME DB_PASSWORD; do
             [ -z "${!name}" ] && missing+=("$name")
           done
           if [ ${#missing[@]} -gt 0 ]; then
-            echo "::warning title=배포 건너뜀::설정되지 않은 값: ${missing[*]} (README 의 '배포 준비' 참고)"
+            echo "::warning title=배포 건너뜀::설정되지 않은 Secrets: ${missing[*]} (README 의 '배포 준비' 참고)"
             echo "ready=false" >> "$GITHUB_OUTPUT"
           else
             echo "ready=true" >> "$GITHUB_OUTPUT"
@@ -56,18 +55,25 @@ jobs:
           token: ${{ secrets.CLOUDTYPE_TOKEN }}
           ghtoken: ${{ secrets.GHP_TOKEN }}
 
+      # 설정값은 Cloudtype 대시보드의 CLI 탭(dasi-siheung-backend.yaml)과 같게 유지한다.
+      # 여기 값이 배포 때마다 대시보드 설정을 덮어쓴다.
       - name: Cloudtype 배포 요청
         if: steps.guard.outputs.ready == 'true'
         uses: cloudtype-github-actions/deploy@v1
         with:
           token: ${{ secrets.CLOUDTYPE_TOKEN }}
-          project: ${{ vars.CLOUDTYPE_PROJECT }}
-          stage: ${{ vars.CLOUDTYPE_STAGE || 'main' }}
+          project: wonjongwoo01/dasi-siheung-backend
+          stage: main
           yaml: |
             name: dasi-siheung-backend
             app: java@21
             options:
-              ports: 8080
+              ports: "8080"
+              start: java -XX:MaxRAMPercentage=75 -jar build/libs/app.jar
+              build: ./gradlew clean bootJar
+              healthz: /actuator/health/readiness
+              initialDelaySeconds: "180"
+              strategy: recreate
               env:
                 - name: SPRING_PROFILES_ACTIVE
                   value: prod
@@ -79,10 +85,8 @@ jobs:
                   value: "${{ secrets.DB_USERNAME }}"
                 - name: DB_PASSWORD
                   value: "${{ secrets.DB_PASSWORD }}"
-                - name: CORS_ALLOWED_ORIGINS
-                  value: "${{ vars.CORS_ALLOWED_ORIGINS }}"
+              buildenv: []
             context:
               git:
                 url: git@github.com:${{ github.repository }}.git
                 ref: ${{ github.ref }}
-              preset: java-springboot
