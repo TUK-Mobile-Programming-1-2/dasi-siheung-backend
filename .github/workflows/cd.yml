@@ -20,7 +20,7 @@ jobs:
   deploy:
     name: Cloudtype 배포
     needs: ci
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     environment: production
     steps:
@@ -47,7 +47,7 @@ jobs:
 
       - name: 소스 가져오기
         if: steps.guard.outputs.ready == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Cloudtype 저장소 연결
         if: steps.guard.outputs.ready == 'true'

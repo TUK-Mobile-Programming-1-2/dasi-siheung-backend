@@ -20,6 +20,15 @@ updates:
       # Spring Boot 는 3.x 를 유지한다
       - dependency-name: "org.springframework.boot*"
         update-types: ["version-update:semver-major"]
+      # springdoc 3.x 는 Spring Boot 4 전용
+      - dependency-name: "org.springdoc*"
+        update-types: ["version-update:semver-major"]
+      # restdocs-api-spec 0.20 이상은 Spring Boot 4 전용
+      - dependency-name: "com.epages*"
+        versions: [">= 0.20.0"]
+      # Gradle 은 8.x 를 유지한다
+      - dependency-name: "gradle-wrapper"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
