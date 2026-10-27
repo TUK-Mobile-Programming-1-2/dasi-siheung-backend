@@ -23,6 +23,12 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Member extends BaseTimeEntity {
 
+    /** 탈퇴 회원의 이메일. ".invalid" 는 실제로 존재할 수 없는 예약 도메인이다. */
+    private static final String WITHDRAWN_EMAIL_FORMAT = "withdrawn-%d@deleted.invalid";
+    /** BCrypt 형식이 아니므로 어떤 비밀번호와도 일치하지 않는다. */
+    private static final String WITHDRAWN_PASSWORD_HASH = "WITHDRAWN";
+    private static final String WITHDRAWN_NAME = "탈퇴한 회원";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -98,6 +104,39 @@ public class Member extends BaseTimeEntity {
             }
             throw new BusinessException(ErrorCode.ACCOUNT_SUSPENDED, suspensionMessage());
         }
+    }
+
+    /** 이름·연락처 수정. null 인 값은 바꾸지 않는다. */
+    public void updateProfile(String name, String phone) {
+        if (name != null) {
+            this.name = name.strip();
+        }
+        if (phone != null) {
+            this.phone = normalizePhone(phone);
+        }
+    }
+
+    /** @param newPasswordHash 이미 암호화된 새 비밀번호 */
+    public void changePassword(String newPasswordHash) {
+        this.passwordHash = newPasswordHash;
+    }
+
+    /**
+     * 탈퇴. 다시 로그인할 수 없도록 개인정보를 즉시 지우고 식별할 수 없는 값으로 바꾼다.
+     * 공간·신청 같은 거래 기록은 회원 ID 로만 남는다.
+     */
+    public void withdraw(LocalDateTime now) {
+        this.email = WITHDRAWN_EMAIL_FORMAT.formatted(id);
+        this.passwordHash = WITHDRAWN_PASSWORD_HASH;
+        this.name = WITHDRAWN_NAME;
+        this.phone = null;
+        this.status = MemberStatus.WITHDRAWN;
+        this.suspendedUntil = null;
+        this.withdrawnAt = now;
+    }
+
+    public boolean isWithdrawn() {
+        return status == MemberStatus.WITHDRAWN;
     }
 
     public boolean isActive() {

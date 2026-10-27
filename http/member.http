@@ -1,0 +1,158 @@
+### 준비: 새 이용자 가입
+# 기대값: 201 Created
+POST {{baseUrl}}/api/v1/auth/signup
+Content-Type: application/json
+
+{
+  "email": "http-member-{{$timestamp}}-{{$randomInt}}@test.dasisiheung.com",
+  "password": "password123",
+  "name": "김시흥",
+  "phone": "010-1234-5678",
+  "role": "USER"
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+    client.global.set("memberEmail", response.body.data.email);
+%}
+
+### 준비: 로그인
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{memberEmail}}",
+  "password": "password123"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+    client.global.set("memberToken", response.body.data.accessToken);
+%}
+
+### 내 정보 조회
+# 인증: 로그인
+# 기대값: 200 OK
+# { "data": { "id": 1, "email": "...", "name": "김시흥", "phone": "01012345678", "role": "USER",
+#             "status": "ACTIVE", "createdAt": "2026-10-20T21:00:00" } }
+GET {{baseUrl}}/api/v1/members/me
+Authorization: Bearer {{memberToken}}
+
+> {%
+    client.test("200 OK + 내 정보", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.email === client.global.get("memberEmail"), "이메일이 다릅니다");
+        client.assert(response.body.data.phone === "01012345678", `실제 ${response.body.data.phone}`);
+        client.assert(response.body.data.status === "ACTIVE", `실제 ${response.body.data.status}`);
+    });
+%}
+
+### 내 정보 수정 (휴대폰 번호만)
+# 기대값: 200 OK, phone 만 바뀌고 name 은 유지
+PATCH {{baseUrl}}/api/v1/members/me
+Authorization: Bearer {{memberToken}}
+Content-Type: application/json
+
+{
+  "phone": "010-9876-5432"
+}
+
+> {%
+    client.test("200 OK + 휴대폰 번호만 변경", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.phone === "01098765432", `실제 ${response.body.data.phone}`);
+        client.assert(response.body.data.name === "김시흥", `실제 ${response.body.data.name}`);
+    });
+%}
+
+### 내 정보 수정 — 빈 요청 → 400
+# 기대값: 400 INVALID_INPUT
+PATCH {{baseUrl}}/api/v1/members/me
+Authorization: Bearer {{memberToken}}
+Content-Type: application/json
+
+{}
+
+> {%
+    client.test("400 INVALID_INPUT", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "INVALID_INPUT", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 비밀번호 변경 — 현재 비밀번호 틀림 → 400
+# 기대값: 400 PASSWORD_MISMATCH
+PATCH {{baseUrl}}/api/v1/members/me/password
+Authorization: Bearer {{memberToken}}
+Content-Type: application/json
+
+{
+  "currentPassword": "wrong1234",
+  "newPassword": "newPassword456"
+}
+
+> {%
+    client.test("400 PASSWORD_MISMATCH", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "PASSWORD_MISMATCH", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 비밀번호 변경
+# 기대값: 200 OK
+PATCH {{baseUrl}}/api/v1/members/me/password
+Authorization: Bearer {{memberToken}}
+Content-Type: application/json
+
+{
+  "currentPassword": "password123",
+  "newPassword": "newPassword456"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+%}
+
+### 회원 탈퇴
+# 기대값: 200 OK
+POST {{baseUrl}}/api/v1/members/me/withdraw
+Authorization: Bearer {{memberToken}}
+Content-Type: application/json
+
+{
+  "password": "newPassword456"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+%}
+
+### 탈퇴 후 로그인 → 401
+# 기대값: 401 INVALID_CREDENTIALS
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{memberEmail}}",
+  "password": "newPassword456"
+}
+
+> {%
+    client.test("401 INVALID_CREDENTIALS", () => {
+        client.assert(response.status === 401, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "INVALID_CREDENTIALS", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 탈퇴 후 기존 토큰으로 내 정보 조회 → 404
+# 액세스 토큰은 만료(30분) 전까지 형식상 유효하지만, 탈퇴 회원은 찾을 수 없다.
+# 기대값: 404 MEMBER_NOT_FOUND
+GET {{baseUrl}}/api/v1/members/me
+Authorization: Bearer {{memberToken}}
+
+> {%
+    client.test("404 MEMBER_NOT_FOUND", () => {
+        client.assert(response.status === 404, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "MEMBER_NOT_FOUND", `실제 ${response.body.error.code}`);
+    });
+%}
