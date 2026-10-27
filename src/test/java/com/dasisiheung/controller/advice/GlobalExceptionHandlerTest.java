@@ -1,4 +1,4 @@
-package com.dasisiheung.exception;
+package com.dasisiheung.controller.advice;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.containsInAnyOrder;
@@ -12,12 +12,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.dasisiheung.dto.common.ApiResult;
+import com.dasisiheung.exception.BusinessException;
+import com.dasisiheung.exception.ErrorCode;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.PositiveOrZero;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.web.servlet.MockMvc;
@@ -112,6 +115,15 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    @DisplayName("DB 제약 위반은 409 DATA_CONFLICT 로 응답하고 SQL 메시지를 노출하지 않는다")
+    void dataIntegrityViolation() throws Exception {
+        mockMvc.perform(get("/stub/conflict"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("DATA_CONFLICT"))
+                .andExpect(content().string(not(containsString(StubController.INTERNAL_DETAIL))));
+    }
+
+    @Test
     @DisplayName("인가 예외는 직접 응답하지 않고 Spring Security 로 넘긴다")
     void accessDeniedIsDelegatedToSecurity() {
         assertThatThrownBy(() -> mockMvc.perform(get("/stub/admin-only")))
@@ -137,6 +149,11 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/crash")
         ApiResult<Void> crash() {
             throw new IllegalStateException(INTERNAL_DETAIL);
+        }
+
+        @GetMapping("/conflict")
+        ApiResult<Void> conflict() {
+            throw new DataIntegrityViolationException(INTERNAL_DETAIL);
         }
 
         @GetMapping("/admin-only")

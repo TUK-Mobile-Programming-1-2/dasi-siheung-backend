@@ -1,11 +1,16 @@
-package com.dasisiheung.exception;
+package com.dasisiheung.controller.advice;
 
 import com.dasisiheung.dto.common.ApiResult;
 import com.dasisiheung.dto.common.ErrorResponse;
 import com.dasisiheung.dto.common.ErrorResponse.FieldErrorDetail;
+import com.dasisiheung.exception.BusinessException;
+import com.dasisiheung.exception.ErrorCode;
 import java.util.List;
 import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
@@ -21,6 +26,11 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+/**
+ * 컨트롤러에서 발생한 예외를 공통 응답 형식({@link ApiResult})으로 바꾼다.
+ * <p>
+ * 웹 계층의 관심사이므로 controller 패키지에 둔다. (exception 패키지는 dto 를 모른다)
+ */
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -29,7 +39,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResult<Void>> handleBusinessException(BusinessException e) {
         log.debug("비즈니스 예외: {}", e.getMessage());
         ErrorCode errorCode = e.getErrorCode();
-        return toResponse(errorCode, errorCode.toErrorResponse(e.getMessage()));
+        return toResponse(errorCode, ErrorResponse.of(errorCode, e.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -74,6 +84,19 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 동시에 같은 데이터를 바꾸려다 DB 제약·잠금에 걸린 경우. 내부 SQL 메시지는 노출하지 않는다.
+     */
+    @ExceptionHandler({
+            DataIntegrityViolationException.class,
+            OptimisticLockingFailureException.class,
+            PessimisticLockingFailureException.class
+    })
+    public ResponseEntity<ApiResult<Void>> handleDataConflict(RuntimeException e) {
+        log.warn("데이터 충돌: {}", e.getMessage());
+        return toResponse(ErrorCode.DATA_CONFLICT);
+    }
+
+    /**
      * 인증·인가 예외는 다시 던져 Spring Security 의 ExceptionTranslationFilter 가
      * 미인증(401)과 권한 부족(403)을 구분해 처리하게 한다.
      */
@@ -95,11 +118,11 @@ public class GlobalExceptionHandler {
     }
 
     private ResponseEntity<ApiResult<Void>> toInvalidInputResponse(List<FieldErrorDetail> fieldErrors) {
-        return toResponse(ErrorCode.INVALID_INPUT, ErrorCode.INVALID_INPUT.toErrorResponse(fieldErrors));
+        return toResponse(ErrorCode.INVALID_INPUT, ErrorResponse.of(ErrorCode.INVALID_INPUT, fieldErrors));
     }
 
     private ResponseEntity<ApiResult<Void>> toResponse(ErrorCode errorCode) {
-        return toResponse(errorCode, errorCode.toErrorResponse());
+        return toResponse(errorCode, ErrorResponse.of(errorCode));
     }
 
     private ResponseEntity<ApiResult<Void>> toResponse(ErrorCode errorCode, ErrorResponse errorResponse) {
