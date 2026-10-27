@@ -15,6 +15,11 @@ logging:
     org.hibernate.SQL: debug
     org.hibernate.orm.jdbc.bind: trace
 
+# 로컬·CI 전용 기본 키. 운영(prod)에는 이 값이 없으므로 JWT_SECRET 을 넣지 않으면 기동되지 않는다.
+app:
+  jwt:
+    secret: ${JWT_SECRET:local-development-only-jwt-secret-key-0123456789}
+
 management:
   endpoint:
     health:
