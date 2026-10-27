@@ -1,5 +1,6 @@
 package com.dasisiheung.entity.member;
 
+import com.dasisiheung.entity.LabeledEnum;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
@@ -8,7 +9,7 @@ import lombok.RequiredArgsConstructor;
  */
 @Getter
 @RequiredArgsConstructor
-public enum Role {
+public enum Role implements LabeledEnum {
 
     USER("이용자", true),
     PROVIDER("공간 제공자", true),
