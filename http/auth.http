@@ -156,12 +156,15 @@ Content-Type: application/json
 }
 
 > {%
+    // client.test 콜백은 핸들러 본문이 끝난 뒤 실행되므로, 덮어쓰기 전에 이전 토큰을 잡아 둔다
+    const usedRefreshToken = client.global.get("authRefreshToken");
+    const newRefreshToken = response.body.data.refreshToken;
     client.test("200 OK + 새 리프레시 토큰", () => {
         client.assert(response.status === 200, `기대 200, 실제 ${response.status}`);
-        client.assert(response.body.data.refreshToken !== client.global.get("authRefreshToken"), "토큰이 교체되지 않았습니다");
+        client.assert(newRefreshToken !== usedRefreshToken, "토큰이 교체되지 않았습니다");
     });
-    client.global.set("authUsedRefreshToken", client.global.get("authRefreshToken"));
-    client.global.set("authRefreshToken", response.body.data.refreshToken);
+    client.global.set("authUsedRefreshToken", usedRefreshToken);
+    client.global.set("authRefreshToken", newRefreshToken);
     client.global.set("authAccessToken", response.body.data.accessToken);
 %}
 
