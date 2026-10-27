@@ -3,6 +3,14 @@ name: CD
 on:
   push:
     branches: [main]
+    # 문서·요청 예시만 바뀐 머지는 서버 동작이 같으므로 재배포하지 않는다.
+    # (PR 단계의 CI 는 그대로 실행된다. 필요하면 Actions 에서 수동 실행)
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "http/**"
+      - ".github/pull_request_template.md"
+      - ".github/dependabot.yml"
   workflow_dispatch:
 
 permissions:

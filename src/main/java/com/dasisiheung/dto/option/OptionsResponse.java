@@ -1,0 +1,16 @@
+package com.dasisiheung.dto.option;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.List;
+
+/** 앱·관리자 웹의 선택 목록(드롭다운·칩)에 쓰는 코드와 이름. 코드는 바뀌지 않고 이름만 바뀔 수 있다. */
+public record OptionsResponse(
+        @Schema(description = "가입할 수 있는 역할") List<OptionItem> signupRoles,
+        @Schema(description = "서비스 지역") List<OptionItem> regions,
+        @Schema(description = "허용 활동 · 신청 활동 종류") List<OptionItem> activityTypes,
+        @Schema(description = "보유 시설") List<OptionItem> facilities,
+        @Schema(description = "건축물 용도") List<OptionItem> buildingUses,
+        @Schema(description = "상권 테마") List<OptionItem> commercialThemes,
+        @Schema(description = "이용 목적") List<OptionItem> usePurposes
+) {
+}

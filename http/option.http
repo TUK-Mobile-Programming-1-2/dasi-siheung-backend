@@ -1,0 +1,30 @@
+### 선택지 조회
+# 인증: 공개
+# 기대값: 200 OK, Cache-Control: max-age=3600, public
+# { "data": { "signupRoles": [{ "code": "USER", "label": "이용자" }, ...],
+#             "regions": [{ "code": "JEONGWANG", "label": "정왕동" }, ...],
+#             "activityTypes": [...], "facilities": [...], "buildingUses": [...],
+#             "commercialThemes": [...], "usePurposes": [...] } }
+GET {{baseUrl}}/api/v1/options
+
+> {%
+    client.test("200 OK + 캐시 헤더", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(String(response.headers.valueOf("Cache-Control")).includes("max-age=3600"),
+            `실제 ${response.headers.valueOf("Cache-Control")}`);
+    });
+    client.test("가입 역할에 관리자 없음", () => {
+        const roles = response.body.data.signupRoles.map(o => o.code);
+        client.assert(roles.length === 2 && !roles.includes("ADMIN"), `실제 ${roles}`);
+    });
+    client.test("지역 3곳", () => {
+        const regions = response.body.data.regions.map(o => o.code);
+        client.assert(regions.join() === "JEONGWANG,GEOBUKSEOM,BAEGOT", `실제 ${regions}`);
+    });
+    client.test("모든 그룹이 code·label 을 가진다", () => {
+        for (const [group, items] of Object.entries(response.body.data)) {
+            client.assert(Array.isArray(items) && items.length > 0, `${group} 이 비어 있습니다`);
+            items.forEach(o => client.assert(o.code && o.label, `${group} 항목 형식 오류`));
+        }
+    });
+%}

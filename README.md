@@ -241,7 +241,7 @@ flowchart LR
 | 워크플로 | 실행 시점 | 하는 일 |
 | --- | --- | --- |
 | `ci.yml` | 모든 PR, `develop`·`test` 푸시 | 빌드·테스트, 커버리지, 명세 최신 여부 경고, `.http` 시나리오 검증 |
-| `cd.yml` | `main` 푸시, 수동 실행 | CI 통과 후 Cloudtype 배포 |
+| `cd.yml` | `main` 푸시(문서·`.http` 만 바뀐 경우 제외), 수동 실행 | CI 통과 후 Cloudtype 배포 |
 | `dependabot.yml` | 매주 월요일 | 의존성 업데이트 PR (Spring Boot 는 3.x 유지) |
 
 CI 는 러너에 기본 설치된 PostgreSQL 에 PostGIS 를 apt 로 추가해 테스트 DB로 쓰고(`.github/actions/setup-postgis`),
