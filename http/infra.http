@@ -18,7 +18,7 @@ GET {{baseUrl}}/actuator/health
 #   "success": false,
 #   "error": { "code": "UNAUTHORIZED", "message": "인증이 필요합니다." }
 # }
-GET {{baseUrl}}/api/v1/spaces
+GET {{baseUrl}}/api/v1/members/me
 Accept: application/json
 
 > {%
