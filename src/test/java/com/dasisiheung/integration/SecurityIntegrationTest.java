@@ -53,7 +53,7 @@ class SecurityIntegrationTest {
     @Test
     @DisplayName("인증 없이 보호된 API 를 호출하면 401 과 공통 오류 형식을 반환한다")
     void protectedApiRequiresAuthentication() throws Exception {
-        mockMvc.perform(get("/api/v1/spaces"))
+        mockMvc.perform(get("/api/v1/members/me"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"))

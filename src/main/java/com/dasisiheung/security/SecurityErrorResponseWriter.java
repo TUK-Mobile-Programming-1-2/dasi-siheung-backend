@@ -1,6 +1,7 @@
 package com.dasisiheung.security;
 
 import com.dasisiheung.dto.common.ApiResult;
+import com.dasisiheung.dto.common.ErrorResponse;
 import com.dasisiheung.exception.ErrorCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
@@ -23,6 +24,6 @@ public class SecurityErrorResponseWriter {
         response.setStatus(errorCode.getStatus().value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        objectMapper.writeValue(response.getWriter(), ApiResult.fail(errorCode.toErrorResponse()));
+        objectMapper.writeValue(response.getWriter(), ApiResult.fail(ErrorResponse.of(errorCode)));
     }
 }

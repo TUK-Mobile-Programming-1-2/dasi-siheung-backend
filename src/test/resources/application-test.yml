@@ -12,3 +12,7 @@ spring:
 logging:
   level:
     org.hibernate.SQL: debug
+
+app:
+  jwt:
+    secret: test-only-jwt-secret-key-for-dasi-siheung-0123456789

@@ -1,5 +1,6 @@
 package com.dasisiheung.dto.common;
 
+import com.dasisiheung.exception.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
@@ -15,8 +16,16 @@ public record ErrorResponse(
         fieldErrors = fieldErrors == null ? List.of() : List.copyOf(fieldErrors);
     }
 
-    public static ErrorResponse of(String code, String message) {
-        return new ErrorResponse(code, message, List.of());
+    public static ErrorResponse of(ErrorCode errorCode) {
+        return of(errorCode, errorCode.getMessage());
+    }
+
+    public static ErrorResponse of(ErrorCode errorCode, String message) {
+        return new ErrorResponse(errorCode.name(), message, List.of());
+    }
+
+    public static ErrorResponse of(ErrorCode errorCode, List<FieldErrorDetail> fieldErrors) {
+        return new ErrorResponse(errorCode.name(), errorCode.getMessage(), fieldErrors);
     }
 
     public record FieldErrorDetail(

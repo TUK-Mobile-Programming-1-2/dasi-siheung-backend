@@ -8,25 +8,19 @@ import static org.springframework.restdocs.payload.PayloadDocumentation.response
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.dasisiheung.config.ClockConfig;
 import com.dasisiheung.support.ApiDocsTest;
 import com.epages.restdocs.apispec.ResourceSnippetParameters;
-import java.time.Clock;
-import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
 import org.springframework.restdocs.payload.FieldDescriptor;
 import org.springframework.restdocs.payload.JsonFieldType;
 import org.springframework.test.web.servlet.MockMvc;
 
+/** 현재 시각은 {@link com.dasisiheung.support.FixedClockConfig} 가 2026-10-20 21:00 KST 로 고정한다. */
 @ApiDocsTest(SystemController.class)
 class SystemControllerTest {
-
-    private static final Instant FIXED_NOW = Instant.parse("2026-10-20T12:00:00Z");
 
     @Autowired
     private MockMvc mockMvc;
@@ -56,12 +50,4 @@ class SystemControllerTest {
                         responseFields(pingFields)));
     }
 
-    @TestConfiguration(proxyBeanMethods = false)
-    static class FixedClockConfig {
-
-        @Bean
-        Clock clock() {
-            return Clock.fixed(FIXED_NOW, ClockConfig.SERVICE_ZONE);
-        }
-    }
 }
