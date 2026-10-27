@@ -145,6 +145,8 @@ flowchart LR
 | `INVALID_REFRESH_TOKEN` | 401 | 리프레시 토큰 만료·폐기·재사용 | 로그인 화면으로 이동 |
 | `ACCOUNT_SUSPENDED` | 403 | 이용 정지된 계정으로 로그인 | `error.message` 그대로 표시 (해제 예정일 포함) |
 | `MEMBER_NOT_FOUND` | 404 | 없는 회원 | "찾을 수 없습니다" 안내 |
+| `PASSWORD_MISMATCH` | 400 | 비밀번호 변경·탈퇴 시 현재 비밀번호 불일치 | 비밀번호 입력칸에 사유 표시 |
+| `SAME_AS_CURRENT_PASSWORD` | 400 | 새 비밀번호가 현재와 같음 | "다른 비밀번호를 입력하세요" |
 
 ### 3-4. 인증 (JWT)
 
@@ -509,3 +511,11 @@ try {
 | POST | `/api/v1/auth/refresh` | 공개 | 토큰 재발급 (리프레시 토큰 교체) |
 | POST | `/api/v1/auth/logout` | 공개 | 로그아웃 (리프레시 토큰 폐기) |
 
+### 내 정보 (`http/member.http`)
+
+| 메서드 | 경로 | 인증 | 설명 |
+| --- | --- | --- | --- |
+| GET | `/api/v1/members/me` | 로그인 | 내 정보 조회 |
+| PATCH | `/api/v1/members/me` | 로그인 | 이름·휴대폰 번호 수정 (보낸 값만) |
+| PATCH | `/api/v1/members/me/password` | 로그인 | 비밀번호 변경 (다른 기기 로그아웃) |
+| POST | `/api/v1/members/me/withdraw` | 로그인 | 회원 탈퇴 (개인정보 즉시 삭제) |
