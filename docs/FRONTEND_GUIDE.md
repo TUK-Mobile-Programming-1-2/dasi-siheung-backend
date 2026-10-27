@@ -17,6 +17,7 @@
 6. [API 확인하는 방법](#6-api-확인하는-방법)
 7. [API 변경 사항 주고받기](#7-api-변경-사항-주고받기)
 8. [문제 해결](#8-문제-해결)
+9. [기능별 API 목록](#9-기능별-api-목록)
 
 ---
 
@@ -81,7 +82,7 @@ flowchart LR
 | 경로 | 모든 API는 `/api/v1/...` 로 시작 |
 | 본문 형식 | JSON (`Content-Type: application/json`), UTF-8 |
 | 시각 | ISO-8601 문자열, 서울 시간 (`2026-10-22T00:30:00+09:00`) |
-| 인증 | `Authorization: Bearer <토큰>` 헤더 (로그인 기능 개발 후 적용, 아래 3-4 참고) |
+| 인증 | `Authorization: Bearer <액세스 토큰>` 헤더 (아래 3-4 참고) |
 
 ### 3-2. 응답 형식
 
@@ -123,20 +124,49 @@ flowchart LR
 | `error.code` | HTTP 상태 | 언제 | 화면 처리 예시 |
 | --- | --- | --- | --- |
 | `INVALID_INPUT` | 400 | 필수값 누락, 형식 오류, 숫자 자리에 문자 등 | `fieldErrors` 로 해당 입력칸 아래에 사유 표시 |
-| `UNAUTHORIZED` | 401 | 로그인하지 않았거나 토큰 만료 | 로그인 화면으로 이동 |
-| `FORBIDDEN` | 403 | 로그인했지만 권한 없음 (예: 이용자가 관리자 기능 호출) | "권한이 없습니다" 안내 |
-| `RESOURCE_NOT_FOUND` | 404 | 없는 데이터·주소 | "찾을 수 없습니다" 안내 |
+| `UNAUTHORIZED` | 401 | 토큰 없이 로그인이 필요한 API 호출 | 로그인 화면으로 이동 |
+| `FORBIDDEN` | 403 | 로그인했지만 역할 권한 없음 (예: 이용자가 관리자 기능 호출) | "권한이 없습니다" 안내 |
+| `RESOURCE_NOT_FOUND` | 404 | 없는 주소 | "찾을 수 없습니다" 안내 |
 | `METHOD_NOT_ALLOWED` | 405 | GET/POST 등을 잘못 씀 | 개발 중 실수 → 백엔드 담당에게 문의 |
 | `UNSUPPORTED_MEDIA_TYPE` | 415 | JSON이 아닌 본문 전송 | `Content-Type: application/json` 확인 |
+| `DATA_CONFLICT` | 409 | 같은 데이터를 동시에 수정함 | 새로고침 후 다시 시도 안내 |
 | `INTERNAL_SERVER_ERROR` | 500 | 서버 오류 | "잠시 후 다시 시도" 안내 + 백엔드 담당에게 제보 |
 
-예약 기간 중복처럼 **기능별 오류 코드는 해당 API를 만들 때 이 표에 추가**하고 공지합니다.
+<!-- ERROR_CODES_BY_FEATURE -->
+**인증 · 회원**
 
-### 3-4. 인증 (예정)
+| `error.code` | HTTP 상태 | 언제 | 화면 처리 예시 |
+| --- | --- | --- | --- |
+| `DUPLICATE_EMAIL` | 409 | 이미 가입된 이메일로 가입 | 이메일 입력칸에 "이미 가입된 이메일" |
+| `ROLE_NOT_ALLOWED` | 400 | 가입 역할로 ADMIN 을 보냄 | 개발 중 실수 (가입은 USER / PROVIDER 만) |
+| `INVALID_CREDENTIALS` | 401 | 이메일·비밀번호 불일치, 탈퇴 계정 | "이메일 또는 비밀번호를 확인하세요" |
+| `INVALID_TOKEN` | 401 | 위조·손상된 액세스 토큰 | 저장된 토큰 삭제 후 로그인 화면 |
+| `EXPIRED_TOKEN` | 401 | 액세스 토큰 만료 (30분) | **재발급 API 호출 후 원래 요청 재시도** |
+| `INVALID_REFRESH_TOKEN` | 401 | 리프레시 토큰 만료·폐기·재사용 | 로그인 화면으로 이동 |
+| `ACCOUNT_SUSPENDED` | 403 | 이용 정지된 계정으로 로그인 | `error.message` 그대로 표시 (해제 예정일 포함) |
+| `MEMBER_NOT_FOUND` | 404 | 없는 회원 | "찾을 수 없습니다" 안내 |
 
-- 로그인 기능이 생기면 로그인 API가 토큰을 돌려줍니다. 이후 요청에는 `Authorization: Bearer <토큰>` 헤더를 붙입니다.
-- 지금 인증 없이 호출할 수 있는 API는 **연결 확인(`/api/v1/system/**`)** 뿐입니다. 그 외 주소는 401을 응답합니다.
-- 역할은 **이용자 / 공간 제공자 / 관리자** 로 나뉘고, 역할에 맞지 않는 API는 403을 응답합니다.
+### 3-4. 인증 (JWT)
+
+| 토큰 | 유효 시간 | 쓰는 곳 |
+| --- | --- | --- |
+| 액세스 토큰 (JWT) | 30분 | 모든 요청의 `Authorization: Bearer {accessToken}` 헤더 |
+| 리프레시 토큰 | 14일 | 액세스 토큰이 만료됐을 때 `POST /api/v1/auth/refresh` 로 새 토큰 받기 |
+
+```
+로그인 ─▶ accessToken + refreshToken 저장 (앱: EncryptedSharedPreferences / 웹: 메모리 + localStorage)
+  │
+  ├─ API 호출 ── 200 ─▶ 정상
+  │      └──── 401 EXPIRED_TOKEN ─▶ /auth/refresh ─▶ 새 토큰 2개로 교체 저장 ─▶ 원래 요청 재시도
+  │                                      └── 401 INVALID_REFRESH_TOKEN ─▶ 로그인 화면
+  └─ 로그아웃 ─▶ /auth/logout (refreshToken 폐기) ─▶ 저장된 토큰 삭제
+```
+
+- **재발급하면 리프레시 토큰도 새 값으로 바뀝니다.** 이전 리프레시 토큰은 바로 폐기되므로 반드시 둘 다 교체 저장하세요.
+- 여러 요청이 동시에 `EXPIRED_TOKEN` 을 받으면 재발급은 **한 번만** 호출하고 나머지는 그 결과를 기다리게 하세요. (같은 리프레시 토큰으로 두 번 재발급하면 두 번째는 실패)
+- 역할은 **이용자(USER) / 공간 제공자(PROVIDER) / 관리자(ADMIN)** 입니다. 역할에 맞지 않는 API는 403 `FORBIDDEN` 입니다.
+- 관리자는 가입할 수 없고 백엔드 담당이 DB에서 승격합니다. 승격 직후에는 **다시 로그인**해야 관리자 권한이 토큰에 반영됩니다.
+- 로그인 없이 호출할 수 있는 API: 연결 확인(`/api/v1/system/**`), 회원가입·로그인·재발급·로그아웃(`/api/v1/auth/**`)
 
 ---
 
@@ -461,3 +491,21 @@ try {
 ---
 
 **문의 · 요청 · 장애 제보: 원종우(갠톡 주세요)**
+
+---
+
+## 9. 기능별 API 목록
+
+요청·응답 필드는 Swagger UI 에서, 호출 순서와 기대값은 `http/*.http` 에서 확인하세요.
+인증 열: **공개** = 토큰 없이 호출 / **로그인** = 역할 무관 / **USER·PROVIDER·ADMIN** = 해당 역할만
+
+<!-- API_LIST -->
+### 인증 (`http/auth.http`)
+
+| 메서드 | 경로 | 인증 | 설명 |
+| --- | --- | --- | --- |
+| POST | `/api/v1/auth/signup` | 공개 | 회원가입 (USER / PROVIDER) |
+| POST | `/api/v1/auth/login` | 공개 | 로그인 → 액세스·리프레시 토큰 |
+| POST | `/api/v1/auth/refresh` | 공개 | 토큰 재발급 (리프레시 토큰 교체) |
+| POST | `/api/v1/auth/logout` | 공개 | 로그아웃 (리프레시 토큰 폐기) |
+

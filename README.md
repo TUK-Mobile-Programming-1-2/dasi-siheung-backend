@@ -46,7 +46,7 @@
 | --- | --- |
 | 언어 · 프레임워크 | Java 21, Spring Boot 3.5.16 |
 | 데이터 | PostgreSQL 17, PostGIS 3.5, Spring Data JPA, Hibernate Spatial, Flyway |
-| 보안 | Spring Security (Stateless, JWT 예정) |
+| 보안 | Spring Security (Stateless), JWT(jjwt) — 액세스 30분 · 리프레시 14일(재발급마다 교체) |
 | API 문서 | springdoc(Swagger UI), Spring REST Docs → OpenAPI 3 (`openapi3.yaml`) |
 | 테스트 | JUnit 5, MockMvc, Spring REST Docs, ArchUnit, IntelliJ HTTP Client |
 | 빌드 · 배포 | Gradle 8.14, GitHub Actions, Cloudtype(서버), Supabase(DB) |
@@ -79,16 +79,18 @@ src/main/java/com/dasisiheung
 ├── repository   Spring Data JPA, PostGIS 공간 쿼리
 ├── entity       JPA 엔티티 (BaseTimeEntity: 생성·수정 시각 자동 기록)
 ├── dto          요청·응답 객체 (common: 공통 응답 형식)
-├── exception    ErrorCode, BusinessException, 전역 예외 처리
-├── security     보안 필터 단계의 401/403 JSON 응답
-├── config       Security, CORS, JPA Auditing, Clock, OpenAPI 설정
+│   └── advice   전역 예외 처리 (예외 → 공통 응답 형식)
+├── exception    ErrorCode, BusinessException
+├── security     JWT 발급·검증 필터, 로그인 회원 주입(@LoginMember), 401/403 JSON 응답
+├── scheduler    정기 작업 (만료 토큰 정리 등)
+├── config       Security, CORS, JPA Auditing, Clock, OpenAPI, 스케줄링 설정
 └── util         GeoPoints (위도·경도 → WGS84 Point)
 
 src/main/resources
 ├── application.yml          공통 설정
 ├── application-local.yml    로컬 (기본 프로필)
 ├── application-prod.yml     운영 (Cloudtype + Supabase)
-├── db/migration             Flyway 마이그레이션 (V1: PostGIS 활성화)
+├── db/migration             Flyway 마이그레이션 (V1 PostGIS → V2 회원 → V3 리프레시 토큰 …)
 └── static/docs/openapi3.yaml   테스트로 검증된 API 명세
 
 http/                        IntelliJ HTTP Client 요청 + 기대값 검증
@@ -201,19 +203,8 @@ GET {{baseUrl}}/api/v1/system/ping
 }
 ```
 
-클라이언트는 `error.code` 로 분기합니다.
-
-| code | HTTP | 상황 |
-| --- | --- | --- |
-| `INVALID_INPUT` | 400 | 입력 검증 실패, JSON 형식 오류, 파라미터 타입 오류 |
-| `UNAUTHORIZED` | 401 | 인증 정보 없음 |
-| `FORBIDDEN` | 403 | 역할 권한 부족 |
-| `RESOURCE_NOT_FOUND` | 404 | 없는 리소스·경로 |
-| `METHOD_NOT_ALLOWED` | 405 | 지원하지 않는 HTTP 메서드 |
-| `UNSUPPORTED_MEDIA_TYPE` | 415 | JSON 이 아닌 요청 본문 |
-| `INTERNAL_SERVER_ERROR` | 500 | 서버 오류 (내부 메시지는 노출하지 않음) |
-
-도메인 오류(예: 예약 기간 중복)는 기능 개발 시 `ErrorCode` 에 추가합니다.
+클라이언트는 `error.code` 로 분기합니다. 전체 오류 코드와 화면 처리 예시는 [연동 가이드 3-3](docs/FRONTEND_GUIDE.md#3-3-오류-코드) 에 정리합니다.
+새 오류는 `ErrorCode` 에 추가하고 연동 가이드 표도 함께 갱신합니다.
 
 ## 테스트
 
@@ -269,6 +260,7 @@ CI 는 러너에 기본 설치된 PostgreSQL 에 PostGIS 를 apt 로 추가해 �
 | `DB_URL` | `jdbc:postgresql://<pooler-host>:5432/postgres?sslmode=require` (운영 Supabase) |
 | `DB_USERNAME` | `postgres.<project-ref>` (운영 Supabase) |
 | `DB_PASSWORD` | 운영 Supabase DB 비밀번호 |
+| `JWT_SECRET` | JWT 서명 키. 32바이트 이상 임의 문자열 (`openssl rand -base64 48`) |
 
 배포 대상(`wonjongwoo01/dasi-siheung-backend`, 스테이지 `main`)과 실행 옵션은 `cd.yml` 에 적혀 있습니다.
 CD 는 배포할 때마다 Cloudtype 설정을 `cd.yml` 내용으로 덮어쓰므로, 설정 변경은 대시보드가 아니라 `cd.yml` 에서 합니다.
@@ -303,12 +295,12 @@ CD 는 배포할 때마다 Cloudtype 설정을 `cd.yml` 내용으로 덮어쓰�
 | Health Check | `/actuator/health/readiness` |
 | Initial Delay Seconds | `180` (프리티어는 기동에 2~3분 걸림) |
 | Update strategy | `recreate` (프리티어는 인스턴스 1개) |
-| 환경 변수 | `SPRING_PROFILES_ACTIVE=prod`, `TZ=Asia/Seoul`, `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` |
+| 환경 변수 | `SPRING_PROFILES_ACTIVE=prod`, `TZ=Asia/Seoul`, `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET` |
 
 CD 연결 순서
 
 1. Cloudtype 계정 설정에서 **API 키 발급** → `CLOUDTYPE_TOKEN`
-2. [GitHub 설정값](#github-설정값) 4개를 등록하고 `main` 에 푸시 (또는 Actions 에서 CD 수동 실행)
+2. [GitHub 설정값](#github-설정값)을 모두 등록하고 `main` 에 푸시 (또는 Actions 에서 CD 수동 실행)
 3. 배포 후 `http/*.http` 를 `prod` 환경으로 실행해 운영 서버를 확인
 
 > 조직 정책상 저장소 Deploy key 를 쓸 수 없어서, 소스는 Cloudtype GitHub 앱 권한(https)으로 가져옵니다.
@@ -321,6 +313,7 @@ CD 연결 순서
 | 통합 테스트가 모두 `SKIPPED` | `TEST_DB_URL` 이 없음. 개발용 DB를 지정하거나 CI 결과로 확인 |
 | `type "geometry" does not exist` | 접속한 DB에 PostGIS 가 없음. Supabase 는 Extensions 에서 `postgis` 활성화, 로컬은 PostGIS 포함 설치본 사용 |
 | CI 에 "API 명세 갱신 필요" 경고 | `./gradlew generateApiDocs` 실행 후 `openapi3.yaml` 을 함께 커밋 |
+| 운영 기동 시 `app.jwt.secret(환경 변수 JWT_SECRET)은 32바이트 이상` 오류 | GitHub Secrets 에 `JWT_SECRET` 이 없거나 짧음. 등록 후 CD 재실행 |
 | 운영에서 DB 연결 실패 | `DB_URL` 이 Session pooler 주소인지, `?sslmode=require` 가 붙었는지, 사용자명이 `postgres.<ref>` 인지 확인 |
 
 ---
