@@ -35,17 +35,20 @@ public record ProviderSpaceResponse(
         @Schema(description = "보유 시설") List<Facility> facilities,
         @Schema(description = "허용 활동") List<ActivityType> activityTypes,
         @Schema(description = "사용 가능 날짜 (오름차순)") List<LocalDate> availableDates,
+        @Schema(description = "사진 (순서대로, 첫 번째가 대표)") List<SpacePhotoResponse> photos,
+        @Schema(description = "권한 증빙 (임시 주소 포함)") List<SpaceProofResponse> proofs,
         @Schema(description = "등록 시각") LocalDateTime createdAt,
         @Schema(description = "마지막 수정 시각") LocalDateTime updatedAt
 ) {
 
-    public static ProviderSpaceResponse from(Space space) {
+    public static ProviderSpaceResponse of(Space space, List<SpacePhotoResponse> photos,
+                                           List<SpaceProofResponse> proofs) {
         return new ProviderSpaceResponse(space.getId(), space.getStatus(), space.getReviewComment(),
                 space.getReviewedAt(), space.getRegion(), space.getTitle(), space.getDescription(), space.getRules(),
                 space.getAddress(), space.getBuildingName(), space.getUnitNumber(), space.latitude(),
                 space.longitude(), space.getAreaSqm(), space.getBuildingUse(), space.getCommercialTheme(),
                 space.getDailyPrice(), SpaceResponses.sorted(space.getFacilities()),
                 SpaceResponses.sorted(space.getActivityTypes()), SpaceResponses.sorted(space.getAvailableDates()),
-                space.getCreatedAt(), space.getUpdatedAt());
+                photos, proofs, space.getCreatedAt(), space.getUpdatedAt());
     }
 }
