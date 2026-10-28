@@ -4,6 +4,7 @@ import com.dasisiheung.entity.BaseTimeEntity;
 import com.dasisiheung.entity.member.Member;
 import com.dasisiheung.exception.BusinessException;
 import com.dasisiheung.exception.ErrorCode;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
@@ -16,12 +17,17 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import lombok.AccessLevel;
@@ -37,6 +43,8 @@ public class Space extends BaseTimeEntity {
 
     /** 가능 날짜는 오늘부터 이 기간 안에서만 지정할 수 있다. */
     public static final int AVAILABLE_DATE_WINDOW_DAYS = 365;
+    public static final int MAX_PHOTOS = 10;
+    public static final int MAX_PROOFS = 5;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -116,6 +124,14 @@ public class Space extends BaseTimeEntity {
     @Column(name = "available_date", nullable = false)
     private Set<LocalDate> availableDates = new HashSet<>();
 
+    @OneToMany(mappedBy = "space", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sortOrder ASC, id ASC")
+    private List<SpacePhoto> photos = new ArrayList<>();
+
+    @OneToMany(mappedBy = "space", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("id ASC")
+    private List<SpaceProof> proofs = new ArrayList<>();
+
     private Space(Member provider, Region region, SpaceDetails details) {
         this.provider = provider;
         this.status = SpaceStatus.PENDING_REVIEW;
@@ -132,6 +148,96 @@ public class Space extends BaseTimeEntity {
 
     public boolean isOwnedBy(Long memberId) {
         return provider.getId().equals(memberId);
+    }
+
+    /** @throws BusinessException 본인 공간이 아니면 NOT_SPACE_OWNER */
+    public void validateOwner(Long memberId) {
+        if (!isOwnedBy(memberId)) {
+            throw new BusinessException(ErrorCode.NOT_SPACE_OWNER);
+        }
+    }
+
+    /** @throws BusinessException 관리자가 숨긴 공간이면 SPACE_NOT_EDITABLE */
+    public void validateEditable() {
+        if (status == SpaceStatus.HIDDEN) {
+            throw new BusinessException(ErrorCode.SPACE_NOT_EDITABLE);
+        }
+    }
+
+    /** 사진을 맨 뒤에 추가한다. */
+    public SpacePhoto addPhoto(String storagePath, LocalDateTime now) {
+        validateEditable();
+        if (photos.size() >= MAX_PHOTOS) {
+            throw new BusinessException(ErrorCode.SPACE_PHOTO_LIMIT_EXCEEDED);
+        }
+        int nextOrder = photos.stream().mapToInt(SpacePhoto::getSortOrder).max().orElse(-1) + 1;
+        SpacePhoto photo = new SpacePhoto(this, storagePath, nextOrder, now);
+        photos.add(photo);
+        return photo;
+    }
+
+    public void validateCanAddPhotos(int count) {
+        validateEditable();
+        if (photos.size() + count > MAX_PHOTOS) {
+            throw new BusinessException(ErrorCode.SPACE_PHOTO_LIMIT_EXCEEDED,
+                    "사진은 최대 %d장까지 올릴 수 있습니다. (현재 %d장)".formatted(MAX_PHOTOS, photos.size()));
+        }
+    }
+
+    /** @return 지운 사진 (저장소 파일 삭제용) */
+    public SpacePhoto removePhoto(Long photoId) {
+        validateEditable();
+        SpacePhoto photo = photos.stream().filter(p -> p.getId().equals(photoId)).findFirst()
+                .orElseThrow(() -> new BusinessException(ErrorCode.SPACE_PHOTO_NOT_FOUND));
+        photos.remove(photo);
+        return photo;
+    }
+
+    /**
+     * 사진 순서를 바꾼다. 첫 번째가 대표 사진이 된다.
+     *
+     * @param photoIds 이 공간의 모든 사진 ID 를 원하는 순서대로 한 번씩
+     */
+    public void reorderPhotos(List<Long> photoIds) {
+        validateEditable();
+        Set<Long> currentIds = new HashSet<>();
+        photos.forEach(photo -> currentIds.add(photo.getId()));
+        if (photoIds.size() != photos.size() || !currentIds.equals(new HashSet<>(photoIds))) {
+            throw new BusinessException(ErrorCode.INVALID_PHOTO_ORDER);
+        }
+        for (SpacePhoto photo : photos) {
+            photo.moveTo(photoIds.indexOf(photo.getId()));
+        }
+        photos.sort(Comparator.comparingInt(SpacePhoto::getSortOrder));
+    }
+
+    /** 증빙이 바뀌면 공개 중인 공간도 다시 검수받는다. */
+    public SpaceProof addProof(ProofType proofType, SpaceProof.StoredProofFile file, LocalDateTime now) {
+        validateEditable();
+        if (proofs.size() >= MAX_PROOFS) {
+            throw new BusinessException(ErrorCode.SPACE_PROOF_LIMIT_EXCEEDED);
+        }
+        SpaceProof proof = new SpaceProof(this, proofType, file, now);
+        proofs.add(proof);
+        requestReReviewIfPublic();
+        return proof;
+    }
+
+    /** @return 지운 증빙 (저장소 파일 삭제용) */
+    public SpaceProof removeProof(Long proofId) {
+        validateEditable();
+        SpaceProof proof = proofs.stream().filter(p -> p.getId().equals(proofId)).findFirst()
+                .orElseThrow(() -> new BusinessException(ErrorCode.SPACE_PROOF_NOT_FOUND));
+        proofs.remove(proof);
+        requestReReviewIfPublic();
+        return proof;
+    }
+
+    /** 공개·일시 중단 중에 검수 항목이 바뀌면 검수 대기로 되돌린다. */
+    private void requestReReviewIfPublic() {
+        if (status == SpaceStatus.PUBLISHED || status == SpaceStatus.PAUSED) {
+            status = SpaceStatus.PENDING_REVIEW;
+        }
     }
 
     /**

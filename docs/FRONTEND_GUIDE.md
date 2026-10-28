@@ -164,6 +164,13 @@ flowchart LR
 | `SPACE_NOT_FOUND` | 404 | 없는 공간, 공개되지 않은 공간 | "찾을 수 없습니다" 안내 후 목록으로 |
 | `SPACE_OUT_OF_SERVICE_AREA` | 400 | 좌표가 정왕동·거북섬·배곧 밖 | "서비스 지역의 공간만 등록할 수 있습니다" |
 | `INVALID_AVAILABLE_DATE` | 400 | 사용 가능 날짜가 오늘 이전 또는 1년 뒤 이후 | 캘린더 선택 범위를 오늘~1년으로 제한 |
+| `NOT_SPACE_OWNER` | 403 | 다른 제공자의 공간을 관리하려 함 | "본인 공간만 관리할 수 있습니다" |
+| `SPACE_NOT_EDITABLE` | 409 | 관리자가 숨긴 공간을 수정하려 함 | 관리자 문의 안내 |
+| `SPACE_PHOTO_LIMIT_EXCEEDED` | 400 | 사진이 10장을 넘음 | 남은 장수 안내 (`error.message`) |
+| `SPACE_PHOTO_NOT_FOUND` | 404 | 없는 사진 ID | 목록 새로고침 |
+| `INVALID_PHOTO_ORDER` | 400 | 순서 변경에 모든 사진 ID 를 한 번씩 보내지 않음 | 개발 중 실수 |
+| `SPACE_PROOF_LIMIT_EXCEEDED` | 400 | 증빙이 5개를 넘음 | 기존 증빙 삭제 후 다시 시도 |
+| `SPACE_PROOF_NOT_FOUND` | 404 | 없는 증빙 ID | 목록 새로고침 |
 
 ### 3-3-1. 목록 응답 (페이지)
 
@@ -591,3 +598,9 @@ try {
 | 메서드 | 경로 | 인증 | 설명 |
 | --- | --- | --- | --- |
 | POST | `/api/v1/provider/spaces` | PROVIDER | 공간 등록 (지역은 좌표로 판정, 검수 대기로 시작) |
+| POST | `/api/v1/provider/spaces/{spaceId}/photos` | PROVIDER | 사진 추가 (multipart files, 최대 10장) |
+| PUT | `/api/v1/provider/spaces/{spaceId}/photos/order` | PROVIDER | 사진 순서 변경 (첫 번째가 대표) |
+| DELETE | `/api/v1/provider/spaces/{spaceId}/photos/{photoId}` | PROVIDER | 사진 삭제 |
+| POST | `/api/v1/provider/spaces/{spaceId}/proofs` | PROVIDER | 권한 증빙 추가 (multipart file + proofType) |
+| GET | `/api/v1/provider/spaces/{spaceId}/proofs` | PROVIDER | 권한 증빙 목록 (임시 주소) |
+| DELETE | `/api/v1/provider/spaces/{spaceId}/proofs/{proofId}` | PROVIDER | 권한 증빙 삭제 |

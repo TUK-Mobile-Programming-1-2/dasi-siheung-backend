@@ -33,7 +33,8 @@ class OptionControllerTest extends ApiDocsTestSupport {
             {"facilities", "보유 시설"},
             {"buildingUses", "건축물 용도"},
             {"commercialThemes", "상권 테마"},
-            {"usePurposes", "이용 목적"}
+            {"usePurposes", "이용 목적"},
+            {"proofTypes", "권한 증빙 종류"}
     };
 
     @MockitoBean

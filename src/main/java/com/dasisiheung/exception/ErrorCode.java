@@ -43,7 +43,14 @@ public enum ErrorCode {
     // 공간
     SPACE_NOT_FOUND(HttpStatus.NOT_FOUND, "공간을 찾을 수 없습니다."),
     SPACE_OUT_OF_SERVICE_AREA(HttpStatus.BAD_REQUEST, "정왕동·거북섬·배곧 지역의 공간만 등록할 수 있습니다."),
-    INVALID_AVAILABLE_DATE(HttpStatus.BAD_REQUEST, "사용 가능 날짜는 오늘부터 1년 이내로만 지정할 수 있습니다.");
+    INVALID_AVAILABLE_DATE(HttpStatus.BAD_REQUEST, "사용 가능 날짜는 오늘부터 1년 이내로만 지정할 수 있습니다."),
+    NOT_SPACE_OWNER(HttpStatus.FORBIDDEN, "본인이 등록한 공간만 관리할 수 있습니다."),
+    SPACE_NOT_EDITABLE(HttpStatus.CONFLICT, "숨김 처리된 공간은 수정할 수 없습니다. 관리자에게 문의해 주세요."),
+    SPACE_PHOTO_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "사진은 최대 10장까지 올릴 수 있습니다."),
+    SPACE_PHOTO_NOT_FOUND(HttpStatus.NOT_FOUND, "사진을 찾을 수 없습니다."),
+    INVALID_PHOTO_ORDER(HttpStatus.BAD_REQUEST, "이 공간의 모든 사진 ID 를 한 번씩 보내야 합니다."),
+    SPACE_PROOF_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "증빙은 최대 5개까지 올릴 수 있습니다."),
+    SPACE_PROOF_NOT_FOUND(HttpStatus.NOT_FOUND, "증빙을 찾을 수 없습니다.");
 
     private final HttpStatus status;
     private final String message;

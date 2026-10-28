@@ -57,8 +57,30 @@ public final class SpaceDocumentation {
                 fieldWithPath(prefix + "facilities").type(JsonFieldType.ARRAY).description("보유 시설"),
                 fieldWithPath(prefix + "activityTypes").type(JsonFieldType.ARRAY).description("허용 활동"),
                 fieldWithPath(prefix + "availableDates").type(JsonFieldType.ARRAY).description("사용 가능 날짜 (오름차순)"),
+                fieldWithPath(prefix + "photos").type(JsonFieldType.ARRAY).description("사진 (순서대로, 첫 번째가 대표)"),
+                fieldWithPath(prefix + "proofs").type(JsonFieldType.ARRAY).description("권한 증빙 (임시 주소 포함)"),
                 fieldWithPath(prefix + "createdAt").type(JsonFieldType.STRING).description("등록 시각"),
                 fieldWithPath(prefix + "updatedAt").type(JsonFieldType.STRING).description("마지막 수정 시각")));
         return fields;
+    }
+
+    /** 사진 항목 필드. prefix 예: "data.photos[]." */
+    public static List<FieldDescriptor> photoFields(String prefix) {
+        return List.of(
+                fieldWithPath(prefix + "id").type(JsonFieldType.NUMBER).description("사진 ID"),
+                fieldWithPath(prefix + "url").type(JsonFieldType.STRING).description("사진 주소 (공개, 고정)"),
+                fieldWithPath(prefix + "sortOrder").type(JsonFieldType.NUMBER).description("순서 (0 이 대표 사진)"));
+    }
+
+    /** 증빙 항목 필드. prefix 예: "data.proofs[]." */
+    public static List<FieldDescriptor> proofFields(String prefix) {
+        return List.of(
+                fieldWithPath(prefix + "id").type(JsonFieldType.NUMBER).description("증빙 ID"),
+                fieldWithPath(prefix + "proofType").type(JsonFieldType.STRING).description("증빙 종류 (선택지 proofTypes)"),
+                fieldWithPath(prefix + "originalName").type(JsonFieldType.STRING).optional().description("올린 파일 이름"),
+                fieldWithPath(prefix + "contentType").type(JsonFieldType.STRING).description("파일 형식"),
+                fieldWithPath(prefix + "fileSize").type(JsonFieldType.NUMBER).description("파일 크기(바이트)"),
+                fieldWithPath(prefix + "url").type(JsonFieldType.STRING).description("열람용 임시 주소 (10분 뒤 만료)"),
+                fieldWithPath(prefix + "createdAt").type(JsonFieldType.STRING).description("올린 시각"));
     }
 }

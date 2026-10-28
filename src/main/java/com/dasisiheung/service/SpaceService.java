@@ -25,6 +25,7 @@ public class SpaceService {
     private final SpaceRepository spaceRepository;
     private final MemberRepository memberRepository;
     private final ServiceRegionRepository serviceRegionRepository;
+    private final SpaceResponseMapper responseMapper;
     private final Clock clock;
 
     /**
@@ -40,7 +41,7 @@ public class SpaceService {
         Region region = resolveRegion(request.latitude(), request.longitude());
 
         Space space = Space.register(provider, region, request.toDetails(), request.availableDates(), today());
-        return ProviderSpaceResponse.from(spaceRepository.save(space));
+        return responseMapper.providerSpace(spaceRepository.save(space));
     }
 
     Region resolveRegion(double latitude, double longitude) {

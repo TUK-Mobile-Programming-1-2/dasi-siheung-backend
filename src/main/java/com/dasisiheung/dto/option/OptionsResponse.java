@@ -11,6 +11,7 @@ public record OptionsResponse(
         @Schema(description = "보유 시설") List<OptionItem> facilities,
         @Schema(description = "건축물 용도") List<OptionItem> buildingUses,
         @Schema(description = "상권 테마") List<OptionItem> commercialThemes,
-        @Schema(description = "이용 목적") List<OptionItem> usePurposes
+        @Schema(description = "이용 목적") List<OptionItem> usePurposes,
+        @Schema(description = "권한 증빙 종류") List<OptionItem> proofTypes
 ) {
 }

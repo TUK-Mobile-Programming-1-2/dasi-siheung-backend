@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 
 import com.dasisiheung.dto.space.ProviderSpaceResponse;
@@ -46,7 +47,7 @@ class SpaceServiceTest {
     @BeforeEach
     void setUp() {
         spaceService = new SpaceService(spaceRepository, memberRepository, serviceRegionRepository,
-                FixedClockConfig.fixedClock());
+                new SpaceResponseMapper(mock(FileUploadService.class)), FixedClockConfig.fixedClock());
     }
 
     @Test
