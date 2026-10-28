@@ -30,6 +30,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
  * <ul>
  *   <li>PUBLIC_ENDPOINTS: 누구나 호출</li>
  *   <li>/api/v1/admin/**: 관리자(ADMIN)만</li>
+ *   <li>/api/v1/provider/**: 공간 제공자(PROVIDER)만</li>
  *   <li>그 외: 로그인 필요. 역할별 제한은 컨트롤러의 {@code @PreAuthorize} 로 건다.</li>
  * </ul>
  */
@@ -49,6 +50,7 @@ public class SecurityConfig {
             "/error"
     };
     private static final String ADMIN_ENDPOINTS = "/api/v1/admin/**";
+    private static final String PROVIDER_ENDPOINTS = "/api/v1/provider/**";
     private static final List<String> ALLOWED_METHODS = List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS");
     private static final Duration PREFLIGHT_CACHE_DURATION = Duration.ofHours(1);
 
@@ -73,6 +75,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
                         .requestMatchers(ADMIN_ENDPOINTS).hasRole("ADMIN")
+                        .requestMatchers(PROVIDER_ENDPOINTS).hasRole("PROVIDER")
                         .anyRequest().authenticated())
                 .build();
     }
