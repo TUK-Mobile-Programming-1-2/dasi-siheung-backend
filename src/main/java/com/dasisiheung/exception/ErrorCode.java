@@ -38,7 +38,12 @@ public enum ErrorCode {
     FILE_REQUIRED(HttpStatus.BAD_REQUEST, "파일을 선택해 주세요."),
     FILE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "파일 크기가 너무 큽니다."),
     UNSUPPORTED_FILE_TYPE(HttpStatus.BAD_REQUEST, "올릴 수 없는 파일 형식입니다."),
-    STORAGE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "파일 저장소에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+    STORAGE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "파일 저장소에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요."),
+
+    // 공간
+    SPACE_NOT_FOUND(HttpStatus.NOT_FOUND, "공간을 찾을 수 없습니다."),
+    SPACE_OUT_OF_SERVICE_AREA(HttpStatus.BAD_REQUEST, "정왕동·거북섬·배곧 지역의 공간만 등록할 수 있습니다."),
+    INVALID_AVAILABLE_DATE(HttpStatus.BAD_REQUEST, "사용 가능 날짜는 오늘부터 1년 이내로만 지정할 수 있습니다.");
 
     private final HttpStatus status;
     private final String message;
