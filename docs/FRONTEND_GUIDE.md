@@ -171,6 +171,7 @@ flowchart LR
 | `INVALID_PHOTO_ORDER` | 400 | 순서 변경에 모든 사진 ID 를 한 번씩 보내지 않음 | 개발 중 실수 |
 | `SPACE_PROOF_LIMIT_EXCEEDED` | 400 | 증빙이 5개를 넘음 | 기존 증빙 삭제 후 다시 시도 |
 | `SPACE_PROOF_NOT_FOUND` | 404 | 없는 증빙 ID | 목록 새로고침 |
+| `INVALID_SPACE_STATUS` | 409 | 지금 상태에서 할 수 없는 작업 (예: 검수 대기 중 일시 중단) | `error.message` 그대로 표시 |
 
 ### 3-3-1. 목록 응답 (페이지)
 
@@ -214,6 +215,20 @@ flowchart LR
 - 공간 등록 화면에서 **앱의 지도 SDK 로 주소를 좌표(위도·경도)로 변환**해 `address` 와 함께 보냅니다.
 - 지역(정왕동·거북섬·배곧)은 **서버가 좌표로 판정**합니다. 서비스 지역 밖이면 400 `SPACE_OUT_OF_SERVICE_AREA` 입니다.
 - 날짜는 `yyyy-MM-dd`, 시각은 `yyyy-MM-ddTHH:mm:ss` (한국 시간, 시간대 표기 없음) 입니다.
+
+### 3-3-5. 공간 공개 상태
+
+```
+등록 ─▶ PENDING_REVIEW(검수 대기) ──관리자 승인──▶ PUBLISHED(공개) ⇄ PAUSED(일시 중단)
+              │   ▲                                   │
+     수정 요청 │   │ 고친 뒤 /resubmit                  └ 주소·건물·호실·면적·용도·증빙을 바꾸면 PENDING_REVIEW
+              ▼   │
+   REVISION_REQUESTED(수정 요청) / ON_HOLD(공개 보류)
+HIDDEN(숨김): 신고 처리로 관리자가 내린 공간 — 수정 불가
+```
+
+- 내 공간 목록·상세의 `reviewComment` 에 관리자가 남긴 사유가 있습니다. 수정 요청·보류일 때 그대로 보여주세요.
+- 이용자 화면(탐색·지도·상세)에는 **PUBLISHED** 공간만 나옵니다.
 
 ### 3-4. 인증 (JWT)
 
@@ -604,3 +619,10 @@ try {
 | POST | `/api/v1/provider/spaces/{spaceId}/proofs` | PROVIDER | 권한 증빙 추가 (multipart file + proofType) |
 | GET | `/api/v1/provider/spaces/{spaceId}/proofs` | PROVIDER | 권한 증빙 목록 (임시 주소) |
 | DELETE | `/api/v1/provider/spaces/{spaceId}/proofs/{proofId}` | PROVIDER | 권한 증빙 삭제 |
+| GET | `/api/v1/provider/spaces` | PROVIDER | 내 공간 목록 (검수 상태·사유, status 필터) |
+| GET | `/api/v1/provider/spaces/{spaceId}` | PROVIDER | 내 공간 상세 (사진·증빙 포함) |
+| PUT | `/api/v1/provider/spaces/{spaceId}` | PROVIDER | 공간 정보 수정 (검수 항목 변경 시 재검수) |
+| PUT | `/api/v1/provider/spaces/{spaceId}/available-dates` | PROVIDER | 사용 가능 날짜(캘린더) 설정 |
+| POST | `/api/v1/provider/spaces/{spaceId}/pause` | PROVIDER | 공개 일시 중단 |
+| POST | `/api/v1/provider/spaces/{spaceId}/resume` | PROVIDER | 공개 재개 |
+| POST | `/api/v1/provider/spaces/{spaceId}/resubmit` | PROVIDER | 수정 후 다시 검수 요청 |
