@@ -9,6 +9,8 @@ import com.dasisiheung.entity.space.CommercialTheme;
 import com.dasisiheung.entity.space.Facility;
 import com.dasisiheung.entity.space.ProofType;
 import com.dasisiheung.entity.space.Region;
+import com.dasisiheung.entity.space.ReviewDecision;
+import com.dasisiheung.entity.space.SpaceStatus;
 import com.dasisiheung.entity.space.UsePurpose;
 import org.springframework.stereotype.Service;
 
@@ -24,7 +26,9 @@ public class OptionService {
             OptionItem.listOf(BuildingUse.class),
             OptionItem.listOf(CommercialTheme.class),
             OptionItem.listOf(UsePurpose.class),
-            OptionItem.listOf(ProofType.class)
+            OptionItem.listOf(ProofType.class),
+            OptionItem.listOf(SpaceStatus.class),
+            OptionItem.listOf(ReviewDecision.class)
     );
 
     public OptionsResponse getOptions() {
