@@ -16,3 +16,7 @@ logging:
 app:
   jwt:
     secret: test-only-jwt-secret-key-for-dasi-siheung-0123456789
+  storage:
+    provider: local
+    local:
+      root: build/test-storage

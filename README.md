@@ -82,10 +82,11 @@ src/main/java/com/dasisiheung
 ├── dto          요청·응답 객체 (common: 공통 응답 형식)
 │   └── advice   전역 예외 처리 (예외 → 공통 응답 형식)
 ├── exception    ErrorCode, BusinessException
+├── storage      파일 저장소 (운영: Supabase Storage / 로컬·CI: 디스크)
 ├── security     JWT 발급·검증 필터, 로그인 회원 주입(@LoginMember), 401/403 JSON 응답
 ├── scheduler    정기 작업 (만료 토큰 정리 등)
 ├── config       Security, CORS, JPA Auditing, Clock, OpenAPI, 스케줄링 설정
-└── util         GeoPoints (위도·경도 → WGS84 Point)
+└── util         GeoPoints (위도·경도 → WGS84 Point), FileType (파일 시그니처 판별)
 
 src/main/resources
 ├── application.yml          공통 설정
@@ -262,6 +263,8 @@ CI 는 러너에 기본 설치된 PostgreSQL 에 PostGIS 를 apt 로 추가해 �
 | `DB_USERNAME` | `postgres.<project-ref>` (운영 Supabase) |
 | `DB_PASSWORD` | 운영 Supabase DB 비밀번호 |
 | `JWT_SECRET` | JWT 서명 키. 32바이트 이상 임의 문자열 (`openssl rand -base64 48`) |
+| `SUPABASE_URL` | 운영 Supabase 프로젝트 주소 `https://<project-ref>.supabase.co` (파일 저장소) |
+| `SUPABASE_SERVICE_KEY` | 운영 Supabase **secret 키**(`sb_secret_...`) 또는 service_role 키. 서버에만 둔다 |
 
 배포 대상(`wonjongwoo01/dasi-siheung-backend`, 스테이지 `main`)과 실행 옵션은 `cd.yml` 에 적혀 있습니다.
 CD 는 배포할 때마다 Cloudtype 설정을 `cd.yml` 내용으로 덮어쓰므로, 설정 변경은 대시보드가 아니라 `cd.yml` 에서 합니다.
@@ -283,6 +286,23 @@ CD 는 배포할 때마다 Cloudtype 설정을 `cd.yml` 내용으로 덮어쓰�
    > Direct connection(`db.<ref>.supabase.co`)은 IPv6 전용이라 외부 서버에서 연결되지 않을 수 있어 **Session pooler** 를 사용합니다.
    > Transaction pooler(6543)는 JDBC prepared statement 와 충돌하므로 쓰지 않습니다.
 
+### 1-1. Supabase Storage (파일)
+
+공간 사진·권한 증빙·활동 기록 사진을 저장합니다. **버킷은 서버가 처음 기동할 때 없으면 자동으로 만듭니다.**
+
+| 버킷 | 공개 | 용도 | 파일당 최대 |
+| --- | --- | --- | --- |
+| `space-photos` | 공개 | 공간 사진 (누구나 주소로 조회) | 10MB, JPG·PNG·WEBP |
+| `private-files` | 비공개 | 권한 증빙, 활동 전후 사진 (서버가 10분짜리 임시 주소 발급) | 20MB, PDF·JPG·PNG |
+
+1. 운영 프로젝트 → **Project Settings → API Keys** 에서 **secret 키**(`sb_secret_...`)를 만들거나, Legacy 탭의 `service_role` 키를 복사합니다.
+2. GitHub Secrets 에 `SUPABASE_URL`(`https://<project-ref>.supabase.co`), `SUPABASE_SERVICE_KEY` 를 등록합니다.
+3. 로컬은 기본값(`STORAGE_PROVIDER=local`)이면 `build/local-storage/` 에 저장하므로 키가 필요 없습니다.
+   개발 Supabase 로 확인하려면 `.env` 에 `STORAGE_PROVIDER=supabase` 와 개발 프로젝트의 `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` 를 넣습니다.
+
+> secret 키는 RLS 를 무시하는 관리자 키입니다. 앱·관리자 웹에는 절대 넣지 말고 서버 환경 변수로만 씁니다.
+> 서버는 파일 내용의 앞부분(시그니처)으로 형식을 판별하므로 확장자만 바꾼 파일은 거부됩니다.
+
 ### 2. Cloudtype (서버)
 
 서비스는 대시보드에서 아래 설정으로 처음 만들고, 이후 배포는 CD 가 담당합니다.
@@ -296,7 +316,7 @@ CD 는 배포할 때마다 Cloudtype 설정을 `cd.yml` 내용으로 덮어쓰�
 | Health Check | `/actuator/health/readiness` |
 | Initial Delay Seconds | `180` (프리티어는 기동에 2~3분 걸림) |
 | Update strategy | `recreate` (프리티어는 인스턴스 1개) |
-| 환경 변수 | `SPRING_PROFILES_ACTIVE=prod`, `TZ=Asia/Seoul`, `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET` |
+| 환경 변수 | `SPRING_PROFILES_ACTIVE=prod`, `TZ=Asia/Seoul`, `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` |
 
 CD 연결 순서
 

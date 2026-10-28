@@ -10,6 +10,11 @@ spring:
     properties:
       hibernate:
         default_batch_fetch_size: 100
+  servlet:
+    multipart:
+      # 파일별 제한(사진 10MB, 증빙 20MB)은 서버가 따로 검사한다. 여기는 요청 전체 상한
+      max-file-size: 20MB
+      max-request-size: 100MB
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -53,5 +58,17 @@ app:
     secret: ${JWT_SECRET:}
     access-token-validity: ${JWT_ACCESS_TOKEN_VALIDITY:30m}
     refresh-token-validity: ${JWT_REFRESH_TOKEN_VALIDITY:14d}
+  storage:
+    # local: 로컬 디스크(build/local-storage) / supabase: Supabase Storage (운영)
+    provider: ${STORAGE_PROVIDER:local}
+    signed-url-ttl: 10m
+    supabase:
+      url: ${SUPABASE_URL:}
+      service-key: ${SUPABASE_SERVICE_KEY:}
+      public-bucket: ${SUPABASE_PUBLIC_BUCKET:space-photos}
+      private-bucket: ${SUPABASE_PRIVATE_BUCKET:private-files}
+    local:
+      root: ${STORAGE_LOCAL_ROOT:build/local-storage}
+      base-url: ${STORAGE_LOCAL_BASE_URL:http://localhost:${PORT:8080}}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}

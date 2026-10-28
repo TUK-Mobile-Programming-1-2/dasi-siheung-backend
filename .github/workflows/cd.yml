@@ -40,9 +40,11 @@ jobs:
           DB_USERNAME: ${{ secrets.DB_USERNAME }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
           missing=()
-          for name in CLOUDTYPE_TOKEN DB_URL DB_USERNAME DB_PASSWORD JWT_SECRET; do
+          for name in CLOUDTYPE_TOKEN DB_URL DB_USERNAME DB_PASSWORD JWT_SECRET SUPABASE_URL SUPABASE_SERVICE_KEY; do
             [ -z "${!name}" ] && missing+=("$name")
           done
           if [ ${#missing[@]} -gt 0 ]; then
@@ -85,6 +87,10 @@ jobs:
                   value: "${{ secrets.DB_PASSWORD }}"
                 - name: JWT_SECRET
                   value: "${{ secrets.JWT_SECRET }}"
+                - name: SUPABASE_URL
+                  value: "${{ secrets.SUPABASE_URL }}"
+                - name: SUPABASE_SERVICE_KEY
+                  value: "${{ secrets.SUPABASE_SERVICE_KEY }}"
               buildenv: []
             context:
               git:
