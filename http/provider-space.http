@@ -146,3 +146,117 @@ Content-Type: application/json
         client.assert(response.body.error.code === "INVALID_AVAILABLE_DATE", `실제 ${response.body.error.code}`);
     });
 %}
+
+### 사진 2장 추가 (multipart, 파트 이름 files)
+# 인증: PROVIDER (본인 공간)
+# 기대값: 201 Created, data = 전체 사진 목록 [{ id, url, sortOrder }], sortOrder 0 이 대표
+POST {{baseUrl}}/api/v1/provider/spaces/{{providerSpaceId}}/photos
+Authorization: Bearer {{providerToken}}
+Content-Type: multipart/form-data; boundary=dasi-boundary
+
+--dasi-boundary
+Content-Disposition: form-data; name="files"; filename="space-photo.jpg"
+Content-Type: image/jpeg
+
+< ./fixtures/space-photo.jpg
+--dasi-boundary
+Content-Disposition: form-data; name="files"; filename="space-photo.png"
+Content-Type: image/png
+
+< ./fixtures/space-photo.png
+--dasi-boundary--
+
+> {%
+    client.test("201 Created + 사진 2장", () => {
+        client.assert(response.status === 201, `기대 201, 실제 ${response.status}`);
+        client.assert(response.body.data.length === 2, `실제 ${response.body.data.length}`);
+        client.assert(response.body.data[0].sortOrder === 0, "첫 번째 사진의 sortOrder 는 0");
+        client.assert(response.body.data[0].url.startsWith("http"), `실제 ${response.body.data[0].url}`);
+    });
+    client.global.set("photoId1", response.body.data[0].id);
+    client.global.set("photoId2", response.body.data[1].id);
+%}
+
+### 사진 순서 바꾸기 (두 번째 사진을 대표로)
+# 기대값: 200 OK, data[0].id = 두 번째로 올린 사진
+PUT {{baseUrl}}/api/v1/provider/spaces/{{providerSpaceId}}/photos/order
+Authorization: Bearer {{providerToken}}
+Content-Type: application/json
+
+{
+  "photoIds": [{{photoId2}}, {{photoId1}}]
+}
+
+> {%
+    client.test("200 OK + 순서 변경", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(String(response.body.data[0].id) === String(client.global.get("photoId2")), `실제 ${response.body.data[0].id}`);
+    });
+%}
+
+### 확장자만 jpg 인 텍스트 파일 → 400
+# 기대값: 400 UNSUPPORTED_FILE_TYPE
+POST {{baseUrl}}/api/v1/provider/spaces/{{providerSpaceId}}/photos
+Authorization: Bearer {{providerToken}}
+Content-Type: multipart/form-data; boundary=dasi-boundary
+
+--dasi-boundary
+Content-Disposition: form-data; name="files"; filename="not-an-image.jpg"
+Content-Type: image/jpeg
+
+< ./fixtures/not-an-image.jpg
+--dasi-boundary--
+
+> {%
+    client.test("400 UNSUPPORTED_FILE_TYPE", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "UNSUPPORTED_FILE_TYPE", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 권한 증빙 추가 (multipart: file + proofType)
+# 기대값: 201 Created, proofType = LEASE_CONTRACT, url = 10분짜리 임시 주소
+POST {{baseUrl}}/api/v1/provider/spaces/{{providerSpaceId}}/proofs
+Authorization: Bearer {{providerToken}}
+Content-Type: multipart/form-data; boundary=dasi-boundary
+
+--dasi-boundary
+Content-Disposition: form-data; name="proofType"
+
+LEASE_CONTRACT
+--dasi-boundary
+Content-Disposition: form-data; name="file"; filename="proof.pdf"
+Content-Type: application/pdf
+
+< ./fixtures/proof.pdf
+--dasi-boundary--
+
+> {%
+    client.test("201 Created + 증빙", () => {
+        client.assert(response.status === 201, `기대 201, 실제 ${response.status}`);
+        client.assert(response.body.data.proofType === "LEASE_CONTRACT", `실제 ${response.body.data.proofType}`);
+        client.assert(response.body.data.contentType === "application/pdf", `실제 ${response.body.data.contentType}`);
+    });
+    client.global.set("proofId", response.body.data.id);
+%}
+
+### 권한 증빙 목록
+# 기대값: 200 OK, 1건
+GET {{baseUrl}}/api/v1/provider/spaces/{{providerSpaceId}}/proofs
+Authorization: Bearer {{providerToken}}
+
+> {%
+    client.test("200 OK + 1건", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.length === 1, `실제 ${response.body.data.length}`);
+    });
+%}
+
+### 첫 번째로 올린 사진 삭제
+# 기대값: 200 OK
+DELETE {{baseUrl}}/api/v1/provider/spaces/{{providerSpaceId}}/photos/{{photoId1}}
+Authorization: Bearer {{providerToken}}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+%}
