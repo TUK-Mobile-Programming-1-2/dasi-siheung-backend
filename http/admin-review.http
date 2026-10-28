@@ -1,0 +1,250 @@
+# 관리자 검수 시나리오
+# 관리자 계정은 http-client.private.env.json 의 adminEmail / adminPassword 를 쓴다. (docs/ADMIN_GUIDE.md)
+# CI 는 서버 기동 후 SQL 로 테스트용 관리자를 만들고 이 값을 넘겨 실행한다.
+
+### 준비: 공간 제공자 가입 · 로그인
+POST {{baseUrl}}/api/v1/auth/signup
+Content-Type: application/json
+
+{
+  "email": "http-review-provider-{{$timestamp}}-{{$randomInt}}@test.dasisiheung.com",
+  "password": "password123",
+  "name": "검수용 제공자",
+  "phone": "010-3333-4444",
+  "role": "PROVIDER"
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+    client.global.set("reviewProviderEmail", response.body.data.email);
+%}
+
+###
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{reviewProviderEmail}}",
+  "password": "password123"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+    client.global.set("reviewProviderToken", response.body.data.accessToken);
+%}
+
+### 준비: 공간 등록 (배곧)
+POST {{baseUrl}}/api/v1/provider/spaces
+Authorization: Bearer {{reviewProviderToken}}
+Content-Type: application/json
+
+{
+  "title": "배곧 호수공원 앞 상가",
+  "description": "주말 가족 방문객이 많은 공원 앞 상가",
+  "address": "경기도 시흥시 배곧4로 32",
+  "buildingName": "배곧타워",
+  "unitNumber": "105호",
+  "latitude": 37.3773,
+  "longitude": 126.7302,
+  "areaSqm": 40.2,
+  "buildingUse": "NEIGHBORHOOD_2",
+  "commercialTheme": "RESIDENTIAL",
+  "dailyPrice": 45000,
+  "facilities": ["WIFI", "WATER"],
+  "activityTypes": ["EXPERIENCE", "CLASS"]
+}
+
+> {%
+    client.test("201 Created + BAEGOT", () => {
+        client.assert(response.status === 201, `실제 ${response.status}`);
+        client.assert(response.body.data.region === "BAEGOT", `실제 ${response.body.data.region}`);
+    });
+    client.global.set("reviewSpaceId", response.body.data.id);
+%}
+
+### 준비: 관리자 로그인
+# 기대값: 200 OK, member.role = ADMIN (승격 후 다시 로그인한 토큰)
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+> {%
+    client.test("200 OK + ADMIN", () => {
+        client.assert(response.status === 200, `실제 ${response.status} — http-client.private.env.json 의 관리자 계정 확인`);
+        client.assert(response.body.data.member.role === "ADMIN", `실제 ${response.body.data.member.role}`);
+    });
+    client.global.set("adminToken", response.body.data.accessToken);
+%}
+
+### 증빙이 없을 때 공개 승인 → 400
+# 기대값: 400 SPACE_PROOF_REQUIRED
+POST {{baseUrl}}/api/v1/admin/spaces/{{reviewSpaceId}}/reviews
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "decision": "APPROVE",
+  "checklist": { "authorityVerified": true, "addressMatched": true, "buildingUnitMatched": true, "areaMatched": true, "usageMatched": true }
+}
+
+> {%
+    client.test("400 SPACE_PROOF_REQUIRED", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "SPACE_PROOF_REQUIRED", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 준비: 제공자가 증빙 제출
+POST {{baseUrl}}/api/v1/provider/spaces/{{reviewSpaceId}}/proofs
+Authorization: Bearer {{reviewProviderToken}}
+Content-Type: multipart/form-data; boundary=dasi-boundary
+
+--dasi-boundary
+Content-Disposition: form-data; name="proofType"
+
+REGISTRY_CERTIFICATE
+--dasi-boundary
+Content-Disposition: form-data; name="file"; filename="proof.pdf"
+Content-Type: application/pdf
+
+< ./fixtures/proof.pdf
+--dasi-boundary--
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+%}
+
+### 검수 대기 목록
+# 인증: ADMIN
+# 기대값: 200 OK, 모두 PENDING_REVIEW
+GET {{baseUrl}}/api/v1/admin/spaces?status=PENDING_REVIEW&size=100
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("200 OK + 검수 대기만", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.content.every(s => s.status === "PENDING_REVIEW"), "검수 대기가 아닌 공간이 섞였습니다");
+    });
+%}
+
+### 검수 상세 (증빙 임시 주소 · 제공자 · 공식 정보 링크)
+# 기대값: 200 OK, space.proofs 1개, provider.email, referenceLinks 4개
+GET {{baseUrl}}/api/v1/admin/spaces/{{reviewSpaceId}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("200 OK + 검수 자료", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.space.proofs.length === 1, `증빙 ${response.body.data.space.proofs.length}`);
+        client.assert(response.body.data.provider.email === client.global.get("reviewProviderEmail"), "제공자 이메일");
+        client.assert(response.body.data.referenceLinks.length === 4, `링크 ${response.body.data.referenceLinks.length}`);
+    });
+%}
+
+### 항목 미확인 승인 → 400
+# 기대값: 400 REVIEW_CHECKLIST_INCOMPLETE
+POST {{baseUrl}}/api/v1/admin/spaces/{{reviewSpaceId}}/reviews
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "decision": "APPROVE",
+  "checklist": { "authorityVerified": true, "addressMatched": true, "buildingUnitMatched": true, "areaMatched": false, "usageMatched": true }
+}
+
+> {%
+    client.test("400 REVIEW_CHECKLIST_INCOMPLETE", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "REVIEW_CHECKLIST_INCOMPLETE", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 사유 없는 수정 요청 → 400
+# 기대값: 400 REVIEW_REASON_REQUIRED
+POST {{baseUrl}}/api/v1/admin/spaces/{{reviewSpaceId}}/reviews
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "decision": "REQUEST_REVISION",
+  "checklist": { "authorityVerified": true, "addressMatched": true, "buildingUnitMatched": true, "areaMatched": false, "usageMatched": true }
+}
+
+> {%
+    client.test("400 REVIEW_REASON_REQUIRED", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "REVIEW_REASON_REQUIRED", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 공개 승인
+# 기대값: 200 OK, space.status = PUBLISHED, reviews[0].decision = APPROVE
+POST {{baseUrl}}/api/v1/admin/spaces/{{reviewSpaceId}}/reviews
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "decision": "APPROVE",
+  "checklist": { "authorityVerified": true, "addressMatched": true, "buildingUnitMatched": true, "areaMatched": true, "usageMatched": true }
+}
+
+> {%
+    client.test("200 OK + PUBLISHED", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.space.status === "PUBLISHED", `실제 ${response.body.data.space.status}`);
+        client.assert(response.body.data.reviews[0].decision === "APPROVE", `실제 ${response.body.data.reviews[0].decision}`);
+    });
+%}
+
+### 이미 공개된 공간 다시 검수 → 409
+# 기대값: 409 INVALID_SPACE_STATUS
+POST {{baseUrl}}/api/v1/admin/spaces/{{reviewSpaceId}}/reviews
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "decision": "HOLD",
+  "reason": "중복 검수",
+  "checklist": { "authorityVerified": false, "addressMatched": false, "buildingUnitMatched": false, "areaMatched": false, "usageMatched": false }
+}
+
+> {%
+    client.test("409 INVALID_SPACE_STATUS", () => {
+        client.assert(response.status === 409, `실제 ${response.status}`);
+    });
+%}
+
+### 제공자 토큰으로 관리자 API → 403
+# 기대값: 403 FORBIDDEN
+GET {{baseUrl}}/api/v1/admin/spaces
+Authorization: Bearer {{reviewProviderToken}}
+
+> {%
+    client.test("403 FORBIDDEN", () => {
+        client.assert(response.status === 403, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "FORBIDDEN", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 공개되면 제공자가 일시 중단 · 재개할 수 있다
+POST {{baseUrl}}/api/v1/provider/spaces/{{reviewSpaceId}}/pause
+Authorization: Bearer {{reviewProviderToken}}
+
+> {%
+    client.test("200 OK + PAUSED", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.status === "PAUSED", `실제 ${response.body.data.status}`);
+    });
+%}
+
+###
+POST {{baseUrl}}/api/v1/provider/spaces/{{reviewSpaceId}}/resume
+Authorization: Bearer {{reviewProviderToken}}
+
+> {%
+    client.test("200 OK + PUBLISHED", () => client.assert(response.body.data.status === "PUBLISHED", `실제 ${response.body.data.status}`));
+%}

@@ -222,7 +222,7 @@ GET {{baseUrl}}/api/v1/system/ping
 | API 문서 | `SystemControllerTest` (`@ApiDocsTest`) | 없음 | 응답 필드 검증 + 명세 생성 |
 | 통합 | `SecurityIntegrationTest`, `PostgisMigrationTest` (`@IntegrationTest`) | 실제 PostgreSQL + PostGIS | 보안·CORS·마이그레이션·공간 연산 |
 | 구조 | `LayeredArchitectureTest` | 없음 | 계층형 구조 강제 |
-| HTTP 시나리오 | `http/*.http` | 실제 서버 | 기대값 검증 (CI) |
+| HTTP 시나리오 | `http/*.http` | 실제 서버 | 기대값 검증 (CI). 관리자 시나리오는 `http/http-client.private.env.json` 의 관리자 계정 사용 |
 
 - 통합 테스트는 **`TEST_DB_URL` 이 있을 때만** 로컬에서 실행되고, 없으면 `SKIPPED` 로 건너뜁니다. CI 에서는 항상 실행됩니다.
 - 로컬에서 돌리려면 `TEST_DB_URL`, `TEST_DB_USERNAME`, `TEST_DB_PASSWORD` 를 개발용 DB로 지정합니다. **운영 DB는 지정하지 마세요.**

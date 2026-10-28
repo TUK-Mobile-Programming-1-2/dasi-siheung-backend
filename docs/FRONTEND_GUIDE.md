@@ -173,6 +173,14 @@ flowchart LR
 | `SPACE_PROOF_NOT_FOUND` | 404 | 없는 증빙 ID | 목록 새로고침 |
 | `INVALID_SPACE_STATUS` | 409 | 지금 상태에서 할 수 없는 작업 (예: 검수 대기 중 일시 중단) | `error.message` 그대로 표시 |
 
+**관리자 검수**
+
+| `error.code` | HTTP 상태 | 언제 | 화면 처리 예시 |
+| --- | --- | --- | --- |
+| `SPACE_PROOF_REQUIRED` | 400 | 증빙이 없는 공간을 공개 승인 | 공개 보류로 처리하도록 안내 |
+| `REVIEW_CHECKLIST_INCOMPLETE` | 400 | 5개 검수 항목을 모두 확인하지 않고 승인 | 체크하지 않은 항목 강조 |
+| `REVIEW_REASON_REQUIRED` | 400 | 사유 없이 수정 요청·공개 보류 | 사유 입력칸 강조 |
+
 ### 3-3-1. 목록 응답 (페이지)
 
 목록 API 는 `page`(0부터), `size`(기본 20, 최대 100) 쿼리 파라미터를 받고 아래 형식으로 응답합니다.
@@ -626,3 +634,11 @@ try {
 | POST | `/api/v1/provider/spaces/{spaceId}/pause` | PROVIDER | 공개 일시 중단 |
 | POST | `/api/v1/provider/spaces/{spaceId}/resume` | PROVIDER | 공개 재개 |
 | POST | `/api/v1/provider/spaces/{spaceId}/resubmit` | PROVIDER | 수정 후 다시 검수 요청 |
+
+### 관리자 — 공간 검수 (`http/admin-review.http`)
+
+| 메서드 | 경로 | 인증 | 설명 |
+| --- | --- | --- | --- |
+| GET | `/api/v1/admin/spaces` | ADMIN | 공간 목록 (status=PENDING_REVIEW: 검수 대기, 생략: 전체 현황) |
+| GET | `/api/v1/admin/spaces/{spaceId}` | ADMIN | 검수 상세 (증빙 임시 주소·제공자·이력·공식 정보 링크) |
+| POST | `/api/v1/admin/spaces/{spaceId}/reviews` | ADMIN | 검수 결과 등록 (승인 / 수정 요청 / 공개 보류) |

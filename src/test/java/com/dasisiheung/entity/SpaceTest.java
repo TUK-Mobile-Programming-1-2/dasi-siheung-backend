@@ -3,11 +3,15 @@ package com.dasisiheung.entity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.dasisiheung.entity.member.Member;
 import com.dasisiheung.entity.space.BuildingUse;
 import com.dasisiheung.entity.space.ProofType;
+import com.dasisiheung.entity.space.ReviewChecklist;
+import com.dasisiheung.entity.space.ReviewDecision;
 import com.dasisiheung.entity.space.Space;
 import com.dasisiheung.entity.space.SpaceDetails;
 import com.dasisiheung.entity.space.SpaceProof;
+import com.dasisiheung.entity.space.SpaceReview;
 import com.dasisiheung.entity.space.SpaceStatus;
 import com.dasisiheung.exception.ErrorCode;
 import com.dasisiheung.support.SpaceFixtures;
@@ -149,6 +153,38 @@ class SpaceTest {
         ReflectionTestUtils.setField(space, "status", SpaceStatus.REVISION_REQUESTED);
         space.resubmit();
         assertThat(space.getStatus()).isEqualTo(SpaceStatus.PENDING_REVIEW);
+    }
+
+    @Test
+    @DisplayName("공개 승인은 증빙 1개 이상 + 5개 항목 모두 확인, 수정 요청·보류는 사유 필수, 검수 대기에서만")
+    void reviewRules() {
+        Space space = SpaceFixtures.space(1L, SpaceFixtures.provider(2L), Set.of(), TODAY);
+        Member admin = SpaceFixtures.provider(9L);
+        ReviewChecklist allPassed = new ReviewChecklist(true, true, true, true, true);
+        ReviewChecklist areaMismatch = new ReviewChecklist(true, true, true, false, true);
+
+        assertThatThrownBy(() -> space.review(admin, ReviewDecision.APPROVE, null, allPassed, NOW))
+                .extracting("errorCode").isEqualTo(ErrorCode.SPACE_PROOF_REQUIRED);
+
+        space.addProof(ProofType.LEASE_CONTRACT,
+                new SpaceProof.StoredProofFile("proofs/a.pdf", "a.pdf", "application/pdf", 1), NOW);
+        assertThatThrownBy(() -> space.review(admin, ReviewDecision.APPROVE, null, areaMismatch, NOW))
+                .extracting("errorCode").isEqualTo(ErrorCode.REVIEW_CHECKLIST_INCOMPLETE);
+        assertThatThrownBy(() -> space.review(admin, ReviewDecision.REQUEST_REVISION, " ", areaMismatch, NOW))
+                .extracting("errorCode").isEqualTo(ErrorCode.REVIEW_REASON_REQUIRED);
+
+        SpaceReview revision = space.review(admin, ReviewDecision.REQUEST_REVISION, "면적이 증빙과 다릅니다.", areaMismatch, NOW);
+        assertThat(space.getStatus()).isEqualTo(SpaceStatus.REVISION_REQUESTED);
+        assertThat(space.getReviewComment()).isEqualTo("면적이 증빙과 다릅니다.");
+        assertThat(revision.getChecklist().isAreaMatched()).isFalse();
+        assertThatThrownBy(() -> space.review(admin, ReviewDecision.APPROVE, null, allPassed, NOW))
+                .extracting("errorCode").isEqualTo(ErrorCode.INVALID_SPACE_STATUS);
+
+        space.resubmit();
+        space.review(admin, ReviewDecision.APPROVE, null, allPassed, NOW);
+        assertThat(space.getStatus()).isEqualTo(SpaceStatus.PUBLISHED);
+        assertThat(space.getReviewComment()).isNull();
+        assertThat(space.getReviewedAt()).isEqualTo(NOW);
     }
 
     private static Space published() {

@@ -6,6 +6,7 @@ import com.dasisiheung.exception.BusinessException;
 import com.dasisiheung.exception.ErrorCode;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface SpaceRepository extends JpaRepository<Space, Long> {
@@ -18,4 +19,10 @@ public interface SpaceRepository extends JpaRepository<Space, Long> {
     Page<Space> findByProvider_Id(Long providerId, Pageable pageable);
 
     Page<Space> findByProvider_IdAndStatus(Long providerId, SpaceStatus status, Pageable pageable);
+
+    @EntityGraph(attributePaths = "provider")
+    Page<Space> findByStatus(SpaceStatus status, Pageable pageable);
+
+    @EntityGraph(attributePaths = "provider")
+    Page<Space> findAllBy(Pageable pageable);
 }
