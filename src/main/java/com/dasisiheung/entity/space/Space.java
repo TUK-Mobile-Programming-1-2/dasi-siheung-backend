@@ -150,6 +150,48 @@ public class Space extends BaseTimeEntity {
         return provider.getId().equals(memberId);
     }
 
+    /**
+     * 공간 정보를 바꾼다. 공개·일시 중단 중에 검수 항목(지역·주소·건물·호실·면적·용도)이 바뀌면 다시 검수받는다.
+     *
+     * @param availableDates null 이면 기존 캘린더를 유지한다
+     */
+    public void update(Region region, SpaceDetails details, Set<LocalDate> availableDates, LocalDate today) {
+        validateEditable();
+        boolean reviewedFieldsChanged = this.region != region || currentDetails().differsInReviewedFields(details);
+        apply(region, details);
+        if (availableDates != null) {
+            changeAvailableDates(availableDates, today);
+        }
+        if (reviewedFieldsChanged) {
+            requestReReviewIfPublic();
+        }
+    }
+
+    /** 공개 중인 공간을 잠시 내린다. 진행 중인 신청은 그대로 처리할 수 있다. */
+    public void pause() {
+        transition(SpaceStatus.PUBLISHED, SpaceStatus.PAUSED, "공개 중인 공간만 일시 중단할 수 있습니다.");
+    }
+
+    public void resume() {
+        transition(SpaceStatus.PAUSED, SpaceStatus.PUBLISHED, "일시 중단한 공간만 다시 공개할 수 있습니다.");
+    }
+
+    /** 수정 요청·공개 보류를 받은 공간을 고친 뒤 다시 검수를 요청한다. */
+    public void resubmit() {
+        if (status != SpaceStatus.REVISION_REQUESTED && status != SpaceStatus.ON_HOLD) {
+            throw new BusinessException(ErrorCode.INVALID_SPACE_STATUS,
+                    "수정 요청 또는 공개 보류 상태에서만 다시 검수를 요청할 수 있습니다.");
+        }
+        status = SpaceStatus.PENDING_REVIEW;
+    }
+
+    private void transition(SpaceStatus from, SpaceStatus to, String message) {
+        if (status != from) {
+            throw new BusinessException(ErrorCode.INVALID_SPACE_STATUS, message);
+        }
+        status = to;
+    }
+
     /** @throws BusinessException 본인 공간이 아니면 NOT_SPACE_OWNER */
     public void validateOwner(Long memberId) {
         if (!isOwnedBy(memberId)) {
