@@ -185,6 +185,47 @@ public class Space extends BaseTimeEntity {
         status = SpaceStatus.PENDING_REVIEW;
     }
 
+    /**
+     * 관리자 검수 결과를 반영하고 이력을 만든다. (이력 저장은 서비스가 맡는다)
+     * <ul>
+     *   <li>검수 대기 상태에서만 할 수 있다.</li>
+     *   <li>공개 승인: 증빙 1개 이상 + 5개 검수 항목 모두 확인</li>
+     *   <li>수정 요청 · 공개 보류: 사유 필수 (제공자에게 그대로 보인다)</li>
+     * </ul>
+     */
+    public SpaceReview review(Member admin, ReviewDecision decision, String reason, ReviewChecklist checklist,
+                              LocalDateTime now) {
+        if (status != SpaceStatus.PENDING_REVIEW) {
+            throw new BusinessException(ErrorCode.INVALID_SPACE_STATUS, "검수 대기 중인 공간만 검수할 수 있습니다.");
+        }
+        String normalizedReason = blankToNull(reason);
+        if (decision == ReviewDecision.APPROVE) {
+            validateApprovable(checklist);
+        } else if (normalizedReason == null) {
+            throw new BusinessException(ErrorCode.REVIEW_REASON_REQUIRED);
+        }
+        this.status = decision.getResultStatus();
+        this.reviewComment = normalizedReason;
+        this.reviewedAt = now;
+        return new SpaceReview(this, admin, decision, normalizedReason, checklist, now);
+    }
+
+    private void validateApprovable(ReviewChecklist checklist) {
+        if (proofs.isEmpty()) {
+            throw new BusinessException(ErrorCode.SPACE_PROOF_REQUIRED);
+        }
+        if (!checklist.allPassed()) {
+            throw new BusinessException(ErrorCode.REVIEW_CHECKLIST_INCOMPLETE);
+        }
+    }
+
+    /** 신고 처리로 관리자가 숨긴다. 이용자 화면에서 사라지고 제공자는 수정할 수 없다. */
+    public void hide(String reason, LocalDateTime now) {
+        this.status = SpaceStatus.HIDDEN;
+        this.reviewComment = reason;
+        this.reviewedAt = now;
+    }
+
     private void transition(SpaceStatus from, SpaceStatus to, String message) {
         if (status != from) {
             throw new BusinessException(ErrorCode.INVALID_SPACE_STATUS, message);

@@ -51,7 +51,12 @@ public enum ErrorCode {
     SPACE_PHOTO_NOT_FOUND(HttpStatus.NOT_FOUND, "사진을 찾을 수 없습니다."),
     INVALID_PHOTO_ORDER(HttpStatus.BAD_REQUEST, "이 공간의 모든 사진 ID 를 한 번씩 보내야 합니다."),
     SPACE_PROOF_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "증빙은 최대 5개까지 올릴 수 있습니다."),
-    SPACE_PROOF_NOT_FOUND(HttpStatus.NOT_FOUND, "증빙을 찾을 수 없습니다.");
+    SPACE_PROOF_NOT_FOUND(HttpStatus.NOT_FOUND, "증빙을 찾을 수 없습니다."),
+
+    // 관리자 검수
+    SPACE_PROOF_REQUIRED(HttpStatus.BAD_REQUEST, "권한 증빙이 없는 공간은 공개 승인할 수 없습니다. 공개 보류로 처리해 주세요."),
+    REVIEW_CHECKLIST_INCOMPLETE(HttpStatus.BAD_REQUEST, "검수 항목 5개를 모두 확인해야 공개 승인할 수 있습니다."),
+    REVIEW_REASON_REQUIRED(HttpStatus.BAD_REQUEST, "수정 요청·공개 보류는 사유를 입력해야 합니다.");
 
     private final HttpStatus status;
     private final String message;
