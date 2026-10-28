@@ -24,6 +24,9 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
@@ -61,11 +64,19 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({
             HttpMessageNotReadableException.class,
             MethodArgumentTypeMismatchException.class,
-            MissingServletRequestParameterException.class
+            MissingServletRequestParameterException.class,
+            MissingServletRequestPartException.class,
+            MultipartException.class
     })
     public ResponseEntity<ApiResult<Void>> handleMalformedRequest(Exception e) {
         log.debug("잘못된 요청 형식: {}", e.getMessage());
         return toResponse(ErrorCode.INVALID_INPUT);
+    }
+
+    /** spring.servlet.multipart 의 요청 크기 제한을 넘은 경우 (파일별 제한은 UploadPolicy 가 검사) */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResult<Void>> handleMaxUploadSize(MaxUploadSizeExceededException e) {
+        return toResponse(ErrorCode.FILE_TOO_LARGE);
     }
 
     @ExceptionHandler(NoResourceFoundException.class)

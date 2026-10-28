@@ -14,3 +14,11 @@ spring:
 logging:
   level:
     root: info
+
+# 파일은 Supabase Storage 에 저장한다. (버킷이 없으면 기동 시 자동 생성)
+app:
+  storage:
+    provider: supabase
+    supabase:
+      url: ${SUPABASE_URL}
+      service-key: ${SUPABASE_SERVICE_KEY}
