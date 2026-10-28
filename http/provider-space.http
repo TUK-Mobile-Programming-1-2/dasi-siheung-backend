@@ -1,0 +1,148 @@
+### 준비: 공간 제공자 가입
+POST {{baseUrl}}/api/v1/auth/signup
+Content-Type: application/json
+
+{
+  "email": "http-provider-{{$timestamp}}-{{$randomInt}}@test.dasisiheung.com",
+  "password": "password123",
+  "name": "김제공",
+  "phone": "010-2222-3333",
+  "role": "PROVIDER"
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+    client.global.set("providerEmail", response.body.data.email);
+%}
+
+### 준비: 공간 제공자 로그인
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{providerEmail}}",
+  "password": "password123"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+    client.global.set("providerToken", response.body.data.accessToken);
+    // 사용 가능 날짜: 내일 · 모레 (yyyy-MM-dd)
+    const day = (offset) => {
+        const d = new Date(Date.now() + 9 * 3600 * 1000 + offset * 86400 * 1000);
+        return d.toISOString().substring(0, 10);
+    };
+    client.global.set("day1", day(1));
+    client.global.set("day2", day(2));
+%}
+
+### 공간 등록 (정왕역 앞)
+# 인증: PROVIDER
+# 기대값: 201 Created, status = PENDING_REVIEW, region = JEONGWANG (좌표로 판정)
+POST {{baseUrl}}/api/v1/provider/spaces
+Authorization: Bearer {{providerToken}}
+Content-Type: application/json
+
+{
+  "title": "정왕역 앞 1층 상가",
+  "description": "유동 인구가 많은 역 앞 코너 상가입니다.",
+  "rules": "21시 이후 소음 금지, 퇴실 시 원상 복구",
+  "address": "경기도 시흥시 마유로 418",
+  "buildingName": "정왕프라자",
+  "unitNumber": "101호",
+  "latitude": 37.3517,
+  "longitude": 126.7428,
+  "areaSqm": 33.06,
+  "buildingUse": "NEIGHBORHOOD_1",
+  "commercialTheme": "FOOD_ALLEY",
+  "dailyPrice": 50000,
+  "facilities": ["WIFI", "ELECTRICITY"],
+  "activityTypes": ["POPUP_STORE", "EXHIBITION"],
+  "availableDates": ["{{day1}}", "{{day2}}"]
+}
+
+> {%
+    client.test("201 Created + 검수 대기", () => {
+        client.assert(response.status === 201, `기대 201, 실제 ${response.status}`);
+        client.assert(response.body.data.status === "PENDING_REVIEW", `실제 ${response.body.data.status}`);
+        client.assert(response.body.data.region === "JEONGWANG", `실제 ${response.body.data.region}`);
+        client.assert(response.body.data.availableDates.length === 2, `실제 ${response.body.data.availableDates}`);
+    });
+    client.global.set("providerSpaceId", response.body.data.id);
+%}
+
+### 거북섬 좌표 → region = GEOBUKSEOM
+POST {{baseUrl}}/api/v1/provider/spaces
+Authorization: Bearer {{providerToken}}
+Content-Type: application/json
+
+{
+  "title": "거북섬 수변 상가",
+  "description": "웨이브파크 앞 수변 상가",
+  "address": "경기도 시흥시 거북섬중앙로 10",
+  "latitude": 37.3175,
+  "longitude": 126.6822,
+  "areaSqm": 45.5,
+  "buildingUse": "SALES",
+  "dailyPrice": 70000,
+  "activityTypes": ["EXHIBITION"]
+}
+
+> {%
+    client.test("201 Created + GEOBUKSEOM", () => {
+        client.assert(response.status === 201, `실제 ${response.status}`);
+        client.assert(response.body.data.region === "GEOBUKSEOM", `실제 ${response.body.data.region}`);
+        client.assert(response.body.data.availableDates.length === 0, "날짜를 보내지 않으면 빈 캘린더");
+    });
+%}
+
+### 서비스 지역 밖(서울시청) → 400
+# 기대값: 400 SPACE_OUT_OF_SERVICE_AREA
+POST {{baseUrl}}/api/v1/provider/spaces
+Authorization: Bearer {{providerToken}}
+Content-Type: application/json
+
+{
+  "title": "서울 상가",
+  "description": "서비스 지역 밖",
+  "address": "서울특별시 중구 세종대로 110",
+  "latitude": 37.5665,
+  "longitude": 126.9780,
+  "areaSqm": 30,
+  "buildingUse": "SALES",
+  "dailyPrice": 50000,
+  "activityTypes": ["POPUP_STORE"]
+}
+
+> {%
+    client.test("400 SPACE_OUT_OF_SERVICE_AREA", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "SPACE_OUT_OF_SERVICE_AREA", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 과거 날짜 → 400
+# 기대값: 400 INVALID_AVAILABLE_DATE
+POST {{baseUrl}}/api/v1/provider/spaces
+Authorization: Bearer {{providerToken}}
+Content-Type: application/json
+
+{
+  "title": "날짜 오류",
+  "description": "과거 날짜",
+  "address": "경기도 시흥시 마유로 418",
+  "latitude": 37.3517,
+  "longitude": 126.7428,
+  "areaSqm": 30,
+  "buildingUse": "SALES",
+  "dailyPrice": 50000,
+  "activityTypes": ["POPUP_STORE"],
+  "availableDates": ["2020-01-01"]
+}
+
+> {%
+    client.test("400 INVALID_AVAILABLE_DATE", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "INVALID_AVAILABLE_DATE", `실제 ${response.body.error.code}`);
+    });
+%}
