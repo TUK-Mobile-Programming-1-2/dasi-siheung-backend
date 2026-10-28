@@ -2,12 +2,17 @@ package com.dasisiheung.controller;
 
 import com.dasisiheung.config.OpenApiConfig;
 import com.dasisiheung.dto.common.ApiResult;
+import com.dasisiheung.dto.common.PageQuery;
+import com.dasisiheung.dto.common.PageResponse;
+import com.dasisiheung.dto.space.AvailableDatesRequest;
 import com.dasisiheung.dto.space.PhotoOrderRequest;
 import com.dasisiheung.dto.space.ProviderSpaceResponse;
+import com.dasisiheung.dto.space.ProviderSpaceSummaryResponse;
 import com.dasisiheung.dto.space.SpacePhotoResponse;
 import com.dasisiheung.dto.space.SpaceProofResponse;
 import com.dasisiheung.dto.space.SpaceRequest;
 import com.dasisiheung.entity.space.ProofType;
+import com.dasisiheung.entity.space.SpaceStatus;
 import com.dasisiheung.security.AuthMember;
 import com.dasisiheung.security.LoginMember;
 import com.dasisiheung.service.SpaceFileService;
@@ -18,6 +23,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -51,6 +57,56 @@ public class ProviderSpaceController {
     public ApiResult<ProviderSpaceResponse> register(@LoginMember AuthMember loginMember,
                                                      @Valid @RequestBody SpaceRequest request) {
         return ApiResult.ok(spaceService.register(loginMember.id(), request));
+    }
+
+    @Operation(summary = "내 공간 목록", description = "검수 상태와 사유를 함께 보여줍니다. status 로 상태별 필터 (생략하면 전체).")
+    @GetMapping
+    public ApiResult<PageResponse<ProviderSpaceSummaryResponse>> getMySpaces(
+            @LoginMember AuthMember loginMember,
+            @RequestParam(required = false) SpaceStatus status,
+            @Valid @ParameterObject PageQuery pageQuery) {
+        return ApiResult.ok(spaceService.getMySpaces(loginMember.id(), status, pageQuery));
+    }
+
+    @Operation(summary = "내 공간 상세", description = "사진·증빙(임시 주소)·검수 사유를 포함합니다.")
+    @GetMapping("/{spaceId}")
+    public ApiResult<ProviderSpaceResponse> getMySpace(@LoginMember AuthMember loginMember, @PathVariable Long spaceId) {
+        return ApiResult.ok(spaceService.getMySpace(loginMember.id(), spaceId));
+    }
+
+    @Operation(summary = "공간 정보 수정",
+            description = "공개·일시 중단 중에 주소·건물·호실·면적·용도(검수 항목)를 바꾸면 다시 검수 대기가 됩니다. "
+                    + "availableDates 를 보내지 않으면 캘린더는 그대로입니다.")
+    @PutMapping("/{spaceId}")
+    public ApiResult<ProviderSpaceResponse> update(@LoginMember AuthMember loginMember, @PathVariable Long spaceId,
+                                                   @Valid @RequestBody SpaceRequest request) {
+        return ApiResult.ok(spaceService.update(loginMember.id(), spaceId, request));
+    }
+
+    @Operation(summary = "사용 가능 날짜(캘린더) 설정", description = "보낸 날짜 목록으로 통째로 바꿉니다. 검수 상태에는 영향이 없습니다.")
+    @PutMapping("/{spaceId}/available-dates")
+    public ApiResult<ProviderSpaceResponse> changeAvailableDates(@LoginMember AuthMember loginMember,
+                                                                 @PathVariable Long spaceId,
+                                                                 @Valid @RequestBody AvailableDatesRequest request) {
+        return ApiResult.ok(spaceService.changeAvailableDates(loginMember.id(), spaceId, request.dates()));
+    }
+
+    @Operation(summary = "공개 일시 중단", description = "공개(PUBLISHED) 중인 공간만 중단할 수 있습니다. 새 신청을 받지 않습니다.")
+    @PostMapping("/{spaceId}/pause")
+    public ApiResult<ProviderSpaceResponse> pause(@LoginMember AuthMember loginMember, @PathVariable Long spaceId) {
+        return ApiResult.ok(spaceService.pause(loginMember.id(), spaceId));
+    }
+
+    @Operation(summary = "공개 재개", description = "일시 중단(PAUSED)한 공간을 다시 공개합니다.")
+    @PostMapping("/{spaceId}/resume")
+    public ApiResult<ProviderSpaceResponse> resume(@LoginMember AuthMember loginMember, @PathVariable Long spaceId) {
+        return ApiResult.ok(spaceService.resume(loginMember.id(), spaceId));
+    }
+
+    @Operation(summary = "다시 검수 요청", description = "수정 요청(REVISION_REQUESTED)·공개 보류(ON_HOLD)를 받은 공간을 고친 뒤 검수를 다시 요청합니다.")
+    @PostMapping("/{spaceId}/resubmit")
+    public ApiResult<ProviderSpaceResponse> resubmit(@LoginMember AuthMember loginMember, @PathVariable Long spaceId) {
+        return ApiResult.ok(spaceService.resubmit(loginMember.id(), spaceId));
     }
 
     @Operation(summary = "사진 추가", description = "여러 장을 한 번에 올립니다. (multipart 파트 이름: files, 공간당 최대 10장, JPG·PNG·WEBP 10MB)")

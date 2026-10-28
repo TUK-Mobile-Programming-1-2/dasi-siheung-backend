@@ -1,6 +1,7 @@
 package com.dasisiheung.service;
 
 import com.dasisiheung.dto.space.ProviderSpaceResponse;
+import com.dasisiheung.dto.space.ProviderSpaceSummaryResponse;
 import com.dasisiheung.dto.space.SpacePhotoResponse;
 import com.dasisiheung.dto.space.SpaceProofResponse;
 import com.dasisiheung.entity.space.Space;
@@ -18,6 +19,10 @@ public class SpaceResponseMapper {
 
     public ProviderSpaceResponse providerSpace(Space space) {
         return ProviderSpaceResponse.of(space, photos(space), proofs(space));
+    }
+
+    public ProviderSpaceSummaryResponse providerSpaceSummary(Space space) {
+        return ProviderSpaceSummaryResponse.of(space, thumbnailUrl(space));
     }
 
     public List<SpacePhotoResponse> photos(Space space) {
