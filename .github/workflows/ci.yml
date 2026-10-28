@@ -115,6 +115,24 @@ jobs:
           tail -n 200 app.log
           exit 1
 
+      # 관리자는 가입 API 로 만들 수 없으므로 DBA 승격과 같은 방식(SQL)으로 테스트용 관리자를 만든다.
+      # 비밀번호 해시는 pgcrypto 의 crypt(bf) — 서버의 BCrypt 와 호환된다.
+      - name: 테스트용 관리자 준비
+        env:
+          PGPASSWORD: ${{ env.DB_PASSWORD }}
+          CI_ADMIN_EMAIL: ci-admin@test.dasisiheung.com
+          CI_ADMIN_PASSWORD: ci-admin-password1
+        run: |
+          psql -h localhost -U "$DB_USERNAME" -d dasi_siheung -v ON_ERROR_STOP=1 \
+            -v email="$CI_ADMIN_EMAIL" -v password="$CI_ADMIN_PASSWORD" <<'SQL'
+          CREATE EXTENSION IF NOT EXISTS pgcrypto;
+          INSERT INTO member (email, password_hash, name, phone, role, status, created_at, updated_at)
+          VALUES (:'email', crypt(:'password', gen_salt('bf', 10)), 'CI 관리자', '01000000000', 'ADMIN', 'ACTIVE', now(), now())
+          ON CONFLICT (email) DO NOTHING;
+          SQL
+          printf '{"local": {"adminEmail": "%s", "adminPassword": "%s"}}' "$CI_ADMIN_EMAIL" "$CI_ADMIN_PASSWORD" \
+            > http/http-client.private.env.json
+
       - name: IntelliJ HTTP Client CLI 설치
         run: |
           curl -fsSL -o "$RUNNER_TEMP/ijhttp.zip" https://jb.gg/ijhttp/latest
@@ -123,7 +141,7 @@ jobs:
 
       - name: .http 기대값 검증
         working-directory: http
-        run: ijhttp --env-file http-client.env.json --env local ./*.http
+        run: ijhttp --env-file http-client.env.json --private-env-file http-client.private.env.json --env local ./*.http
 
       - name: 서버 로그 업로드
         if: failure()
