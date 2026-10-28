@@ -113,6 +113,51 @@ class SpaceTest {
     }
 
     @Test
+    @DisplayName("공개 중에 용도를 바꾸면 다시 검수 대기, 가격만 바꾸면 공개 유지")
+    void updateReReviewRule() {
+        Space space = published();
+        SpaceDetails base = SpaceFixtures.request(Set.of()).toDetails();
+        SpaceDetails priceOnly = new SpaceDetails(base.title(), base.description(), base.rules(), base.address(),
+                base.buildingName(), base.unitNumber(), base.location(), base.areaSqm(), base.buildingUse(),
+                base.commercialTheme(), 80_000, base.facilities(), base.activityTypes());
+        SpaceDetails useChanged = new SpaceDetails(base.title(), base.description(), base.rules(), base.address(),
+                base.buildingName(), base.unitNumber(), base.location(), base.areaSqm(), BuildingUse.SALES,
+                base.commercialTheme(), base.dailyPrice(), base.facilities(), base.activityTypes());
+
+        space.update(space.getRegion(), priceOnly, null, TODAY);
+        assertThat(space.getStatus()).isEqualTo(SpaceStatus.PUBLISHED);
+        assertThat(space.getDailyPrice()).isEqualTo(80_000);
+
+        space.update(space.getRegion(), useChanged, Set.of(TODAY.plusDays(3)), TODAY);
+        assertThat(space.getStatus()).isEqualTo(SpaceStatus.PENDING_REVIEW);
+        assertThat(space.getAvailableDates()).containsExactly(TODAY.plusDays(3));
+    }
+
+    @Test
+    @DisplayName("일시 중단은 공개 중에만, 재개는 일시 중단 중에만, 재검수 요청은 수정 요청·보류 중에만")
+    void statusTransitions() {
+        Space space = published();
+
+        space.pause();
+        assertThat(space.getStatus()).isEqualTo(SpaceStatus.PAUSED);
+        assertThatThrownBy(space::pause).extracting("errorCode").isEqualTo(ErrorCode.INVALID_SPACE_STATUS);
+
+        space.resume();
+        assertThat(space.getStatus()).isEqualTo(SpaceStatus.PUBLISHED);
+        assertThatThrownBy(space::resubmit).extracting("errorCode").isEqualTo(ErrorCode.INVALID_SPACE_STATUS);
+
+        ReflectionTestUtils.setField(space, "status", SpaceStatus.REVISION_REQUESTED);
+        space.resubmit();
+        assertThat(space.getStatus()).isEqualTo(SpaceStatus.PENDING_REVIEW);
+    }
+
+    private static Space published() {
+        Space space = SpaceFixtures.space(1L, SpaceFixtures.provider(2L), Set.of(), TODAY);
+        ReflectionTestUtils.setField(space, "status", SpaceStatus.PUBLISHED);
+        return space;
+    }
+
+    @Test
     @DisplayName("주소·건물·호실·면적·용도가 바뀌면 검수 항목이 바뀐 것으로 본다 (이름·가격은 아님)")
     void reviewedFieldChanges() {
         SpaceDetails base = SpaceFixtures.request(Set.of()).toDetails();

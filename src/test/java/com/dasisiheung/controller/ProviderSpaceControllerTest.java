@@ -3,6 +3,7 @@ package com.dasisiheung.controller;
 import static com.dasisiheung.support.ApiDocumentation.authorization;
 import static com.dasisiheung.support.ApiDocumentation.document;
 import static com.dasisiheung.support.ApiDocumentation.error;
+import static com.dasisiheung.support.ApiDocumentation.page;
 import static com.dasisiheung.support.ApiDocumentation.resource;
 import static com.dasisiheung.support.ApiDocumentation.success;
 import static org.mockito.ArgumentMatchers.any;
@@ -21,17 +22,23 @@ import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWit
 import static org.springframework.restdocs.request.RequestDocumentation.parameterWithName;
 import static org.springframework.restdocs.request.RequestDocumentation.partWithName;
 import static org.springframework.restdocs.request.RequestDocumentation.pathParameters;
+import static org.springframework.restdocs.request.RequestDocumentation.queryParameters;
 import static org.springframework.restdocs.request.RequestDocumentation.requestParts;
 import static org.springframework.restdocs.payload.PayloadDocumentation.requestFields;
 import static org.springframework.restdocs.payload.PayloadDocumentation.responseFields;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.dasisiheung.dto.common.PageQuery;
+import com.dasisiheung.dto.common.PageResponse;
 import com.dasisiheung.dto.space.ProviderSpaceResponse;
+import com.dasisiheung.dto.space.ProviderSpaceSummaryResponse;
 import com.dasisiheung.dto.space.SpacePhotoResponse;
 import com.dasisiheung.dto.space.SpaceProofResponse;
 import com.dasisiheung.dto.space.SpaceRequest;
 import com.dasisiheung.entity.space.ProofType;
+import com.dasisiheung.entity.space.Region;
+import com.dasisiheung.entity.space.SpaceStatus;
 import com.dasisiheung.exception.BusinessException;
 import com.dasisiheung.exception.ErrorCode;
 import com.dasisiheung.service.SpaceFileService;
@@ -250,6 +257,146 @@ class ProviderSpaceControllerTest extends ApiDocsTestSupport {
                                 parameterWithName("proofId").description("증빙 ID")),
                         responseFields(success())));
         then(spaceFileService).should().deleteProof(PROVIDER_ID, 10L, 5L);
+    }
+
+    @Test
+    @DisplayName("내 공간 목록: 검수 상태·사유와 대표 사진")
+    void getMySpaces() throws Exception {
+        ProviderSpaceSummaryResponse summary = new ProviderSpaceSummaryResponse(10L, "정왕역 앞 1층 상가",
+                Region.JEONGWANG, SpaceStatus.REVISION_REQUESTED, "건물·호실이 증빙과 다릅니다.",
+                photos().get(0).url(), 50_000, 2, 1, 14, FixedClockConfig.FIXED_LOCAL_NOW);
+        given(spaceService.getMySpaces(eq(PROVIDER_ID), eq(SpaceStatus.REVISION_REQUESTED), any(PageQuery.class)))
+                .willReturn(new PageResponse<>(List.of(summary), 0, 20, 1, 1, false));
+
+        mockMvc.perform(get("/api/v1/provider/spaces")
+                        .param("status", "REVISION_REQUESTED")
+                        .param("page", "0")
+                        .param("size", "20")
+                        .header(HttpHeaders.AUTHORIZATION, providerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].reviewComment").value("건물·호실이 증빙과 다릅니다."))
+                .andDo(document("provider-space-list",
+                        resource(TAG, "내 공간 목록", "최근 수정 순. status 를 생략하면 전체 상태를 보여줍니다."),
+                        requestHeaders(authorization()),
+                        queryParameters(
+                                parameterWithName("status").optional().description("공개 상태 필터 (선택)"),
+                                parameterWithName("page").optional().description("페이지 (0부터, 기본 0)"),
+                                parameterWithName("size").optional().description("페이지 크기 (기본 20, 최대 100)")),
+                        responseFields(page(
+                                fieldWithPath("data.content[].id").type(JsonFieldType.NUMBER).description("공간 ID"),
+                                fieldWithPath("data.content[].title").type(JsonFieldType.STRING).description("공간 이름"),
+                                fieldWithPath("data.content[].region").type(JsonFieldType.STRING).description("서비스 지역"),
+                                fieldWithPath("data.content[].status").type(JsonFieldType.STRING).description("공개 상태"),
+                                fieldWithPath("data.content[].reviewComment").type(JsonFieldType.STRING).optional().description("가장 최근 검수 사유"),
+                                fieldWithPath("data.content[].thumbnailUrl").type(JsonFieldType.STRING).optional().description("대표 사진 주소"),
+                                fieldWithPath("data.content[].dailyPrice").type(JsonFieldType.NUMBER).description("1일 이용료(원)"),
+                                fieldWithPath("data.content[].photoCount").type(JsonFieldType.NUMBER).description("사진 수"),
+                                fieldWithPath("data.content[].proofCount").type(JsonFieldType.NUMBER).description("증빙 수"),
+                                fieldWithPath("data.content[].availableDateCount").type(JsonFieldType.NUMBER).description("사용 가능 날짜 수"),
+                                fieldWithPath("data.content[].updatedAt").type(JsonFieldType.STRING).description("마지막 수정 시각")))));
+    }
+
+    @Test
+    @DisplayName("내 공간 상세: 사진·증빙 포함")
+    void getMySpace() throws Exception {
+        given(spaceService.getMySpace(PROVIDER_ID, 10L)).willReturn(providerSpaceWithFiles());
+
+        mockMvc.perform(get("/api/v1/provider/spaces/{spaceId}", 10L)
+                        .header(HttpHeaders.AUTHORIZATION, providerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.photos.length()").value(2))
+                .andDo(document("provider-space-detail",
+                        resource(TAG, "내 공간 상세", "사진, 증빙(10분짜리 임시 주소), 검수 사유를 포함합니다."),
+                        requestHeaders(authorization()),
+                        pathParameters(parameterWithName("spaceId").description("공간 ID")),
+                        responseFields(success(detailFields()))));
+    }
+
+    @Test
+    @DisplayName("공간 정보 수정")
+    void update() throws Exception {
+        given(spaceService.update(eq(PROVIDER_ID), eq(10L), any(SpaceRequest.class))).willReturn(providerSpace());
+
+        mockMvc.perform(put("/api/v1/provider/spaces/{spaceId}", 10L)
+                        .header(HttpHeaders.AUTHORIZATION, providerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(SpaceFixtures.request(Set.of(TOMORROW)))))
+                .andExpect(status().isOk())
+                .andDo(document("provider-space-update",
+                        resource(TAG, "공간 정보 수정", "공개·일시 중단 중에 주소·건물·호실·면적·용도(검수 항목)나 지역이 바뀌면 "
+                                + "다시 검수 대기(PENDING_REVIEW)가 됩니다. 이름·소개·가격·시설·허용 활동만 바꾸면 공개가 유지됩니다."),
+                        requestHeaders(authorization()),
+                        pathParameters(parameterWithName("spaceId").description("공간 ID")),
+                        requestFields(SpaceDocumentation.spaceRequestFields()),
+                        responseFields(success(providerSpaceFields()))));
+    }
+
+    @Test
+    @DisplayName("사용 가능 날짜(캘린더) 설정")
+    void changeAvailableDates() throws Exception {
+        given(spaceService.changeAvailableDates(eq(PROVIDER_ID), eq(10L), any())).willReturn(providerSpace());
+
+        mockMvc.perform(put("/api/v1/provider/spaces/{spaceId}/available-dates", 10L)
+                        .header(HttpHeaders.AUTHORIZATION, providerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"dates": ["%s", "%s"]}
+                                """.formatted(TOMORROW, TOMORROW.plusDays(1))))
+                .andExpect(status().isOk())
+                .andDo(document("provider-space-available-dates",
+                        resource(TAG, "사용 가능 날짜 설정", "보낸 날짜 목록으로 통째로 바꿉니다. 빈 목록이면 모두 닫습니다. "
+                                + "오늘 이전·1년 이후 날짜가 있으면 400 INVALID_AVAILABLE_DATE."),
+                        requestHeaders(authorization()),
+                        pathParameters(parameterWithName("spaceId").description("공간 ID")),
+                        requestFields(fieldWithPath("dates").type(JsonFieldType.ARRAY).description("사용 가능 날짜 yyyy-MM-dd")),
+                        responseFields(success(providerSpaceFields()))));
+    }
+
+    @Test
+    @DisplayName("공개 일시 중단 · 재개 · 다시 검수 요청")
+    void statusActions() throws Exception {
+        given(spaceService.pause(PROVIDER_ID, 10L)).willReturn(providerSpace());
+        given(spaceService.resume(PROVIDER_ID, 10L)).willReturn(providerSpace());
+        given(spaceService.resubmit(PROVIDER_ID, 10L)).willReturn(providerSpace());
+
+        for (String[] action : new String[][]{
+                {"pause", "공개 일시 중단", "공개(PUBLISHED) 중인 공간만 중단할 수 있으며, 아니면 409 INVALID_SPACE_STATUS. 중단 중에는 새 신청을 받지 않습니다."},
+                {"resume", "공개 재개", "일시 중단(PAUSED)한 공간만 다시 공개할 수 있습니다."},
+                {"resubmit", "다시 검수 요청", "수정 요청·공개 보류 상태에서만 요청할 수 있습니다."}}) {
+            mockMvc.perform(post("/api/v1/provider/spaces/{spaceId}/" + action[0], 10L)
+                            .header(HttpHeaders.AUTHORIZATION, providerToken()))
+                    .andExpect(status().isOk())
+                    .andDo(document("provider-space-" + action[0],
+                            resource(TAG, action[1], action[2]),
+                            requestHeaders(authorization()),
+                            pathParameters(parameterWithName("spaceId").description("공간 ID")),
+                            responseFields(success(providerSpaceFields()))));
+        }
+    }
+
+    @Test
+    @DisplayName("상태가 맞지 않으면 409 INVALID_SPACE_STATUS")
+    void pauseInWrongStatus() throws Exception {
+        given(spaceService.pause(PROVIDER_ID, 10L)).willThrow(
+                new BusinessException(ErrorCode.INVALID_SPACE_STATUS, "공개 중인 공간만 일시 중단할 수 있습니다."));
+
+        mockMvc.perform(post("/api/v1/provider/spaces/{spaceId}/pause", 10L)
+                        .header(HttpHeaders.AUTHORIZATION, providerToken()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("INVALID_SPACE_STATUS"))
+                .andExpect(jsonPath("$.error.message").value("공개 중인 공간만 일시 중단할 수 있습니다."));
+    }
+
+    static ProviderSpaceResponse providerSpaceWithFiles() {
+        return ProviderSpaceResponse.of(SpaceFixtures.space(10L, SpaceFixtures.provider(PROVIDER_ID),
+                Set.of(TOMORROW), FixedClockConfig.FIXED_TODAY), photos(), List.of(proof()));
+    }
+
+    static FieldDescriptor[] detailFields() {
+        List<FieldDescriptor> fields = new ArrayList<>(SpaceDocumentation.providerSpaceFields("data."));
+        fields.addAll(SpaceDocumentation.photoFields("data.photos[]."));
+        fields.addAll(SpaceDocumentation.proofFields("data.proofs[]."));
+        return fields.toArray(FieldDescriptor[]::new);
     }
 
     static List<SpacePhotoResponse> photos() {
