@@ -260,3 +260,100 @@ Authorization: Bearer {{providerToken}}
 > {%
     client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
 %}
+
+### 내 공간 목록 (검수 상태·사유)
+# 기대값: 200 OK, 페이지 형식, 방금 등록한 2개 (최근 수정 순)
+GET {{baseUrl}}/api/v1/provider/spaces?page=0&size=20
+Authorization: Bearer {{providerToken}}
+
+> {%
+    client.test("200 OK + 2개", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.totalElements === 2, `실제 ${response.body.data.totalElements}`);
+        client.assert(response.body.data.content.every(s => s.status === "PENDING_REVIEW"), "모두 검수 대기");
+    });
+%}
+
+### 내 공간 상세 (사진 · 증빙 포함)
+# 기대값: 200 OK, 사진 1장(삭제 후), 증빙 1개
+GET {{baseUrl}}/api/v1/provider/spaces/{{providerSpaceId}}
+Authorization: Bearer {{providerToken}}
+
+> {%
+    client.test("200 OK + 사진·증빙", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.photos.length === 1, `사진 ${response.body.data.photos.length}`);
+        client.assert(response.body.data.proofs.length === 1, `증빙 ${response.body.data.proofs.length}`);
+    });
+%}
+
+### 공간 정보 수정 (가격 변경, 캘린더는 그대로)
+# 기대값: 200 OK, dailyPrice = 60000, availableDates 2개 유지
+PUT {{baseUrl}}/api/v1/provider/spaces/{{providerSpaceId}}
+Authorization: Bearer {{providerToken}}
+Content-Type: application/json
+
+{
+  "title": "정왕역 앞 1층 상가",
+  "description": "유동 인구가 많은 역 앞 코너 상가입니다.",
+  "rules": "21시 이후 소음 금지, 퇴실 시 원상 복구",
+  "address": "경기도 시흥시 마유로 418",
+  "buildingName": "정왕프라자",
+  "unitNumber": "101호",
+  "latitude": 37.3517,
+  "longitude": 126.7428,
+  "areaSqm": 33.06,
+  "buildingUse": "NEIGHBORHOOD_1",
+  "commercialTheme": "FOOD_ALLEY",
+  "dailyPrice": 60000,
+  "facilities": ["WIFI", "ELECTRICITY", "RESTROOM"],
+  "activityTypes": ["POPUP_STORE", "EXHIBITION"]
+}
+
+> {%
+    client.test("200 OK + 가격 변경 · 캘린더 유지", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.dailyPrice === 60000, `실제 ${response.body.data.dailyPrice}`);
+        client.assert(response.body.data.availableDates.length === 2, `실제 ${response.body.data.availableDates}`);
+    });
+%}
+
+### 사용 가능 날짜 설정 (내일 하루만)
+# 기대값: 200 OK, availableDates = [내일]
+PUT {{baseUrl}}/api/v1/provider/spaces/{{providerSpaceId}}/available-dates
+Authorization: Bearer {{providerToken}}
+Content-Type: application/json
+
+{
+  "dates": ["{{day1}}"]
+}
+
+> {%
+    client.test("200 OK + 날짜 1개", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.availableDates.join() === client.global.get("day1"), `실제 ${response.body.data.availableDates}`);
+    });
+%}
+
+### 검수 대기 중 일시 중단 → 409
+# 기대값: 409 INVALID_SPACE_STATUS
+POST {{baseUrl}}/api/v1/provider/spaces/{{providerSpaceId}}/pause
+Authorization: Bearer {{providerToken}}
+
+> {%
+    client.test("409 INVALID_SPACE_STATUS", () => {
+        client.assert(response.status === 409, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "INVALID_SPACE_STATUS", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 검수 대기 중 다시 검수 요청 → 409
+# 기대값: 409 INVALID_SPACE_STATUS (수정 요청·공개 보류 상태에서만 가능)
+POST {{baseUrl}}/api/v1/provider/spaces/{{providerSpaceId}}/resubmit
+Authorization: Bearer {{providerToken}}
+
+> {%
+    client.test("409 INVALID_SPACE_STATUS", () => {
+        client.assert(response.status === 409, `실제 ${response.status}`);
+    });
+%}
