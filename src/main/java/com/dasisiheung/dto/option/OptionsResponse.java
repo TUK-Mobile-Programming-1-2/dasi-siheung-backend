@@ -14,6 +14,7 @@ public record OptionsResponse(
         @Schema(description = "이용 목적") List<OptionItem> usePurposes,
         @Schema(description = "권한 증빙 종류") List<OptionItem> proofTypes,
         @Schema(description = "공간 공개 상태") List<OptionItem> spaceStatuses,
-        @Schema(description = "관리자 검수 결과") List<OptionItem> reviewDecisions
+        @Schema(description = "관리자 검수 결과") List<OptionItem> reviewDecisions,
+        @Schema(description = "공간 검색 정렬") List<OptionItem> spaceSorts
 ) {
 }
