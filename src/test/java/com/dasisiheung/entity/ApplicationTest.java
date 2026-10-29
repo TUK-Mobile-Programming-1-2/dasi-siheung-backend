@@ -159,6 +159,37 @@ class ApplicationTest {
     }
 
     @Nested
+    @DisplayName("거절")
+    class Reject {
+
+        @Test
+        @DisplayName("받은 공간 제공자가 사유와 함께 거절한다")
+        void reject() {
+            Application application = submit(TODAY.plusDays(1), TODAY.plusDays(1));
+
+            application.reject(2L, "내부 공사 일정", NOW);
+
+            assertThat(application.getStatus()).isEqualTo(ApplicationStatus.REJECTED);
+            assertThat(application.getStatusReason()).isEqualTo("내부 공사 일정");
+        }
+
+        @Test
+        @DisplayName("다른 제공자 · 신청자는 거절할 수 없고, 끝난 신청은 INVALID_APPLICATION_STATUS")
+        void rejectRules() {
+            Application application = submit(TODAY.plusDays(1), TODAY.plusDays(1));
+
+            assertThatThrownBy(() -> application.reject(APPLICANT_ID, "사유", NOW))
+                    .extracting("errorCode").isEqualTo(ErrorCode.NOT_APPLICATION_PARTICIPANT);
+            assertThatThrownBy(() -> application.reject(99L, "사유", NOW))
+                    .extracting("errorCode").isEqualTo(ErrorCode.NOT_APPLICATION_PARTICIPANT);
+
+            application.cancel(APPLICANT_ID, null, TODAY, NOW);
+            assertThatThrownBy(() -> application.reject(2L, "사유", NOW))
+                    .extracting("errorCode").isEqualTo(ErrorCode.INVALID_APPLICATION_STATUS);
+        }
+    }
+
+    @Nested
     @DisplayName("가격 협의")
     class Negotiation {
 

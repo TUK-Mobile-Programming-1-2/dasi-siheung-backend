@@ -39,4 +39,25 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
     boolean existsOverlappingByApplicant(@Param("spaceId") Long spaceId, @Param("applicantId") Long applicantId,
                                          @Param("status") ApplicationStatus status,
                                          @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+
+    /**
+     * 공간 제공자가 받은 신청.
+     *
+     * @param status  null 이면 전체
+     * @param spaceId null 이면 내 모든 공간
+     */
+    @EntityGraph(attributePaths = {"space", "applicant"})
+    @Query(value = """
+            select a from Application a
+            where a.space.provider.id = :providerId
+              and (:status is null or a.status = :status)
+              and (:spaceId is null or a.space.id = :spaceId)
+            """, countQuery = """
+            select count(a) from Application a
+            where a.space.provider.id = :providerId
+              and (:status is null or a.status = :status)
+              and (:spaceId is null or a.space.id = :spaceId)
+            """)
+    Page<Application> findReceived(@Param("providerId") Long providerId, @Param("status") ApplicationStatus status,
+                                   @Param("spaceId") Long spaceId, Pageable pageable);
 }
