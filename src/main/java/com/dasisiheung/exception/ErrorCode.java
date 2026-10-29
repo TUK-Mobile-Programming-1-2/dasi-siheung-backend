@@ -59,7 +59,17 @@ public enum ErrorCode {
     // 관리자 검수
     SPACE_PROOF_REQUIRED(HttpStatus.BAD_REQUEST, "권한 증빙이 없는 공간은 공개 승인할 수 없습니다. 공개 보류로 처리해 주세요."),
     REVIEW_CHECKLIST_INCOMPLETE(HttpStatus.BAD_REQUEST, "검수 항목 5개를 모두 확인해야 공개 승인할 수 있습니다."),
-    REVIEW_REASON_REQUIRED(HttpStatus.BAD_REQUEST, "수정 요청·공개 보류는 사유를 입력해야 합니다.");
+    REVIEW_REASON_REQUIRED(HttpStatus.BAD_REQUEST, "수정 요청·공개 보류는 사유를 입력해야 합니다."),
+
+    // 공간 이용 신청
+    APPLICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "신청을 찾을 수 없습니다."),
+    NOT_APPLICATION_PARTICIPANT(HttpStatus.FORBIDDEN, "본인이 보내거나 받은 신청만 다룰 수 있습니다."),
+    ACTIVITY_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "이 공간에서 허용하지 않는 활동입니다."),
+    INVALID_APPLICATION_PERIOD(HttpStatus.BAD_REQUEST, "이용 기간은 오늘부터 시작해 최대 30일까지 신청할 수 있습니다."),
+    PERIOD_NOT_AVAILABLE(HttpStatus.CONFLICT, "선택한 기간에 공간을 사용할 수 없는 날짜가 있습니다."),
+    DUPLICATE_APPLICATION(HttpStatus.CONFLICT, "같은 공간 · 같은 기간에 이미 검토 중인 신청이 있습니다."),
+    INVALID_APPLICATION_STATUS(HttpStatus.CONFLICT, "현재 신청 상태에서는 할 수 없는 작업입니다."),
+    APPLICATION_NOT_CANCELLABLE(HttpStatus.CONFLICT, "이용 시작일부터는 확정된 예약을 취소할 수 없습니다. 공간 제공자와 상의해 주세요.");
 
     private final HttpStatus status;
     private final String message;
