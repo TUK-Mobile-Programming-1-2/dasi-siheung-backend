@@ -15,7 +15,8 @@ import org.springframework.test.context.ActiveProfiles;
  * <p>
  * 접속 정보는 {@code TEST_DB_URL / TEST_DB_USERNAME / TEST_DB_PASSWORD} 환경 변수로 받는다.
  * 같은 설정을 쓰는 테스트끼리 스프링 컨텍스트를 공유한다.
- * 회원·토큰이 필요하면 {@link TestAccounts}, 공개 공간이 필요하면 {@link SpaceScenario} 를 주입받는다.
+ * 회원·토큰이 필요하면 {@link TestAccounts}, 공개 공간이 필요하면 {@link SpaceScenario},
+ * 신청이 필요하면 {@link ApplicationScenario} 를 주입받는다.
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
@@ -23,6 +24,6 @@ import org.springframework.test.context.ActiveProfiles;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @ExtendWith(TestDatabaseCondition.class)
-@Import({TestAccounts.class, SpaceScenario.class})
+@Import({TestAccounts.class, SpaceScenario.class, ApplicationScenario.class})
 public @interface IntegrationTest {
 }
