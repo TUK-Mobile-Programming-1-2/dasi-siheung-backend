@@ -62,7 +62,12 @@ public class SpaceScenario {
     /** 등록 → 증빙 → 승인까지 마친 공개 공간 ID. */
     public long publishedSpace(TestAccounts.Account provider, TestAccounts.Account admin,
                                Set<LocalDate> availableDates) throws Exception {
-        long spaceId = register(provider, availableDates);
+        return publishedSpace(provider, admin, SpaceFixtures.request(availableDates));
+    }
+
+    public long publishedSpace(TestAccounts.Account provider, TestAccounts.Account admin,
+                               SpaceRequest request) throws Exception {
+        long spaceId = register(provider, request);
         addProof(provider, spaceId);
         approve(admin, spaceId);
         return spaceId;

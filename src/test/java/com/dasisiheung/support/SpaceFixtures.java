@@ -41,6 +41,15 @@ public final class SpaceFixtures {
                 availableDates);
     }
 
+    /** 검색 테스트용: 이름 · 위치 · 테마 · 가격 · 시설 · 활동을 골라 만든다. */
+    public static SpaceRequest request(String title, double latitude, double longitude, CommercialTheme theme,
+                                       int dailyPrice, Set<Facility> facilities, Set<ActivityType> activityTypes,
+                                       Set<LocalDate> availableDates) {
+        return new SpaceRequest(title, "검색 테스트 공간", null, "경기도 시흥시 테스트로 1", null, null,
+                latitude, longitude, new BigDecimal("30.00"), BuildingUse.NEIGHBORHOOD_1, theme, dailyPrice,
+                facilities, activityTypes, availableDates);
+    }
+
     public static SpaceRequest request(Set<LocalDate> availableDates) {
         return request(JEONGWANG_LAT, JEONGWANG_LNG, availableDates);
     }
