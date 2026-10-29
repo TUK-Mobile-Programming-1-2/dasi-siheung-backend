@@ -263,5 +263,7 @@ Authorization: Bearer {{adminToken}}
         client.assert(Object.keys(d.publishedSpacesByRegion).join() === "JEONGWANG,GEOBUKSEOM,BAEGOT", "지역 순서");
         client.assert(d.spacesByStatus.PUBLISHED >= 1, `공개 ${d.spacesByStatus.PUBLISHED}`);
         client.assert(d.membersByRole.ADMIN >= 1, `관리자 ${d.membersByRole.ADMIN}`);
+        client.assert(Object.keys(d.applicationsByStatus).length === 5, `신청 상태 ${Object.keys(d.applicationsByStatus)}`);
+        client.assert(d.pendingApplicationCount === d.applicationsByStatus.PENDING, "검토 중 신청 수 불일치");
     });
 %}

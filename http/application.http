@@ -575,3 +575,90 @@ Authorization: Bearer {{appUserAToken}}
 > {%
     client.test("403 FORBIDDEN", () => client.assert(response.status === 403, `실제 ${response.status}`));
 %}
+
+### 승인 (예약 확정) — 이용자 A (1~2일, 95000원 합의)
+# 인증: PROVIDER
+# 기대값: 200 OK, APPROVED, 합의 금액 95000
+POST {{baseUrl}}/api/v1/provider/applications/{{appAId}}/approve
+Authorization: Bearer {{appProviderToken}}
+
+> {%
+    client.test("200 OK + APPROVED", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.status === "APPROVED", `실제 ${response.body.data.status}`);
+        client.assert(response.body.data.totalPrice === 95000, `실제 ${response.body.data.totalPrice}`);
+    });
+%}
+
+### 겹치던 이용자 B 신청(2~3일)은 자동 마감
+# 기대값: 200 OK, CLOSED, 마감 사유
+GET {{baseUrl}}/api/v1/applications/{{appBId}}
+Authorization: Bearer {{appUserBToken}}
+
+> {%
+    client.test("CLOSED + 사유", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.status === "CLOSED", `실제 ${response.body.data.status}`);
+        client.assert(response.body.data.statusReason.includes("다른 신청이 확정"), `실제 ${response.body.data.statusReason}`);
+    });
+%}
+
+### 마감된 신청 승인
+# 기대값: 409 INVALID_APPLICATION_STATUS
+POST {{baseUrl}}/api/v1/provider/applications/{{appBId}}/approve
+Authorization: Bearer {{appProviderToken}}
+
+> {%
+    client.test("409 INVALID_APPLICATION_STATUS", () => {
+        client.assert(response.status === 409, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "INVALID_APPLICATION_STATUS", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 이용자 화면: 확정 날짜(1~2일)는 사용 가능 날짜에서 빠진다
+# 기대값: 200 OK, 3일차부터 (5일 중 4~5일은 거절 · 취소로 그대로 열림 → 3 · 4 · 5일)
+GET {{baseUrl}}/api/v1/spaces/{{appSpaceId}}
+
+> {%
+    client.test("확정 날짜 제외", () => {
+        const dates = response.body.data.availableDates;
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(!dates.includes(client.global.get("appDay1")) && !dates.includes(client.global.get("appDay2")), `실제 ${dates}`);
+        client.assert(dates[0] === client.global.get("appDay3"), `실제 ${dates}`);
+    });
+%}
+
+### 확정된 기간에 새 신청
+# 기대값: 409 PERIOD_ALREADY_BOOKED
+POST {{baseUrl}}/api/v1/applications
+Authorization: Bearer {{appUserBToken}}
+Content-Type: application/json
+
+{
+  "spaceId": {{appSpaceId}},
+  "activityType": "POPUP_STORE",
+  "activityTitle": "확정 기간 신청",
+  "plan": "이미 확정된 날짜",
+  "headcount": 1,
+  "startDate": "{{appDay1}}",
+  "endDate": "{{appDay1}}"
+}
+
+> {%
+    client.test("409 PERIOD_ALREADY_BOOKED", () => {
+        client.assert(response.status === 409, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "PERIOD_ALREADY_BOOKED", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 기간 검색에서도 빠진다 (1일차)
+# 기대값: 200 OK, 이 공간 없음
+GET {{baseUrl}}/api/v1/spaces?startDate={{appDay1}}&endDate={{appDay1}}&size=100
+
+> {%
+    client.test("검색 제외", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        const ids = response.body.data.content.map(s => String(s.id));
+        client.assert(!ids.includes(String(client.global.get("appSpaceId"))), "확정된 공간이 검색되었습니다");
+    });
+%}

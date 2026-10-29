@@ -199,6 +199,8 @@ flowchart LR
 | `DUPLICATE_APPLICATION` | 409 | 같은 공간 · 겹치는 기간에 검토 중인 내 신청이 있음 | 기존 신청으로 이동 |
 | `INVALID_APPLICATION_STATUS` | 409 | 이미 끝난 신청에 대한 작업 | 상세 새로고침 |
 | `APPLICATION_NOT_CANCELLABLE` | 409 | 이용 시작일부터 확정 예약 취소 | 제공자와 1:1 소통 안내 |
+| `PERIOD_ALREADY_BOOKED` | 409 | 같은 기간에 확정된 예약이 있음 (동시 승인 포함) | 캘린더 다시 불러오기 |
+| `PRICE_NEGOTIATION_IN_PROGRESS` | 409 | 가격 제안이 답을 기다리는 중에 승인 | 협의 마무리 안내 |
 
 **가격 협의**
 
@@ -264,6 +266,23 @@ HIDDEN(숨김): 신고 처리로 관리자가 내린 공간 — 수정 불가
 
 - 내 공간 목록·상세의 `reviewComment` 에 관리자가 남긴 사유가 있습니다. 수정 요청·보류일 때 그대로 보여주세요.
 - 이용자 화면(탐색·지도·상세)에는 **PUBLISHED** 공간만 나옵니다.
+
+### 3-3-6. 신청 · 가격 협의 · 예약 확정
+
+```
+신청(USER) ─▶ PENDING(검토 중) ──제공자 승인──▶ APPROVED(예약 확정) ──시작 전 취소──▶ CANCELLED
+                 ├─ 제공자 거절(사유) ─▶ REJECTED
+                 ├─ 신청자 취소 ─────▶ CANCELLED
+                 └─ 같은 기간 다른 신청 확정 ─▶ CLOSED(자동 마감, 사유 표시)
+```
+
+- **가격 협의**: 금액은 이용 기간 **합계**입니다. 정가 합계(`listTotalPrice`)를 넘을 수 없습니다.
+  - 신청자 제안 → `WAITING_PROVIDER` → 제공자가 수락하거나 역제안 → `WAITING_APPLICANT` → … → 수락하면 `AGREED`
+  - 내가 보낸 제안에 상대가 답하기 전에는 다시 보낼 수 없습니다 (`OFFER_NOT_ALLOWED`). 버튼을 비활성화하세요.
+  - `*_WAITING` 상태에서는 승인할 수 없습니다 (`PRICE_NEGOTIATION_IN_PROGRESS`). 화면에 "협의 중" 배지를 보여주세요.
+- **결제는 앱 밖**에서 합니다. 서버는 합의 금액(`totalPrice`)만 기록합니다.
+- **겹치는 예약**: 같은 공간 · 겹치는 기간의 확정은 1건뿐입니다. 동시에 승인해도 서버가 막고 `PERIOD_ALREADY_BOOKED` 를 줍니다.
+- 이용자 화면의 `availableDates` 와 기간 검색은 **확정 예약 날짜를 뺀 값**입니다. 제공자 화면(내 공간)의 캘린더는 제공자가 연 날짜 그대로입니다.
 
 ### 3-4. 인증 (JWT)
 
@@ -701,3 +720,4 @@ try {
 | --- | --- | --- | --- |
 | GET | `/api/v1/provider/applications` | PROVIDER | 받은 신청 목록 (status · spaceId 필터) |
 | POST | `/api/v1/provider/applications/{applicationId}/reject` | PROVIDER | 신청 거절 (사유 필수) |
+| POST | `/api/v1/provider/applications/{applicationId}/approve` | PROVIDER | 신청 승인 (예약 확정, 겹치는 신청 자동 마감) |
