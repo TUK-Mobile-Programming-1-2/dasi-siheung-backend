@@ -1,5 +1,6 @@
 package com.dasisiheung.dto.admin;
 
+import com.dasisiheung.entity.application.ApplicationStatus;
 import com.dasisiheung.entity.member.Role;
 import com.dasisiheung.entity.space.Region;
 import com.dasisiheung.entity.space.Space;
@@ -15,6 +16,8 @@ public record DashboardResponse(
         @Schema(description = "상태별 공간 수") Map<SpaceStatus, Long> spacesByStatus,
         @Schema(description = "지역별 공개 공간 수") Map<Region, Long> publishedSpacesByRegion,
         @Schema(description = "역할별 회원 수 (탈퇴 제외)") Map<Role, Long> membersByRole,
+        @Schema(description = "제공자 답변을 기다리는(검토 중) 신청 수", example = "5") long pendingApplicationCount,
+        @Schema(description = "상태별 신청 수") Map<ApplicationStatus, Long> applicationsByStatus,
         @Schema(description = "최근 등록된 공간 5개") List<RecentSpace> recentSpaces,
         @Schema(description = "집계 시각") LocalDateTime generatedAt
 ) {
