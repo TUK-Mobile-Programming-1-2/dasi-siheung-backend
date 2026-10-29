@@ -343,3 +343,106 @@ Content-Type: application/json
         client.assert(response.body.error.code === "INVALID_APPLICATION_STATUS", `실제 ${response.body.error.code}`);
     });
 %}
+
+### 가격 제안 (이용자 A → 제공자)
+# 인증: 신청자 또는 공간 제공자
+# 기대값: 200 OK, WAITING_PROVIDER, 대기 금액 90000, 합의 금액은 아직 정가 100000
+POST {{baseUrl}}/api/v1/applications/{{appAId}}/offers
+Authorization: Bearer {{appUserAToken}}
+Content-Type: application/json
+
+{
+  "amount": 90000,
+  "message": "이틀 연속 이용이라 조금만 조정 부탁드립니다."
+}
+
+> {%
+    client.test("200 OK + 제공자 답변 대기", () => {
+        const data = response.body.data;
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(data.negotiationStatus === "WAITING_PROVIDER", `실제 ${data.negotiationStatus}`);
+        client.assert(data.pendingOfferAmount === 90000 && data.totalPrice === 100000, `실제 ${data.pendingOfferAmount} / ${data.totalPrice}`);
+        client.assert(data.offers.length === 1 && data.offers[0].proposerSide === "APPLICANT", "협의 이력");
+    });
+%}
+
+### 답을 기다리는 중 다시 제안
+# 기대값: 409 OFFER_NOT_ALLOWED
+POST {{baseUrl}}/api/v1/applications/{{appAId}}/offers
+Authorization: Bearer {{appUserAToken}}
+Content-Type: application/json
+
+{
+  "amount": 85000
+}
+
+> {%
+    client.test("409 OFFER_NOT_ALLOWED", () => {
+        client.assert(response.status === 409, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "OFFER_NOT_ALLOWED", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 정가 합계보다 큰 역제안
+# 기대값: 400 INVALID_OFFER_PRICE
+POST {{baseUrl}}/api/v1/applications/{{appAId}}/offers
+Authorization: Bearer {{appProviderToken}}
+Content-Type: application/json
+
+{
+  "amount": 100001
+}
+
+> {%
+    client.test("400 INVALID_OFFER_PRICE", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "INVALID_OFFER_PRICE", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 역제안 (제공자 → 이용자 A)
+# 기대값: 200 OK, WAITING_APPLICANT, 대기 금액 95000
+POST {{baseUrl}}/api/v1/applications/{{appAId}}/offers
+Authorization: Bearer {{appProviderToken}}
+Content-Type: application/json
+
+{
+  "amount": 95000,
+  "message": "9만 5천원까지 가능합니다."
+}
+
+> {%
+    client.test("200 OK + 신청자 답변 대기", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.negotiationStatus === "WAITING_APPLICANT", `실제 ${response.body.data.negotiationStatus}`);
+        client.assert(response.body.data.pendingOfferAmount === 95000, `실제 ${response.body.data.pendingOfferAmount}`);
+    });
+%}
+
+### 제공자가 자기 역제안을 수락
+# 기대값: 409 NO_PENDING_OFFER
+POST {{baseUrl}}/api/v1/applications/{{appAId}}/offers/accept
+Authorization: Bearer {{appProviderToken}}
+
+> {%
+    client.test("409 NO_PENDING_OFFER", () => {
+        client.assert(response.status === 409, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "NO_PENDING_OFFER", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 받은 역제안 수락 (이용자 A)
+# 기대값: 200 OK, AGREED, 합의 금액 95000, 이력 2건 중 마지막이 수락됨
+POST {{baseUrl}}/api/v1/applications/{{appAId}}/offers/accept
+Authorization: Bearer {{appUserAToken}}
+
+> {%
+    client.test("200 OK + 가격 합의", () => {
+        const data = response.body.data;
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(data.negotiationStatus === "AGREED", `실제 ${data.negotiationStatus}`);
+        client.assert(data.totalPrice === 95000, `실제 ${data.totalPrice}`);
+        client.assert(data.pendingOfferAmount === null || data.pendingOfferAmount === undefined, "대기 금액이 남았습니다");
+        client.assert(data.offers.length === 2 && data.offers[1].acceptedAt, "수락 기록");
+    });
+%}
