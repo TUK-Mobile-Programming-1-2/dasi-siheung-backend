@@ -1,0 +1,345 @@
+# 공간 이용 신청 시나리오 — 신청 · 가격 협의 · 승인 · 거절 · 취소
+# 준비 단계에서 공개 공간을 만든다. (관리자 계정: http-client.private.env.json)
+
+### 준비: 공간 제공자 가입
+POST {{baseUrl}}/api/v1/auth/signup
+Content-Type: application/json
+
+{
+  "email": "http-app-provider-{{$timestamp}}-{{$randomInt}}@test.dasisiheung.com",
+  "password": "password123",
+  "name": "신청받는 제공자",
+  "phone": "010-7777-8888",
+  "role": "PROVIDER"
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+    client.global.set("appProviderEmail", response.body.data.email);
+%}
+
+### 준비: 공간 제공자 로그인
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{appProviderEmail}}",
+  "password": "password123"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+    client.global.set("appProviderToken", response.body.data.accessToken);
+    const day = (offset) => new Date(Date.now() + 9 * 3600 * 1000 + offset * 86400 * 1000).toISOString().substring(0, 10);
+    for (let i = 1; i <= 6; i++) {
+        client.global.set(`appDay${i}`, day(i));
+    }
+%}
+
+### 준비: 공간 등록 (정왕, 1일 5만원, 내일부터 5일)
+POST {{baseUrl}}/api/v1/provider/spaces
+Authorization: Bearer {{appProviderToken}}
+Content-Type: application/json
+
+{
+  "title": "정왕 시장 골목 1층",
+  "description": "전통시장 입구 바로 앞 상가입니다.",
+  "address": "경기도 시흥시 정왕대로 233",
+  "latitude": 37.3517,
+  "longitude": 126.7428,
+  "areaSqm": 28.5,
+  "buildingUse": "NEIGHBORHOOD_1",
+  "commercialTheme": "FOOD_ALLEY",
+  "dailyPrice": 50000,
+  "facilities": ["ELECTRICITY", "WATER"],
+  "activityTypes": ["POPUP_STORE", "EXPERIENCE"],
+  "availableDates": ["{{appDay1}}", "{{appDay2}}", "{{appDay3}}", "{{appDay4}}", "{{appDay5}}"]
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+    client.global.set("appSpaceId", response.body.data.id);
+%}
+
+### 준비: 증빙 제출
+POST {{baseUrl}}/api/v1/provider/spaces/{{appSpaceId}}/proofs
+Authorization: Bearer {{appProviderToken}}
+Content-Type: multipart/form-data; boundary=dasi-boundary
+
+--dasi-boundary
+Content-Disposition: form-data; name="proofType"
+
+LEASE_CONTRACT
+--dasi-boundary
+Content-Disposition: form-data; name="file"; filename="proof.pdf"
+Content-Type: application/pdf
+
+< ./fixtures/proof.pdf
+--dasi-boundary--
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+%}
+
+### 준비: 관리자 로그인
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+> {%
+    client.test("200 OK + ADMIN", () => {
+        client.assert(response.status === 200, `실제 ${response.status} — http-client.private.env.json 의 관리자 계정 확인`);
+        client.assert(response.body.data.member.role === "ADMIN", `실제 ${response.body.data.member.role}`);
+    });
+    client.global.set("adminToken", response.body.data.accessToken);
+%}
+
+### 준비: 공개 승인
+POST {{baseUrl}}/api/v1/admin/spaces/{{appSpaceId}}/reviews
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "decision": "APPROVE",
+  "checklist": { "authorityVerified": true, "addressMatched": true, "buildingUnitMatched": true, "areaMatched": true, "usageMatched": true }
+}
+
+> {%
+    client.test("200 OK + PUBLISHED", () => client.assert(response.body.data.space.status === "PUBLISHED", `실제 ${response.body.data.space.status}`));
+%}
+
+### 준비: 이용자 A 가입
+POST {{baseUrl}}/api/v1/auth/signup
+Content-Type: application/json
+
+{
+  "email": "http-app-user-a-{{$timestamp}}-{{$randomInt}}@test.dasisiheung.com",
+  "password": "password123",
+  "name": "이용자A",
+  "phone": "010-1234-0001",
+  "role": "USER"
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+    client.global.set("appUserAEmail", response.body.data.email);
+%}
+
+### 준비: 이용자 A 로그인
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{appUserAEmail}}",
+  "password": "password123"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+    client.global.set("appUserAToken", response.body.data.accessToken);
+%}
+
+### 신청서 제출 (이용자 A, 1~2일차)
+# 인증: USER
+# 기대값: 201 Created, PENDING, 정가 합계 100000 (5만원 × 2일), 협의 NONE
+POST {{baseUrl}}/api/v1/applications
+Authorization: Bearer {{appUserAToken}}
+Content-Type: application/json
+
+{
+  "spaceId": {{appSpaceId}},
+  "activityType": "POPUP_STORE",
+  "activityTitle": "수제 캔들 팝업 스토어",
+  "plan": "이틀 동안 수제 캔들을 전시 · 판매합니다. 테이블 2개를 가져갑니다.",
+  "headcount": 3,
+  "startDate": "{{appDay1}}",
+  "endDate": "{{appDay2}}"
+}
+
+> {%
+    client.test("201 Created + 정가 합계", () => {
+        const data = response.body.data;
+        client.assert(response.status === 201, `실제 ${response.status}`);
+        client.assert(data.status === "PENDING", `실제 ${data.status}`);
+        client.assert(data.listTotalPrice === 100000 && data.totalPrice === 100000, `실제 ${data.listTotalPrice} / ${data.totalPrice}`);
+        client.assert(data.negotiationStatus === "NONE", `실제 ${data.negotiationStatus}`);
+        client.assert(data.days === 2, `실제 ${data.days}`);
+    });
+    client.global.set("appAId", response.body.data.id);
+%}
+
+### 같은 기간 중복 신청
+# 기대값: 409 DUPLICATE_APPLICATION
+POST {{baseUrl}}/api/v1/applications
+Authorization: Bearer {{appUserAToken}}
+Content-Type: application/json
+
+{
+  "spaceId": {{appSpaceId}},
+  "activityType": "POPUP_STORE",
+  "activityTitle": "수제 캔들 팝업 스토어",
+  "plan": "중복 신청",
+  "headcount": 3,
+  "startDate": "{{appDay2}}",
+  "endDate": "{{appDay2}}"
+}
+
+> {%
+    client.test("409 DUPLICATE_APPLICATION", () => {
+        client.assert(response.status === 409, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "DUPLICATE_APPLICATION", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 허용하지 않는 활동
+# 기대값: 400 ACTIVITY_NOT_ALLOWED
+POST {{baseUrl}}/api/v1/applications
+Authorization: Bearer {{appUserAToken}}
+Content-Type: application/json
+
+{
+  "spaceId": {{appSpaceId}},
+  "activityType": "CLASS",
+  "activityTitle": "원데이 클래스",
+  "plan": "허용하지 않는 활동",
+  "headcount": 5,
+  "startDate": "{{appDay3}}",
+  "endDate": "{{appDay3}}"
+}
+
+> {%
+    client.test("400 ACTIVITY_NOT_ALLOWED", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "ACTIVITY_NOT_ALLOWED", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 사용 가능 날짜 밖
+# 기대값: 409 PERIOD_NOT_AVAILABLE (6일차는 비어 있지 않음)
+POST {{baseUrl}}/api/v1/applications
+Authorization: Bearer {{appUserAToken}}
+Content-Type: application/json
+
+{
+  "spaceId": {{appSpaceId}},
+  "activityType": "POPUP_STORE",
+  "activityTitle": "기간 밖",
+  "plan": "사용 가능 날짜 밖",
+  "headcount": 1,
+  "startDate": "{{appDay5}}",
+  "endDate": "{{appDay6}}"
+}
+
+> {%
+    client.test("409 PERIOD_NOT_AVAILABLE", () => {
+        client.assert(response.status === 409, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "PERIOD_NOT_AVAILABLE", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 공간 제공자는 신청할 수 없다
+# 기대값: 403 FORBIDDEN
+POST {{baseUrl}}/api/v1/applications
+Authorization: Bearer {{appProviderToken}}
+Content-Type: application/json
+
+{
+  "spaceId": {{appSpaceId}},
+  "activityType": "POPUP_STORE",
+  "activityTitle": "제공자 신청",
+  "plan": "제공자는 신청 불가",
+  "headcount": 1,
+  "startDate": "{{appDay3}}",
+  "endDate": "{{appDay3}}"
+}
+
+> {%
+    client.test("403 FORBIDDEN", () => {
+        client.assert(response.status === 403, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "FORBIDDEN", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 내가 보낸 신청 (이용자 A)
+# 기대값: 200 OK, 방금 신청 1건
+GET {{baseUrl}}/api/v1/applications?status=PENDING
+Authorization: Bearer {{appUserAToken}}
+
+> {%
+    client.test("200 OK + 1건", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.totalElements === 1, `실제 ${response.body.data.totalElements}`);
+        client.assert(String(response.body.data.content[0].id) === String(client.global.get("appAId")), "신청 ID 불일치");
+    });
+%}
+
+### 신청 상세 (공간 제공자)
+# 인증: 신청자 또는 공간 제공자
+# 기대값: 200 OK, 신청자 이름 = 이용자A
+GET {{baseUrl}}/api/v1/applications/{{appAId}}
+Authorization: Bearer {{appProviderToken}}
+
+> {%
+    client.test("200 OK", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.applicant.name === "이용자A", `실제 ${response.body.data.applicant.name}`);
+    });
+%}
+
+### 취소용 신청 (이용자 A, 5일차)
+POST {{baseUrl}}/api/v1/applications
+Authorization: Bearer {{appUserAToken}}
+Content-Type: application/json
+
+{
+  "spaceId": {{appSpaceId}},
+  "activityType": "EXPERIENCE",
+  "activityTitle": "향초 만들기 체험",
+  "plan": "취소 시나리오용 신청",
+  "headcount": 2,
+  "startDate": "{{appDay5}}",
+  "endDate": "{{appDay5}}"
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+    client.global.set("appCancelId", response.body.data.id);
+%}
+
+### 신청 취소
+# 인증: USER (신청자)
+# 기대값: 200 OK, CANCELLED, 사유 그대로
+POST {{baseUrl}}/api/v1/applications/{{appCancelId}}/cancel
+Authorization: Bearer {{appUserAToken}}
+Content-Type: application/json
+
+{
+  "reason": "일정이 바뀌었습니다."
+}
+
+> {%
+    client.test("200 OK + CANCELLED", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.status === "CANCELLED", `실제 ${response.body.data.status}`);
+        client.assert(response.body.data.statusReason === "일정이 바뀌었습니다.", `실제 ${response.body.data.statusReason}`);
+    });
+%}
+
+### 이미 취소한 신청을 다시 취소
+# 기대값: 409 INVALID_APPLICATION_STATUS
+POST {{baseUrl}}/api/v1/applications/{{appCancelId}}/cancel
+Authorization: Bearer {{appUserAToken}}
+Content-Type: application/json
+
+{}
+
+> {%
+    client.test("409 INVALID_APPLICATION_STATUS", () => {
+        client.assert(response.status === 409, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "INVALID_APPLICATION_STATUS", `실제 ${response.body.error.code}`);
+    });
+%}
