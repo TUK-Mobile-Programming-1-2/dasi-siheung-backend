@@ -20,6 +20,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.dasisiheung.dto.common.PageQuery;
 import com.dasisiheung.dto.common.PageResponse;
 import com.dasisiheung.dto.space.SpaceDetailResponse;
+import com.dasisiheung.dto.space.SpaceMapRequest;
+import com.dasisiheung.dto.space.SpaceMapResponse;
 import com.dasisiheung.dto.space.SpaceSort;
 import com.dasisiheung.dto.space.SpaceSummaryResponse;
 import com.dasisiheung.entity.space.ActivityType;
@@ -84,6 +86,47 @@ class SpaceControllerTest extends ApiDocsTestSupport {
                                 parameterWithName("page").optional().description("페이지 (0부터)"),
                                 parameterWithName("size").optional().description("페이지 크기 (최대 100)")),
                         responseFields(page(summaryFields("data.content[].")))));
+    }
+
+    @Test
+    @DisplayName("지도 마커: 화면 영역 안의 공개 공간")
+    void markers() throws Exception {
+        given(spaceQueryService.getMarkers(any(SpaceMapRequest.class))).willReturn(new SpaceMapResponse(
+                List.of(new SpaceMapResponse.Marker(10L, "정왕역 앞 1층 상가", Region.JEONGWANG, 50_000, 37.3517, 126.7428)),
+                false));
+
+        mockMvc.perform(get("/api/v1/spaces/map")
+                        .param("swLat", "37.30").param("swLng", "126.65").param("neLat", "37.40").param("neLng", "126.80")
+                        .param("activityType", "POPUP_STORE").param("maxPrice", "80000"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.markers[0].latitude").value(37.3517))
+                .andDo(document("space-map",
+                        resource(TAG, "지도 마커", "지도 SDK getBounds() 의 남서(sw)·북동(ne) 꼭짓점을 보냅니다. "
+                                + "최대 300개(최근 공개 순)이며 넘으면 truncated = true — 지도를 확대하라고 안내하세요."),
+                        queryParameters(
+                                parameterWithName("swLat").description("남서쪽 위도"),
+                                parameterWithName("swLng").description("남서쪽 경도"),
+                                parameterWithName("neLat").description("북동쪽 위도"),
+                                parameterWithName("neLng").description("북동쪽 경도"),
+                                parameterWithName("activityType").optional().description("하고 싶은 활동 (선택)"),
+                                parameterWithName("maxPrice").optional().description("1일 이용료 상한(원, 선택)")),
+                        responseFields(success(
+                                fieldWithPath("data.markers[].id").type(JsonFieldType.NUMBER).description("공간 ID"),
+                                fieldWithPath("data.markers[].title").type(JsonFieldType.STRING).description("공간 이름"),
+                                fieldWithPath("data.markers[].region").type(JsonFieldType.STRING).description("서비스 지역"),
+                                fieldWithPath("data.markers[].dailyPrice").type(JsonFieldType.NUMBER).description("1일 이용료(원)"),
+                                fieldWithPath("data.markers[].latitude").type(JsonFieldType.NUMBER).description("위도"),
+                                fieldWithPath("data.markers[].longitude").type(JsonFieldType.NUMBER).description("경도"),
+                                fieldWithPath("data.truncated").type(JsonFieldType.BOOLEAN).description("상한(300개)을 넘어 일부만 보여주는지")))));
+    }
+
+    @Test
+    @DisplayName("지도 마커: 꼭짓점이 뒤바뀌면 400 INVALID_INPUT")
+    void invalidBounds() throws Exception {
+        mockMvc.perform(get("/api/v1/spaces/map")
+                        .param("swLat", "37.40").param("swLng", "126.65").param("neLat", "37.30").param("neLng", "126.80"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_INPUT"));
     }
 
     @Test
