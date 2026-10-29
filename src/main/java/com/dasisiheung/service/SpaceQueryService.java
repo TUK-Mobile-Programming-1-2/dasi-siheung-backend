@@ -12,6 +12,7 @@ import com.dasisiheung.entity.space.Space;
 import com.dasisiheung.entity.space.SpaceStatus;
 import com.dasisiheung.exception.BusinessException;
 import com.dasisiheung.exception.ErrorCode;
+import com.dasisiheung.repository.ApplicationRepository;
 import com.dasisiheung.repository.SpaceRepository;
 import com.dasisiheung.repository.SpaceSpecifications;
 import com.dasisiheung.repository.projection.SpaceMarker;
@@ -19,6 +20,8 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.domain.Specification;
@@ -37,6 +40,7 @@ public class SpaceQueryService {
     public static final int MAX_MAP_MARKERS = 300;
 
     private final SpaceRepository spaceRepository;
+    private final ApplicationRepository applicationRepository;
     private final SpaceResponseMapper responseMapper;
     private final Clock clock;
 
@@ -45,11 +49,19 @@ public class SpaceQueryService {
      */
     public SpaceDetailResponse getSpace(Long spaceId) {
         Space space = getPublishedSpace(spaceId);
-        return responseMapper.spaceDetail(space, LocalDate.now(clock));
+        LocalDate today = LocalDate.now(clock);
+        return responseMapper.spaceDetail(space, today, bookedDates(spaceId, today));
+    }
+
+    /** 오늘 이후 확정 예약이 있는 날짜. */
+    private Set<LocalDate> bookedDates(Long spaceId, LocalDate today) {
+        return applicationRepository.findApprovedEndingFrom(spaceId, today).stream()
+                .flatMap(application -> application.period().dates())
+                .collect(Collectors.toSet());
     }
 
     /**
-     * 조건에 맞는 공개 공간을 찾는다.
+     * 조건에 맞는 공개 공간을 찾는다. 기간을 주면 그 기간에 확정 예약이 없는 공간만 나온다.
      *
      * @throws BusinessException 기간이 오늘 이전이거나 90일을 넘으면 INVALID_SEARCH_PERIOD
      */
@@ -104,6 +116,7 @@ public class SpaceQueryService {
         }
         if (request.hasPeriod()) {
             conditions.add(SpaceSpecifications.availableThroughout(request.startDate(), request.endDate()));
+            conditions.add(SpaceSpecifications.notBookedBetween(request.startDate(), request.endDate()));
         }
         if (request.minPrice() != null) {
             conditions.add(SpaceSpecifications.priceAtLeast(request.minPrice()));

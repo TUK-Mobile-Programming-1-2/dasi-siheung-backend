@@ -1,5 +1,7 @@
 package com.dasisiheung.repository;
 
+import com.dasisiheung.entity.application.Application;
+import com.dasisiheung.entity.application.ApplicationStatus;
 import com.dasisiheung.entity.space.ActivityType;
 import com.dasisiheung.entity.space.CommercialTheme;
 import com.dasisiheung.entity.space.Facility;
@@ -75,6 +77,20 @@ public final class SpaceSpecifications {
             availableDays.select(cb.count(date))
                     .where(cb.equal(sub, root), cb.between(date, startDate, endDate));
             return cb.equal(availableDays, days);
+        };
+    }
+
+    /** 기간과 겹치는 확정 예약이 없다. */
+    public static Specification<Space> notBookedBetween(LocalDate startDate, LocalDate endDate) {
+        return (root, query, cb) -> {
+            Subquery<Long> booked = query.subquery(Long.class);
+            Root<Application> application = booked.from(Application.class);
+            booked.select(application.get("id"))
+                    .where(cb.equal(application.get("space"), root),
+                            cb.equal(application.get("status"), ApplicationStatus.APPROVED),
+                            cb.lessThanOrEqualTo(application.<LocalDate>get("startDate"), endDate),
+                            cb.greaterThanOrEqualTo(application.<LocalDate>get("endDate"), startDate));
+            return cb.not(cb.exists(booked));
         };
     }
 

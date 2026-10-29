@@ -47,7 +47,8 @@ public class ApplicationService {
      * 같은 공간 · 겹치는 기간에 검토 중인 내 신청이 있으면 다시 낼 수 없다.
      * 제안 금액을 함께 보내면 첫 가격 제안으로 남는다.
      *
-     * @throws BusinessException DUPLICATE_APPLICATION 외 {@link Application#submit} 참고
+     * @throws BusinessException 확정 예약과 겹치면 PERIOD_ALREADY_BOOKED, 중복이면 DUPLICATE_APPLICATION,
+     *                           그 밖은 {@link Application#submit} 참고
      */
     @Transactional
     public ApplicationResponse submit(Long applicantId, ApplicationRequest request) {
@@ -56,6 +57,7 @@ public class ApplicationService {
         ApplicationPeriod period = request.toPeriod();
 
         Application application = Application.submit(space, applicant, request.toActivityDetails(), period, today());
+        validateNotBooked(space, period);
         validateNoDuplicate(space, applicantId, period);
         applicationRepository.save(application);
         if (request.hasOffer()) {
@@ -88,6 +90,14 @@ public class ApplicationService {
         application.cancel(applicantId, request.reason(), today(), LocalDateTime.now(clock));
         applicationRepository.flush();
         return responseMapper.detail(application);
+    }
+
+    private void validateNotBooked(Space space, ApplicationPeriod period) {
+        boolean booked = applicationRepository.existsOverlapping(space.getId(), ApplicationStatus.APPROVED,
+                period.startDate(), period.endDate());
+        if (booked) {
+            throw new BusinessException(ErrorCode.PERIOD_ALREADY_BOOKED);
+        }
     }
 
     private void validateNoDuplicate(Space space, Long applicantId, ApplicationPeriod period) {
