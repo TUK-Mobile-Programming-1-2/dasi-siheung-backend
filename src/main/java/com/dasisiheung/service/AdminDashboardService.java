@@ -2,10 +2,12 @@ package com.dasisiheung.service;
 
 import com.dasisiheung.dto.admin.DashboardResponse;
 import com.dasisiheung.dto.admin.DashboardResponse.RecentSpace;
+import com.dasisiheung.entity.application.ApplicationStatus;
 import com.dasisiheung.entity.member.MemberStatus;
 import com.dasisiheung.entity.member.Role;
 import com.dasisiheung.entity.space.Region;
 import com.dasisiheung.entity.space.SpaceStatus;
+import com.dasisiheung.repository.ApplicationRepository;
 import com.dasisiheung.repository.MemberRepository;
 import com.dasisiheung.repository.SpaceRepository;
 import com.dasisiheung.repository.projection.EnumCount;
@@ -26,15 +28,20 @@ public class AdminDashboardService {
 
     private final SpaceRepository spaceRepository;
     private final MemberRepository memberRepository;
+    private final ApplicationRepository applicationRepository;
     private final Clock clock;
 
     public DashboardResponse getDashboard() {
         Map<SpaceStatus, Long> spacesByStatus = zeroFilled(SpaceStatus.class, spaceRepository.countByStatus());
+        Map<ApplicationStatus, Long> applicationsByStatus =
+                zeroFilled(ApplicationStatus.class, applicationRepository.countByStatus());
         return new DashboardResponse(
                 spacesByStatus.get(SpaceStatus.PENDING_REVIEW),
                 spacesByStatus,
                 zeroFilled(Region.class, spaceRepository.countByRegion(SpaceStatus.PUBLISHED)),
                 zeroFilled(Role.class, memberRepository.countByRoleExcludingStatus(MemberStatus.WITHDRAWN)),
+                applicationsByStatus.get(ApplicationStatus.PENDING),
+                applicationsByStatus,
                 spaceRepository.findTop5ByOrderByCreatedAtDesc().stream().map(RecentSpace::from).toList(),
                 LocalDateTime.now(clock));
     }

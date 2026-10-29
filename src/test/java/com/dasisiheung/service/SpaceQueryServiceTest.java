@@ -24,8 +24,10 @@ import com.dasisiheung.entity.space.Region;
 import com.dasisiheung.entity.space.Space;
 import com.dasisiheung.entity.space.SpaceStatus;
 import com.dasisiheung.exception.ErrorCode;
+import com.dasisiheung.repository.ApplicationRepository;
 import com.dasisiheung.repository.SpaceRepository;
 import com.dasisiheung.repository.projection.SpaceMarker;
+import com.dasisiheung.support.ApplicationFixtures;
 import com.dasisiheung.support.FixedClockConfig;
 import com.dasisiheung.support.SpaceFixtures;
 import java.time.LocalDate;
@@ -52,11 +54,14 @@ class SpaceQueryServiceTest {
     @Mock
     private SpaceRepository spaceRepository;
 
+    @Mock
+    private ApplicationRepository applicationRepository;
+
     private SpaceQueryService spaceQueryService;
 
     @BeforeEach
     void setUp() {
-        spaceQueryService = new SpaceQueryService(spaceRepository,
+        spaceQueryService = new SpaceQueryService(spaceRepository, applicationRepository,
                 new SpaceResponseMapper(mock(FileUploadService.class)), FixedClockConfig.fixedClock());
     }
 
@@ -72,6 +77,21 @@ class SpaceQueryServiceTest {
 
         assertThat(response.availableDates()).containsExactly(TODAY, TODAY.plusDays(1), TODAY.plusDays(3));
         assertThat(response.provider().id()).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("확정 예약이 있는 날짜는 사용 가능 날짜에서 뺀다")
+    void bookedDatesExcluded() {
+        Space space = SpaceFixtures.space(10L, SpaceFixtures.provider(2L),
+                Set.of(TODAY.plusDays(1), TODAY.plusDays(2), TODAY.plusDays(3)), TODAY);
+        given(spaceRepository.findByIdAndStatus(10L, SpaceStatus.PUBLISHED)).willReturn(Optional.of(space));
+        given(applicationRepository.findApprovedEndingFrom(10L, TODAY)).willReturn(List.of(
+                ApplicationFixtures.application(7L, ApplicationFixtures.publishedSpace(space),
+                        ApplicationFixtures.applicant(1L), TODAY.plusDays(1), TODAY.plusDays(2), TODAY)));
+
+        SpaceDetailResponse response = spaceQueryService.getSpace(10L);
+
+        assertThat(response.availableDates()).containsExactly(TODAY.plusDays(3));
     }
 
     @Test

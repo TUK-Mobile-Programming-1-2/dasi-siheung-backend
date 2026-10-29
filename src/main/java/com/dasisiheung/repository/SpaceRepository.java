@@ -7,6 +7,8 @@ import com.dasisiheung.exception.BusinessException;
 import com.dasisiheung.exception.ErrorCode;
 import com.dasisiheung.repository.projection.EnumCount;
 import com.dasisiheung.repository.projection.SpaceMarker;
+import jakarta.persistence.LockModeType;
+import jakarta.persistence.QueryHint;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -14,6 +16,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -27,6 +31,15 @@ public interface SpaceRepository extends JpaRepository<Space, Long>, JpaSpecific
     /** 이용자에게 보이는 공간 조회용. 상태가 다르면 비어 있다. */
     @EntityGraph(attributePaths = "provider")
     Optional<Space> findByIdAndStatus(Long id, SpaceStatus status);
+
+    /**
+     * 예약 확정용 행 잠금 (SELECT ... FOR UPDATE). 같은 공간의 승인을 한 번에 하나씩 처리한다.
+     * 3초 안에 잠금을 못 얻으면 409 DATA_CONFLICT 로 끝난다.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000"))
+    @Query("select s from Space s where s.id = :spaceId")
+    Optional<Space> findWithLockById(@Param("spaceId") Long spaceId);
 
     Page<Space> findByProvider_Id(Long providerId, Pageable pageable);
 

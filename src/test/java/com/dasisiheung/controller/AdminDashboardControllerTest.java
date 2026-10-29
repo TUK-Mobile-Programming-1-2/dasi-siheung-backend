@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.dasisiheung.dto.admin.DashboardResponse;
+import com.dasisiheung.entity.application.ApplicationStatus;
 import com.dasisiheung.entity.member.Role;
 import com.dasisiheung.entity.space.Region;
 import com.dasisiheung.entity.space.SpaceStatus;
@@ -56,6 +57,10 @@ class AdminDashboardControllerTest extends ApiDocsTestSupport {
                                         .description("지역별 공개 공간 수 { JEONGWANG: 3, ... }"),
                                 subsectionWithPath("data.membersByRole").type(JsonFieldType.OBJECT)
                                         .description("역할별 회원 수 (탈퇴 제외) { USER: 10, ... }"),
+                                fieldWithPath("data.pendingApplicationCount").type(JsonFieldType.NUMBER)
+                                        .description("제공자 답변을 기다리는(검토 중) 신청 수"),
+                                subsectionWithPath("data.applicationsByStatus").type(JsonFieldType.OBJECT)
+                                        .description("상태별 신청 수 { PENDING: 5, APPROVED: 3, ... }"),
                                 fieldWithPath("data.recentSpaces[].id").type(JsonFieldType.NUMBER).description("공간 ID"),
                                 fieldWithPath("data.recentSpaces[].title").type(JsonFieldType.STRING).description("공간 이름"),
                                 fieldWithPath("data.recentSpaces[].region").type(JsonFieldType.STRING).description("지역"),
@@ -73,7 +78,13 @@ class AdminDashboardControllerTest extends ApiDocsTestSupport {
         byStatus.put(SpaceStatus.PUBLISHED, 4L);
         Map<Region, Long> byRegion = new LinkedHashMap<>(Map.of(Region.JEONGWANG, 3L, Region.GEOBUKSEOM, 0L, Region.BAEGOT, 1L));
         Map<Role, Long> byRole = new LinkedHashMap<>(Map.of(Role.USER, 10L, Role.PROVIDER, 5L, Role.ADMIN, 1L));
-        return new DashboardResponse(2, byStatus, byRegion, byRole,
+        Map<ApplicationStatus, Long> byApplicationStatus = new LinkedHashMap<>();
+        for (ApplicationStatus status : ApplicationStatus.values()) {
+            byApplicationStatus.put(status, 0L);
+        }
+        byApplicationStatus.put(ApplicationStatus.PENDING, 5L);
+        byApplicationStatus.put(ApplicationStatus.APPROVED, 3L);
+        return new DashboardResponse(2, byStatus, byRegion, byRole, 5, byApplicationStatus,
                 List.of(new DashboardResponse.RecentSpace(10L, "정왕역 앞 1층 상가", Region.JEONGWANG,
                         SpaceStatus.PENDING_REVIEW, FixedClockConfig.FIXED_LOCAL_NOW)),
                 FixedClockConfig.FIXED_LOCAL_NOW);

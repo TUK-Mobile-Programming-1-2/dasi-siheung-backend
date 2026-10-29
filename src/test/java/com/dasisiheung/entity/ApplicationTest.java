@@ -159,6 +159,69 @@ class ApplicationTest {
     }
 
     @Nested
+    @DisplayName("승인")
+    class Approve {
+
+        @Test
+        @DisplayName("가격 협의가 끝난 검토 중 신청을 승인하면 예약 확정")
+        void approve() {
+            Application application = submit(TODAY.plusDays(1), TODAY.plusDays(2));
+
+            application.approve(2L, false, TODAY, NOW);
+
+            assertThat(application.getStatus()).isEqualTo(ApplicationStatus.APPROVED);
+            assertThat(application.getDecidedAt()).isEqualTo(NOW);
+        }
+
+        @Test
+        @DisplayName("일시 중단한 공간의 신청도 승인할 수 있다")
+        void pausedSpace() {
+            Application application = submit(TODAY.plusDays(1), TODAY.plusDays(1));
+            space.pause();
+
+            application.approve(2L, false, TODAY, NOW);
+
+            assertThat(application.getStatus()).isEqualTo(ApplicationStatus.APPROVED);
+        }
+
+        @Test
+        @DisplayName("승인 거부 사유: 협의 대기 · 겹치는 확정 · 시작일 지남 · 캘린더에서 빠짐 · 받은 신청 아님")
+        void approveRules() {
+            Application waiting = submit(TODAY.plusDays(1), TODAY.plusDays(1));
+            waiting.offer(applicant, 40_000, null, NOW);
+            assertThatThrownBy(() -> waiting.approve(2L, false, TODAY, NOW))
+                    .extracting("errorCode").isEqualTo(ErrorCode.PRICE_NEGOTIATION_IN_PROGRESS);
+
+            Application booked = submit(TODAY.plusDays(2), TODAY.plusDays(2));
+            assertThatThrownBy(() -> booked.approve(2L, true, TODAY, NOW))
+                    .extracting("errorCode").isEqualTo(ErrorCode.PERIOD_ALREADY_BOOKED);
+            assertThatThrownBy(() -> booked.approve(2L, false, TODAY.plusDays(3), NOW))
+                    .extracting("errorCode").isEqualTo(ErrorCode.INVALID_APPLICATION_PERIOD);
+            assertThatThrownBy(() -> booked.approve(APPLICANT_ID, false, TODAY, NOW))
+                    .extracting("errorCode").isEqualTo(ErrorCode.NOT_APPLICATION_PARTICIPANT);
+
+            space.getAvailableDates().remove(TODAY.plusDays(2));
+            assertThatThrownBy(() -> booked.approve(2L, false, TODAY, NOW))
+                    .extracting("errorCode").isEqualTo(ErrorCode.PERIOD_NOT_AVAILABLE);
+        }
+
+        @Test
+        @DisplayName("자동 마감은 검토 중인 신청만 사유와 함께 CLOSED 로 바꾼다")
+        void closeBecauseBooked() {
+            Application pending = submit(TODAY.plusDays(1), TODAY.plusDays(1));
+            Application cancelled = submit(TODAY.plusDays(2), TODAY.plusDays(2));
+            cancelled.cancel(APPLICANT_ID, null, TODAY, NOW);
+
+            pending.closeBecauseBooked(NOW);
+            cancelled.closeBecauseBooked(NOW);
+
+            assertThat(pending.getStatus()).isEqualTo(ApplicationStatus.CLOSED);
+            assertThat(pending.getStatusReason()).contains("다른 신청이 확정");
+            assertThat(cancelled.getStatus()).isEqualTo(ApplicationStatus.CANCELLED);
+        }
+    }
+
+    @Nested
     @DisplayName("거절")
     class Reject {
 

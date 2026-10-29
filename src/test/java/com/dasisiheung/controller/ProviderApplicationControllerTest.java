@@ -2,6 +2,7 @@ package com.dasisiheung.controller;
 
 import static com.dasisiheung.support.ApiDocumentation.authorization;
 import static com.dasisiheung.support.ApiDocumentation.document;
+import static com.dasisiheung.support.ApiDocumentation.error;
 import static com.dasisiheung.support.ApiDocumentation.page;
 import static com.dasisiheung.support.ApiDocumentation.resource;
 import static com.dasisiheung.support.ApiDocumentation.success;
@@ -25,6 +26,8 @@ import com.dasisiheung.dto.application.RejectApplicationRequest;
 import com.dasisiheung.dto.common.PageQuery;
 import com.dasisiheung.dto.common.PageResponse;
 import com.dasisiheung.entity.application.ApplicationStatus;
+import com.dasisiheung.exception.BusinessException;
+import com.dasisiheung.exception.ErrorCode;
 import com.dasisiheung.service.ProviderApplicationService;
 import com.dasisiheung.support.ApiDocsTest;
 import com.dasisiheung.support.ApiDocsTestSupport;
@@ -65,6 +68,41 @@ class ProviderApplicationControllerTest extends ApiDocsTestSupport {
                                 parameterWithName("page").optional().description("페이지 (0부터)"),
                                 parameterWithName("size").optional().description("페이지 크기 (최대 100)")),
                         responseFields(page(ApplicationDocumentation.summaryFields("data.content[].")))));
+    }
+
+    @Test
+    @DisplayName("신청 승인 (예약 확정)")
+    void approve() throws Exception {
+        given(providerApplicationService.approve(PROVIDER_ID, 7L)).willReturn(ApplicationControllerTest.detail());
+
+        mockMvc.perform(post("/api/v1/provider/applications/{applicationId}/approve", 7L)
+                        .header(HttpHeaders.AUTHORIZATION, providerToken()))
+                .andExpect(status().isOk())
+                .andDo(document("provider-application-approve",
+                        resource(TAG, "신청 승인 (예약 확정)", "검토 중 · 가격 협의가 끝난 신청만 승인할 수 있습니다. "
+                                + "겹치는 기간의 다른 검토 중 신청은 자동으로 마감(CLOSED)되고 사유가 남습니다. "
+                                + "오류: 협의 대기 409 PRICE_NEGOTIATION_IN_PROGRESS, 이미 확정된 기간 409 PERIOD_ALREADY_BOOKED, "
+                                + "캘린더에서 빠진 날짜 409 PERIOD_NOT_AVAILABLE, 시작일 지남 400 INVALID_APPLICATION_PERIOD, "
+                                + "끝난 신청 409 INVALID_APPLICATION_STATUS."),
+                        requestHeaders(authorization()),
+                        pathParameters(parameterWithName("applicationId").description("신청 ID")),
+                        responseFields(success(ApplicationControllerTest.fields(
+                                ApplicationDocumentation.detailFields("data."))))));
+    }
+
+    @Test
+    @DisplayName("신청 승인: 이미 확정된 기간이면 409 PERIOD_ALREADY_BOOKED")
+    void approveAlreadyBooked() throws Exception {
+        given(providerApplicationService.approve(PROVIDER_ID, 8L))
+                .willThrow(new BusinessException(ErrorCode.PERIOD_ALREADY_BOOKED));
+
+        mockMvc.perform(post("/api/v1/provider/applications/{applicationId}/approve", 8L)
+                        .header(HttpHeaders.AUTHORIZATION, providerToken()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("PERIOD_ALREADY_BOOKED"))
+                .andDo(document("provider-application-approve-already-booked",
+                        resource(TAG, "신청 승인 (예약 확정)", "같은 기간에 이미 확정된 예약이 있는 예시"),
+                        responseFields(error())));
     }
 
     @Test

@@ -5,6 +5,7 @@ import com.dasisiheung.dto.common.ErrorResponse;
 import com.dasisiheung.dto.common.ErrorResponse.FieldErrorDetail;
 import com.dasisiheung.exception.BusinessException;
 import com.dasisiheung.exception.ErrorCode;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
@@ -94,8 +95,12 @@ public class GlobalExceptionHandler {
         return toResponse(ErrorCode.UNSUPPORTED_MEDIA_TYPE);
     }
 
+    /** PostgreSQL 배타 제약 위반 (겹치는 확정 예약, V9). */
+    private static final String EXCLUSION_VIOLATION = "23P01";
+
     /**
      * 동시에 같은 데이터를 바꾸려다 DB 제약·잠금에 걸린 경우. 내부 SQL 메시지는 노출하지 않는다.
+     * 확정 예약 겹침(배타 제약)은 화면에서 구분할 수 있게 PERIOD_ALREADY_BOOKED 로 알려준다.
      */
     @ExceptionHandler({
             DataIntegrityViolationException.class,
@@ -104,7 +109,19 @@ public class GlobalExceptionHandler {
     })
     public ResponseEntity<ApiResult<Void>> handleDataConflict(RuntimeException e) {
         log.warn("데이터 충돌: {}", e.getMessage());
+        if (hasSqlState(e, EXCLUSION_VIOLATION)) {
+            return toResponse(ErrorCode.PERIOD_ALREADY_BOOKED);
+        }
         return toResponse(ErrorCode.DATA_CONFLICT);
+    }
+
+    private static boolean hasSqlState(Throwable e, String sqlState) {
+        for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+            if (cause instanceof SQLException sqlException && sqlState.equals(sqlException.getSQLState())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

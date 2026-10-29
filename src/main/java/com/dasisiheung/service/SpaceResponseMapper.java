@@ -10,6 +10,7 @@ import com.dasisiheung.entity.space.Space;
 import com.dasisiheung.entity.space.SpacePhoto;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -24,10 +25,15 @@ public class SpaceResponseMapper {
         return ProviderSpaceResponse.of(space, photos(space), proofs(space));
     }
 
-    /** 이용자용 상세. 지난 날짜는 빼고 보여준다. */
-    public SpaceDetailResponse spaceDetail(Space space, LocalDate today) {
+    /**
+     * 이용자용 상세. 지난 날짜와 이미 확정된 예약 날짜는 빼고 보여준다.
+     *
+     * @param bookedDates 확정 예약이 있는 날짜
+     */
+    public SpaceDetailResponse spaceDetail(Space space, LocalDate today, Set<LocalDate> bookedDates) {
         List<LocalDate> upcomingDates = space.getAvailableDates().stream()
                 .filter(date -> !date.isBefore(today))
+                .filter(date -> !bookedDates.contains(date))
                 .sorted()
                 .toList();
         return SpaceDetailResponse.of(space, upcomingDates, photos(space));
