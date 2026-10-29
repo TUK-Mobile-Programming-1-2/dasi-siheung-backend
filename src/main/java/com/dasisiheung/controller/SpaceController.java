@@ -4,6 +4,8 @@ import com.dasisiheung.dto.common.ApiResult;
 import com.dasisiheung.dto.common.PageQuery;
 import com.dasisiheung.dto.common.PageResponse;
 import com.dasisiheung.dto.space.SpaceDetailResponse;
+import com.dasisiheung.dto.space.SpaceMapRequest;
+import com.dasisiheung.dto.space.SpaceMapResponse;
 import com.dasisiheung.dto.space.SpaceSearchRequest;
 import com.dasisiheung.dto.space.SpaceSummaryResponse;
 import com.dasisiheung.service.SpaceQueryService;
@@ -32,6 +34,13 @@ public class SpaceController {
     public ApiResult<PageResponse<SpaceSummaryResponse>> search(@Valid @ParameterObject SpaceSearchRequest request,
                                                                 @Valid @ParameterObject PageQuery pageQuery) {
         return ApiResult.ok(spaceQueryService.search(request, pageQuery));
+    }
+
+    @Operation(summary = "지도 마커",
+            description = "지도 화면 영역(남서·북동 꼭짓점) 안의 공개 공간. 최대 300개이며 넘으면 truncated = true 입니다.")
+    @GetMapping("/map")
+    public ApiResult<SpaceMapResponse> getMarkers(@Valid @ParameterObject SpaceMapRequest request) {
+        return ApiResult.ok(spaceQueryService.getMarkers(request));
     }
 
     @Operation(summary = "공간 상세", description = "공개 중인 공간만 조회됩니다. 사용 가능 날짜는 오늘 이후만 내려갑니다.")
