@@ -44,6 +44,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Application extends BaseTimeEntity {
 
+    static final String CLOSED_REASON = "같은 기간에 다른 신청이 확정되어 마감되었습니다.";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -218,6 +220,47 @@ public class Application extends BaseTimeEntity {
     private void validatePending() {
         if (status != ApplicationStatus.PENDING) {
             throw new BusinessException(ErrorCode.INVALID_APPLICATION_STATUS, "검토 중인 신청만 가격을 협의할 수 있습니다.");
+        }
+    }
+
+    /**
+     * 공간 제공자가 승인해 예약을 확정한다. 일시 중단(PAUSED)한 공간도 이미 받은 신청은 처리할 수 있다.
+     *
+     * @param periodBooked 같은 공간에 겹치는 확정 예약이 있는지 (공간을 잠근 뒤 서비스가 조회한 값)
+     * @throws BusinessException 받은 신청이 아니면 NOT_APPLICATION_PARTICIPANT, 검토 중이 아니면 INVALID_APPLICATION_STATUS,
+     *                           가격 협의 대기 중이면 PRICE_NEGOTIATION_IN_PROGRESS, 공간이 공개 · 일시 중단이 아니면 INVALID_SPACE_STATUS,
+     *                           이미 시작일이 지났으면 INVALID_APPLICATION_PERIOD, 날짜가 캘린더에서 빠졌으면 PERIOD_NOT_AVAILABLE,
+     *                           겹치는 확정 예약이 있으면 PERIOD_ALREADY_BOOKED
+     */
+    public void approve(Long providerId, boolean periodBooked, LocalDate today, LocalDateTime now) {
+        validateReceivedBy(providerId);
+        if (status != ApplicationStatus.PENDING) {
+            throw new BusinessException(ErrorCode.INVALID_APPLICATION_STATUS, "검토 중인 신청만 승인할 수 있습니다.");
+        }
+        if (negotiationStatus.isWaiting()) {
+            throw new BusinessException(ErrorCode.PRICE_NEGOTIATION_IN_PROGRESS);
+        }
+        if (space.getStatus() != SpaceStatus.PUBLISHED && space.getStatus() != SpaceStatus.PAUSED) {
+            throw new BusinessException(ErrorCode.INVALID_SPACE_STATUS, "공개 · 일시 중단 중인 공간의 신청만 승인할 수 있습니다.");
+        }
+        if (startDate.isBefore(today)) {
+            throw new BusinessException(ErrorCode.INVALID_APPLICATION_PERIOD, "이용 시작일이 지난 신청은 승인할 수 없습니다.");
+        }
+        if (!period().isCoveredBy(space.getAvailableDates())) {
+            throw new BusinessException(ErrorCode.PERIOD_NOT_AVAILABLE);
+        }
+        if (periodBooked) {
+            throw new BusinessException(ErrorCode.PERIOD_ALREADY_BOOKED);
+        }
+        this.status = ApplicationStatus.APPROVED;
+        this.statusReason = null;
+        this.decidedAt = now;
+    }
+
+    /** 같은 기간의 다른 신청이 확정되어 자동으로 마감한다. */
+    public void closeBecauseBooked(LocalDateTime now) {
+        if (status == ApplicationStatus.PENDING) {
+            finish(ApplicationStatus.CLOSED, CLOSED_REASON, now);
         }
     }
 
