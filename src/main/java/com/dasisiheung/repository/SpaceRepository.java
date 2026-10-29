@@ -7,6 +7,7 @@ import com.dasisiheung.exception.BusinessException;
 import com.dasisiheung.exception.ErrorCode;
 import com.dasisiheung.repository.projection.EnumCount;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -20,6 +21,10 @@ public interface SpaceRepository extends JpaRepository<Space, Long> {
     default Space getSpace(Long spaceId) {
         return findById(spaceId).orElseThrow(() -> new BusinessException(ErrorCode.SPACE_NOT_FOUND));
     }
+
+    /** 이용자에게 보이는 공간 조회용. 상태가 다르면 비어 있다. */
+    @EntityGraph(attributePaths = "provider")
+    Optional<Space> findByIdAndStatus(Long id, SpaceStatus status);
 
     Page<Space> findByProvider_Id(Long providerId, Pageable pageable);
 
