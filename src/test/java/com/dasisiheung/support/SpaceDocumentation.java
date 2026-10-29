@@ -64,6 +64,33 @@ public final class SpaceDocumentation {
         return fields;
     }
 
+    /** 이용자가 보는 공간 상세 필드 (사진 항목 포함). prefix 예: "data." */
+    public static List<FieldDescriptor> spaceDetailFields(String prefix) {
+        List<FieldDescriptor> fields = new ArrayList<>(List.of(
+                fieldWithPath(prefix + "id").type(JsonFieldType.NUMBER).description("공간 ID"),
+                fieldWithPath(prefix + "region").type(JsonFieldType.STRING).description("서비스 지역"),
+                fieldWithPath(prefix + "title").type(JsonFieldType.STRING).description("공간 이름"),
+                fieldWithPath(prefix + "description").type(JsonFieldType.STRING).description("공간 소개"),
+                fieldWithPath(prefix + "rules").type(JsonFieldType.STRING).optional().description("이용 수칙"),
+                fieldWithPath(prefix + "address").type(JsonFieldType.STRING).description("도로명 주소"),
+                fieldWithPath(prefix + "buildingName").type(JsonFieldType.STRING).optional().description("건물 이름"),
+                fieldWithPath(prefix + "unitNumber").type(JsonFieldType.STRING).optional().description("호실"),
+                fieldWithPath(prefix + "latitude").type(JsonFieldType.NUMBER).description("위도"),
+                fieldWithPath(prefix + "longitude").type(JsonFieldType.NUMBER).description("경도"),
+                fieldWithPath(prefix + "areaSqm").type(JsonFieldType.NUMBER).description("전용 면적(㎡)"),
+                fieldWithPath(prefix + "buildingUse").type(JsonFieldType.STRING).description("건축물 용도"),
+                fieldWithPath(prefix + "commercialTheme").type(JsonFieldType.STRING).optional().description("상권 테마"),
+                fieldWithPath(prefix + "dailyPrice").type(JsonFieldType.NUMBER).description("1일 이용료(원)"),
+                fieldWithPath(prefix + "facilities").type(JsonFieldType.ARRAY).description("보유 시설"),
+                fieldWithPath(prefix + "activityTypes").type(JsonFieldType.ARRAY).description("허용 활동"),
+                fieldWithPath(prefix + "availableDates").type(JsonFieldType.ARRAY).description("오늘 이후 사용 가능 날짜 (오름차순)"),
+                fieldWithPath(prefix + "photos").type(JsonFieldType.ARRAY).description("사진 (순서대로, 첫 번째가 대표)"),
+                fieldWithPath(prefix + "provider.id").type(JsonFieldType.NUMBER).description("공간 제공자 회원 ID"),
+                fieldWithPath(prefix + "provider.name").type(JsonFieldType.STRING).description("공간 제공자 이름")));
+        fields.addAll(photoFields(prefix + "photos[]."));
+        return fields;
+    }
+
     /** 사진 항목 필드. prefix 예: "data.photos[]." */
     public static List<FieldDescriptor> photoFields(String prefix) {
         return List.of(
