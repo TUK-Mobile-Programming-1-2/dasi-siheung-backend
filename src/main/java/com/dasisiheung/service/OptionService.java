@@ -3,6 +3,8 @@ package com.dasisiheung.service;
 import com.dasisiheung.dto.option.OptionItem;
 import com.dasisiheung.dto.option.OptionsResponse;
 import com.dasisiheung.dto.space.SpaceSort;
+import com.dasisiheung.entity.application.ApplicationStatus;
+import com.dasisiheung.entity.application.PriceNegotiationStatus;
 import com.dasisiheung.entity.member.Role;
 import com.dasisiheung.entity.space.ActivityType;
 import com.dasisiheung.entity.space.BuildingUse;
@@ -30,7 +32,9 @@ public class OptionService {
             OptionItem.listOf(ProofType.class),
             OptionItem.listOf(SpaceStatus.class),
             OptionItem.listOf(ReviewDecision.class),
-            OptionItem.listOf(SpaceSort.class)
+            OptionItem.listOf(SpaceSort.class),
+            OptionItem.listOf(ApplicationStatus.class),
+            OptionItem.listOf(PriceNegotiationStatus.class)
     );
 
     public OptionsResponse getOptions() {

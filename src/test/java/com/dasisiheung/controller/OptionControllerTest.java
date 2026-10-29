@@ -37,7 +37,9 @@ class OptionControllerTest extends ApiDocsTestSupport {
             {"proofTypes", "권한 증빙 종류"},
             {"spaceStatuses", "공간 공개 상태"},
             {"reviewDecisions", "관리자 검수 결과"},
-            {"spaceSorts", "공간 검색 정렬"}
+            {"spaceSorts", "공간 검색 정렬"},
+            {"applicationStatuses", "신청 상태"},
+            {"negotiationStatuses", "가격 협의 상태"}
     };
 
     @MockitoBean
