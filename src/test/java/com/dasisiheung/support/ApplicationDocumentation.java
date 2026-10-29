@@ -21,7 +21,10 @@ public final class ApplicationDocumentation {
                 fieldWithPath("plan").type(JsonFieldType.STRING).description("활동 계획 · 공간 사용 방법 (최대 2000자)"),
                 fieldWithPath("headcount").type(JsonFieldType.NUMBER).description("예상 운영 인원 (1~200)"),
                 fieldWithPath("startDate").type(JsonFieldType.STRING).description("이용 시작일 yyyy-MM-dd (오늘부터)"),
-                fieldWithPath("endDate").type(JsonFieldType.STRING).description("이용 종료일 yyyy-MM-dd (최대 30일)"));
+                fieldWithPath("endDate").type(JsonFieldType.STRING).description("이용 종료일 yyyy-MM-dd (최대 30일)"),
+                fieldWithPath("offerAmount").type(JsonFieldType.NUMBER).optional()
+                        .description("처음부터 제안할 금액(원, 기간 합계, 선택) — 없으면 정가로 신청"),
+                fieldWithPath("offerMessage").type(JsonFieldType.STRING).optional().description("가격 제안 한마디 (선택)"));
     }
 
     /** 신청 상세 필드. prefix 예: "data." */
@@ -51,6 +54,14 @@ public final class ApplicationDocumentation {
                 fieldWithPath(prefix + "negotiationStatus").type(JsonFieldType.STRING)
                         .description("NONE 정가 신청 | WAITING_PROVIDER 제공자 답변 대기 | WAITING_APPLICANT 신청자 답변 대기 | AGREED 가격 합의"),
                 fieldWithPath(prefix + "pendingOfferAmount").type(JsonFieldType.NUMBER).optional().description("답변을 기다리는 제안 금액"),
+                fieldWithPath(prefix + "offers").type(JsonFieldType.ARRAY).description("가격 협의 이력 (오래된 순)"),
+                fieldWithPath(prefix + "offers[].id").type(JsonFieldType.NUMBER).optional().description("제안 ID"),
+                fieldWithPath(prefix + "offers[].proposerSide").type(JsonFieldType.STRING).optional().description("APPLICANT 신청자 | PROVIDER 공간 제공자"),
+                fieldWithPath(prefix + "offers[].proposerName").type(JsonFieldType.STRING).optional().description("제안한 회원 이름"),
+                fieldWithPath(prefix + "offers[].amount").type(JsonFieldType.NUMBER).optional().description("제안 금액(원, 기간 합계)"),
+                fieldWithPath(prefix + "offers[].message").type(JsonFieldType.STRING).optional().description("한마디"),
+                fieldWithPath(prefix + "offers[].acceptedAt").type(JsonFieldType.STRING).optional().description("상대가 수락한 시각 (수락 전이면 null)"),
+                fieldWithPath(prefix + "offers[].createdAt").type(JsonFieldType.STRING).optional().description("제안 시각"),
                 fieldWithPath(prefix + "createdAt").type(JsonFieldType.STRING).description("신청 시각"),
                 fieldWithPath(prefix + "decidedAt").type(JsonFieldType.STRING).optional().description("확정 · 거절 · 취소 · 마감 시각")));
     }

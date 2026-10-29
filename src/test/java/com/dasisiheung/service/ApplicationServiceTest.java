@@ -11,10 +11,13 @@ import static org.mockito.Mockito.never;
 import com.dasisiheung.dto.application.ApplicationResponse;
 import com.dasisiheung.entity.application.Application;
 import com.dasisiheung.entity.application.ApplicationStatus;
+import com.dasisiheung.entity.application.PriceNegotiationStatus;
+import com.dasisiheung.entity.application.PriceOffer;
 import com.dasisiheung.entity.space.Space;
 import com.dasisiheung.exception.ErrorCode;
 import com.dasisiheung.repository.ApplicationRepository;
 import com.dasisiheung.repository.MemberRepository;
+import com.dasisiheung.repository.PriceOfferRepository;
 import com.dasisiheung.repository.SpaceRepository;
 import com.dasisiheung.support.ApplicationFixtures;
 import com.dasisiheung.support.FixedClockConfig;
@@ -46,13 +49,17 @@ class ApplicationServiceTest {
     @Mock
     private MemberRepository memberRepository;
 
+    @Mock
+    private PriceOfferRepository priceOfferRepository;
+
     private ApplicationService applicationService;
     private Space space;
 
     @BeforeEach
     void setUp() {
         applicationService = new ApplicationService(applicationRepository, spaceRepository, memberRepository,
-                new ApplicationResponseMapper(new SpaceResponseMapper(mock(FileUploadService.class))),
+                priceOfferRepository, new ApplicationResponseMapper(
+                        new SpaceResponseMapper(mock(FileUploadService.class)), priceOfferRepository),
                 FixedClockConfig.fixedClock());
         space = ApplicationFixtures.publishedSpace(
                 SpaceFixtures.space(10L, SpaceFixtures.provider(PROVIDER_ID), Set.of(START, START.plusDays(1)), TODAY));
@@ -96,5 +103,21 @@ class ApplicationServiceTest {
         assertThat(applicationService.getApplication(PROVIDER_ID, 7L).id()).isEqualTo(7L);
         assertThatThrownBy(() -> applicationService.getApplication(99L, 7L))
                 .extracting("errorCode").isEqualTo(ErrorCode.NOT_APPLICATION_PARTICIPANT);
+    }
+
+    @Test
+    @DisplayName("제안 금액을 함께 보내면 첫 가격 제안으로 저장하고 제공자 답변 대기가 된다")
+    void submitWithOffer() {
+        given(memberRepository.findById(USER_ID)).willReturn(Optional.of(ApplicationFixtures.applicant(USER_ID)));
+        given(spaceRepository.getSpace(10L)).willReturn(space);
+        given(applicationRepository.save(any(Application.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        ApplicationResponse response = applicationService.submit(USER_ID,
+                ApplicationFixtures.requestWithOffer(10L, START, START.plusDays(1), 90_000));
+
+        assertThat(response.negotiationStatus()).isEqualTo(PriceNegotiationStatus.WAITING_PROVIDER);
+        assertThat(response.pendingOfferAmount()).isEqualTo(90_000);
+        assertThat(response.totalPrice()).isEqualTo(100_000);
+        then(priceOfferRepository).should().save(any(PriceOffer.class));
     }
 }

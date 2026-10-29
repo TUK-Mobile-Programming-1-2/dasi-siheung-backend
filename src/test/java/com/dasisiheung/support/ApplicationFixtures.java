@@ -19,7 +19,15 @@ public final class ApplicationFixtures {
 
     public static ApplicationRequest request(long spaceId, LocalDate startDate, LocalDate endDate) {
         return new ApplicationRequest(spaceId, ActivityType.POPUP_STORE, "수제 캔들 팝업 스토어",
-                "주말 이틀 동안 수제 캔들을 전시 · 판매합니다.", 3, startDate, endDate);
+                "주말 이틀 동안 수제 캔들을 전시 · 판매합니다.", 3, startDate, endDate, null, null);
+    }
+
+    /** 처음부터 가격을 제안하는 신청서. */
+    public static ApplicationRequest requestWithOffer(long spaceId, LocalDate startDate, LocalDate endDate,
+                                                      int offerAmount) {
+        return new ApplicationRequest(spaceId, ActivityType.POPUP_STORE, "수제 캔들 팝업 스토어",
+                "주말 이틀 동안 수제 캔들을 전시 · 판매합니다.", 3, startDate, endDate, offerAmount,
+                "이틀 연속 이용이라 조금만 조정 부탁드립니다.");
     }
 
     public static Member applicant(long id) {
