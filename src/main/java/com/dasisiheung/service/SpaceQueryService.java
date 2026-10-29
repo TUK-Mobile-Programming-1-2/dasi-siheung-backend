@@ -1,14 +1,23 @@
 package com.dasisiheung.service;
 
+import com.dasisiheung.dto.common.PageQuery;
+import com.dasisiheung.dto.common.PageResponse;
 import com.dasisiheung.dto.space.SpaceDetailResponse;
+import com.dasisiheung.dto.space.SpaceSearchRequest;
+import com.dasisiheung.dto.space.SpaceSummaryResponse;
 import com.dasisiheung.entity.space.Space;
 import com.dasisiheung.entity.space.SpaceStatus;
 import com.dasisiheung.exception.BusinessException;
 import com.dasisiheung.exception.ErrorCode;
 import com.dasisiheung.repository.SpaceRepository;
+import com.dasisiheung.repository.SpaceSpecifications;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +26,9 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class SpaceQueryService {
+
+    /** 기간 검색은 오늘부터 이 날수 안에서만 한다. */
+    public static final int MAX_SEARCH_PERIOD_DAYS = 90;
 
     private final SpaceRepository spaceRepository;
     private final SpaceResponseMapper responseMapper;
@@ -28,6 +40,58 @@ public class SpaceQueryService {
     public SpaceDetailResponse getSpace(Long spaceId) {
         Space space = getPublishedSpace(spaceId);
         return responseMapper.spaceDetail(space, LocalDate.now(clock));
+    }
+
+    /**
+     * 조건에 맞는 공개 공간을 찾는다.
+     *
+     * @throws BusinessException 기간이 오늘 이전이거나 90일을 넘으면 INVALID_SEARCH_PERIOD
+     */
+    public PageResponse<SpaceSummaryResponse> search(SpaceSearchRequest request, PageQuery pageQuery) {
+        if (request.hasPeriod()) {
+            validatePeriod(request.startDate(), request.endDate());
+        }
+        Page<Space> spaces = spaceRepository.findAll(toSpecification(request),
+                pageQuery.toPageable(request.sort().toSort()));
+        return PageResponse.from(spaces, responseMapper::spaceSummary);
+    }
+
+    private void validatePeriod(LocalDate startDate, LocalDate endDate) {
+        LocalDate today = LocalDate.now(clock);
+        boolean outOfWindow = startDate.isBefore(today) || endDate.isAfter(today.plusDays(MAX_SEARCH_PERIOD_DAYS));
+        if (outOfWindow) {
+            throw new BusinessException(ErrorCode.INVALID_SEARCH_PERIOD);
+        }
+    }
+
+    static Specification<Space> toSpecification(SpaceSearchRequest request) {
+        List<Specification<Space>> conditions = new ArrayList<>();
+        conditions.add(SpaceSpecifications.hasStatus(SpaceStatus.PUBLISHED));
+        if (request.region() != null) {
+            conditions.add(SpaceSpecifications.inRegion(request.region()));
+        }
+        if (request.activityType() != null) {
+            conditions.add(SpaceSpecifications.allowsActivity(request.activityType()));
+        }
+        if (request.purpose() != null) {
+            conditions.add(SpaceSpecifications.themeIn(request.purpose().getSuitableThemes()));
+        }
+        if (request.hasPeriod()) {
+            conditions.add(SpaceSpecifications.availableThroughout(request.startDate(), request.endDate()));
+        }
+        if (request.minPrice() != null) {
+            conditions.add(SpaceSpecifications.priceAtLeast(request.minPrice()));
+        }
+        if (request.maxPrice() != null) {
+            conditions.add(SpaceSpecifications.priceAtMost(request.maxPrice()));
+        }
+        if (!request.facilities().isEmpty()) {
+            conditions.add(SpaceSpecifications.hasAllFacilities(request.facilities()));
+        }
+        if (request.keyword() != null) {
+            conditions.add(SpaceSpecifications.containsKeyword(request.keyword()));
+        }
+        return Specification.allOf(conditions);
     }
 
     private Space getPublishedSpace(Long spaceId) {

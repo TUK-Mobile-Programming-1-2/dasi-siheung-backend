@@ -53,6 +53,9 @@ public enum ErrorCode {
     SPACE_PROOF_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "증빙은 최대 5개까지 올릴 수 있습니다."),
     SPACE_PROOF_NOT_FOUND(HttpStatus.NOT_FOUND, "증빙을 찾을 수 없습니다."),
 
+    // 공간 둘러보기
+    INVALID_SEARCH_PERIOD(HttpStatus.BAD_REQUEST, "검색 기간은 오늘부터 최대 90일까지 지정할 수 있습니다."),
+
     // 관리자 검수
     SPACE_PROOF_REQUIRED(HttpStatus.BAD_REQUEST, "권한 증빙이 없는 공간은 공개 승인할 수 없습니다. 공개 보류로 처리해 주세요."),
     REVIEW_CHECKLIST_INCOMPLETE(HttpStatus.BAD_REQUEST, "검수 항목 5개를 모두 확인해야 공개 승인할 수 있습니다."),
