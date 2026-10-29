@@ -238,3 +238,42 @@ GET {{baseUrl}}/api/v1/spaces?startDate={{browseDay1}}
         client.assert(response.body.error.code === "INVALID_INPUT", `실제 ${response.body.error.code}`);
     });
 %}
+
+### 지도 마커 — 거북섬 일대 화면
+# 기대값: 200 OK, 준비한 공간 마커 포함, 모든 마커가 화면 영역 안
+GET {{baseUrl}}/api/v1/spaces/map?swLat=37.300&swLng=126.650&neLat=37.330&neLng=126.700
+
+> {%
+    client.test("200 OK + 영역 안 마커", () => {
+        const markers = response.body.data.markers;
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(markers.some(m => String(m.id) === String(client.global.get("browseSpaceId"))), "준비한 공간이 없습니다");
+        client.assert(markers.every(m => m.latitude >= 37.300 && m.latitude <= 37.330 && m.longitude >= 126.650 && m.longitude <= 126.700),
+            "영역 밖 마커가 섞였습니다");
+        client.assert(markers.length <= 300, `마커 ${markers.length}`);
+        client.assert(typeof response.body.data.truncated === "boolean", "truncated 누락");
+    });
+%}
+
+### 지도 마커 — 허용하지 않는 활동으로 거르기
+# 기대값: 200 OK, 준비한 공간(전시 · 팝업만 허용)은 CLASS 조건에서 빠진다
+GET {{baseUrl}}/api/v1/spaces/map?swLat=37.300&swLng=126.650&neLat=37.330&neLng=126.700&activityType=CLASS
+
+> {%
+    client.test("200 OK + 제외", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        const ids = response.body.data.markers.map(m => String(m.id));
+        client.assert(!ids.includes(String(client.global.get("browseSpaceId"))), "허용하지 않는 활동의 공간이 나왔습니다");
+    });
+%}
+
+### 지도 마커 — 꼭짓점이 뒤바뀜
+# 기대값: 400 INVALID_INPUT
+GET {{baseUrl}}/api/v1/spaces/map?swLat=37.330&swLng=126.650&neLat=37.300&neLng=126.700
+
+> {%
+    client.test("400 INVALID_INPUT", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "INVALID_INPUT", `실제 ${response.body.error.code}`);
+    });
+%}
