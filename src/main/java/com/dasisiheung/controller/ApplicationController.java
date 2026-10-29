@@ -5,6 +5,7 @@ import com.dasisiheung.dto.application.ApplicationRequest;
 import com.dasisiheung.dto.application.ApplicationResponse;
 import com.dasisiheung.dto.application.ApplicationSummaryResponse;
 import com.dasisiheung.dto.application.CancelApplicationRequest;
+import com.dasisiheung.dto.application.PriceOfferRequest;
 import com.dasisiheung.dto.common.ApiResult;
 import com.dasisiheung.dto.common.PageQuery;
 import com.dasisiheung.dto.common.PageResponse;
@@ -12,6 +13,7 @@ import com.dasisiheung.entity.application.ApplicationStatus;
 import com.dasisiheung.security.AuthMember;
 import com.dasisiheung.security.LoginMember;
 import com.dasisiheung.service.ApplicationService;
+import com.dasisiheung.service.PriceNegotiationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,7 +31,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 공간 이용 신청. 신청 · 목록 · 취소는 이용자(USER), 상세는 신청자와 공간 제공자 모두. */
+/** 공간 이용 신청. 신청 · 목록 · 취소는 이용자(USER), 상세 · 가격 협의는 신청자와 공간 제공자 모두. */
 @Tag(name = "Application", description = "공간 이용 신청")
 @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
 @RestController
@@ -38,6 +40,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ApplicationController {
 
     private final ApplicationService applicationService;
+    private final PriceNegotiationService priceNegotiationService;
 
     @Operation(summary = "신청서 제출", description = "공개 공간 · 허용 활동 · 사용 가능 날짜 안의 기간(최대 30일)만 신청할 수 있습니다.")
     @PostMapping
@@ -70,5 +73,21 @@ public class ApplicationController {
     public ApiResult<ApplicationResponse> cancel(@LoginMember AuthMember loginMember, @PathVariable Long applicationId,
                                                  @Valid @RequestBody CancelApplicationRequest request) {
         return ApiResult.ok(applicationService.cancel(loginMember.id(), applicationId, request));
+    }
+
+    @Operation(summary = "가격 제안 · 역제안",
+            description = "신청자 · 공간 제공자 모두 보낼 수 있습니다. 금액은 기간 합계(1원~정가 합계)이며, "
+                    + "보낸 제안에 상대가 답하기 전에는 다시 보낼 수 없습니다.")
+    @PostMapping("/{applicationId}/offers")
+    public ApiResult<ApplicationResponse> offer(@LoginMember AuthMember loginMember, @PathVariable Long applicationId,
+                                                @Valid @RequestBody PriceOfferRequest request) {
+        return ApiResult.ok(priceNegotiationService.offer(loginMember.id(), applicationId, request));
+    }
+
+    @Operation(summary = "받은 가격 제안 수락", description = "상대가 보낸 최근 제안 금액으로 합의합니다.")
+    @PostMapping("/{applicationId}/offers/accept")
+    public ApiResult<ApplicationResponse> acceptOffer(@LoginMember AuthMember loginMember,
+                                                      @PathVariable Long applicationId) {
+        return ApiResult.ok(priceNegotiationService.accept(loginMember.id(), applicationId));
     }
 }

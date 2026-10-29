@@ -39,7 +39,8 @@ class OptionControllerTest extends ApiDocsTestSupport {
             {"reviewDecisions", "관리자 검수 결과"},
             {"spaceSorts", "공간 검색 정렬"},
             {"applicationStatuses", "신청 상태"},
-            {"negotiationStatuses", "가격 협의 상태"}
+            {"negotiationStatuses", "가격 협의 상태"},
+            {"offerSides", "가격 제안한 쪽"}
     };
 
     @MockitoBean

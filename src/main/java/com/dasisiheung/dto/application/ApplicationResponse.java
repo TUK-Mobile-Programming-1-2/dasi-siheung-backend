@@ -10,6 +10,7 @@ import com.dasisiheung.entity.space.Space;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /** 신청 상세. 신청자와 공간 제공자가 같은 화면을 본다. */
 public record ApplicationResponse(
@@ -30,17 +31,18 @@ public record ApplicationResponse(
         @Schema(description = "현재 합의 금액(원) — 협의 전에는 정가 합계", example = "100000") int totalPrice,
         @Schema(description = "가격 협의 상태", example = "NONE") PriceNegotiationStatus negotiationStatus,
         @Schema(description = "답변을 기다리는 제안 금액 (없으면 null)", example = "90000") Integer pendingOfferAmount,
+        @Schema(description = "가격 협의 이력 (오래된 순)") List<PriceOfferResponse> offers,
         @Schema(description = "신청 시각") LocalDateTime createdAt,
         @Schema(description = "확정 · 거절 · 취소 · 마감 시각") LocalDateTime decidedAt
 ) {
 
-    public static ApplicationResponse of(Application application, String thumbnailUrl) {
+    public static ApplicationResponse of(Application application, String thumbnailUrl, List<PriceOfferResponse> offers) {
         return new ApplicationResponse(application.getId(), application.getStatus(), application.getStatusReason(),
                 SpaceInfo.of(application.getSpace(), thumbnailUrl), ApplicantInfo.from(application.getApplicant()),
                 application.getActivityType(), application.getActivityTitle(), application.getPlan(),
                 application.getHeadcount(), application.getStartDate(), application.getEndDate(), application.days(),
                 application.getListDailyPrice(), application.getListTotalPrice(), application.getTotalPrice(),
-                application.getNegotiationStatus(), application.getPendingOfferAmount(), application.getCreatedAt(),
+                application.getNegotiationStatus(), application.getPendingOfferAmount(), offers, application.getCreatedAt(),
                 application.getDecidedAt());
     }
 

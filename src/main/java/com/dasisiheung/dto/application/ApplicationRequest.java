@@ -34,8 +34,19 @@ public record ApplicationRequest(
         @NotNull LocalDate startDate,
 
         @Schema(description = "이용 종료일 yyyy-MM-dd (최대 30일)", example = "2026-10-25")
-        @NotNull LocalDate endDate
+        @NotNull LocalDate endDate,
+
+        @Schema(description = "처음부터 제안할 금액(원, 기간 합계, 선택) — 없으면 정가로 신청", example = "90000")
+        @Min(1) Integer offerAmount,
+
+        @Schema(description = "가격 제안 한마디 (선택, 최대 300자)")
+        @Size(max = 300) String offerMessage
 ) {
+
+    public boolean hasOffer() {
+        return offerAmount != null;
+    }
+
 
     @JsonIgnore
     @AssertTrue(message = "종료일은 시작일보다 빠를 수 없습니다.")

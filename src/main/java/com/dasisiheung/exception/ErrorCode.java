@@ -69,7 +69,12 @@ public enum ErrorCode {
     PERIOD_NOT_AVAILABLE(HttpStatus.CONFLICT, "선택한 기간에 공간을 사용할 수 없는 날짜가 있습니다."),
     DUPLICATE_APPLICATION(HttpStatus.CONFLICT, "같은 공간 · 같은 기간에 이미 검토 중인 신청이 있습니다."),
     INVALID_APPLICATION_STATUS(HttpStatus.CONFLICT, "현재 신청 상태에서는 할 수 없는 작업입니다."),
-    APPLICATION_NOT_CANCELLABLE(HttpStatus.CONFLICT, "이용 시작일부터는 확정된 예약을 취소할 수 없습니다. 공간 제공자와 상의해 주세요.");
+    APPLICATION_NOT_CANCELLABLE(HttpStatus.CONFLICT, "이용 시작일부터는 확정된 예약을 취소할 수 없습니다. 공간 제공자와 상의해 주세요."),
+
+    // 가격 협의
+    INVALID_OFFER_PRICE(HttpStatus.BAD_REQUEST, "제안 금액은 1원 이상, 정가 합계 이하로 입력해 주세요."),
+    OFFER_NOT_ALLOWED(HttpStatus.CONFLICT, "보낸 제안에 대한 상대방의 답변을 기다리는 중입니다."),
+    NO_PENDING_OFFER(HttpStatus.CONFLICT, "수락할 가격 제안이 없습니다.");
 
     private final HttpStatus status;
     private final String message;

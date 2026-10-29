@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.dasisiheung.entity.application.Application;
 import com.dasisiheung.entity.application.ApplicationPeriod;
 import com.dasisiheung.entity.application.ApplicationStatus;
+import com.dasisiheung.entity.application.OfferSide;
+import com.dasisiheung.entity.application.PriceOffer;
 import com.dasisiheung.entity.application.PriceNegotiationStatus;
 import com.dasisiheung.entity.member.Member;
 import com.dasisiheung.entity.space.ActivityType;
@@ -153,6 +155,75 @@ class ApplicationTest {
 
             assertThatThrownBy(() -> application.cancel(APPLICANT_ID, null, TODAY, NOW))
                     .extracting("errorCode").isEqualTo(ErrorCode.INVALID_APPLICATION_STATUS);
+        }
+    }
+
+    @Nested
+    @DisplayName("가격 협의")
+    class Negotiation {
+
+        private final Member provider = SpaceFixtures.provider(2L);
+
+        @Test
+        @DisplayName("신청자 제안 → 제공자 역제안 → 신청자 수락이면 역제안 금액으로 합의한다")
+        void counterOfferAndAccept() {
+            Application application = submit(TODAY.plusDays(1), TODAY.plusDays(2));
+
+            PriceOffer first = application.offer(applicant, 80_000, "8만원 가능할까요?", NOW);
+            assertThat(first.getProposerSide()).isEqualTo(OfferSide.APPLICANT);
+            assertThat(application.getNegotiationStatus()).isEqualTo(PriceNegotiationStatus.WAITING_PROVIDER);
+
+            PriceOffer counter = application.offer(provider, 95_000, null, NOW);
+            assertThat(application.getNegotiationStatus()).isEqualTo(PriceNegotiationStatus.WAITING_APPLICANT);
+            assertThat(application.getPendingOfferAmount()).isEqualTo(95_000);
+
+            application.acceptOffer(APPLICANT_ID, counter, NOW);
+            assertThat(application.getNegotiationStatus()).isEqualTo(PriceNegotiationStatus.AGREED);
+            assertThat(application.getTotalPrice()).isEqualTo(95_000);
+            assertThat(application.getPendingOfferAmount()).isNull();
+            assertThat(counter.isAccepted()).isTrue();
+        }
+
+        @Test
+        @DisplayName("내 제안에 답을 기다리는 중에는 다시 제안 · 수락할 수 없다")
+        void waitingForCounterpart() {
+            Application application = submit(TODAY.plusDays(1), TODAY.plusDays(2));
+            PriceOffer first = application.offer(applicant, 80_000, null, NOW);
+
+            assertThatThrownBy(() -> application.offer(applicant, 70_000, null, NOW))
+                    .extracting("errorCode").isEqualTo(ErrorCode.OFFER_NOT_ALLOWED);
+            assertThatThrownBy(() -> application.acceptOffer(APPLICANT_ID, first, NOW))
+                    .extracting("errorCode").isEqualTo(ErrorCode.NO_PENDING_OFFER);
+        }
+
+        @Test
+        @DisplayName("제안 금액은 1원~정가 합계, 참여자만, 검토 중인 신청만")
+        void offerRules() {
+            Application application = submit(TODAY.plusDays(1), TODAY.plusDays(2));
+
+            assertThatThrownBy(() -> application.offer(applicant, 100_001, null, NOW))
+                    .extracting("errorCode").isEqualTo(ErrorCode.INVALID_OFFER_PRICE);
+            assertThatThrownBy(() -> application.offer(applicant, 0, null, NOW))
+                    .extracting("errorCode").isEqualTo(ErrorCode.INVALID_OFFER_PRICE);
+            assertThatThrownBy(() -> application.offer(ApplicationFixtures.applicant(99L), 90_000, null, NOW))
+                    .extracting("errorCode").isEqualTo(ErrorCode.NOT_APPLICATION_PARTICIPANT);
+
+            application.cancel(APPLICANT_ID, null, TODAY, NOW);
+            assertThatThrownBy(() -> application.offer(applicant, 90_000, null, NOW))
+                    .extracting("errorCode").isEqualTo(ErrorCode.INVALID_APPLICATION_STATUS);
+        }
+
+        @Test
+        @DisplayName("답을 기다리는 제안이 있는 채로 취소하면 대기 제안은 사라지고 합의 금액은 그대로다")
+        void cancelClearsPendingOffer() {
+            Application application = submit(TODAY.plusDays(1), TODAY.plusDays(2));
+            application.offer(applicant, 80_000, null, NOW);
+
+            application.cancel(APPLICANT_ID, null, TODAY, NOW);
+
+            assertThat(application.getPendingOfferAmount()).isNull();
+            assertThat(application.getNegotiationStatus()).isEqualTo(PriceNegotiationStatus.NONE);
+            assertThat(application.getTotalPrice()).isEqualTo(100_000);
         }
     }
 

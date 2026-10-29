@@ -15,6 +15,7 @@ import com.dasisiheung.exception.BusinessException;
 import com.dasisiheung.exception.ErrorCode;
 import com.dasisiheung.repository.ApplicationRepository;
 import com.dasisiheung.repository.MemberRepository;
+import com.dasisiheung.repository.PriceOfferRepository;
 import com.dasisiheung.repository.SpaceRepository;
 import java.time.Clock;
 import java.time.LocalDate;
@@ -37,12 +38,14 @@ public class ApplicationService {
     private final ApplicationRepository applicationRepository;
     private final SpaceRepository spaceRepository;
     private final MemberRepository memberRepository;
+    private final PriceOfferRepository priceOfferRepository;
     private final ApplicationResponseMapper responseMapper;
     private final Clock clock;
 
     /**
      * 신청서를 낸다. 공개 공간 · 허용 활동 · 사용 가능 날짜 안의 기간이어야 하고,
      * 같은 공간 · 겹치는 기간에 검토 중인 내 신청이 있으면 다시 낼 수 없다.
+     * 제안 금액을 함께 보내면 첫 가격 제안으로 남는다.
      *
      * @throws BusinessException DUPLICATE_APPLICATION 외 {@link Application#submit} 참고
      */
@@ -54,7 +57,12 @@ public class ApplicationService {
 
         Application application = Application.submit(space, applicant, request.toActivityDetails(), period, today());
         validateNoDuplicate(space, applicantId, period);
-        return responseMapper.detail(applicationRepository.save(application));
+        applicationRepository.save(application);
+        if (request.hasOffer()) {
+            priceOfferRepository.save(application.offer(applicant, request.offerAmount(), request.offerMessage(),
+                    LocalDateTime.now(clock)));
+        }
+        return responseMapper.detail(application);
     }
 
     /** 내가 보낸 신청 (최근 순). status 가 null 이면 전체. */

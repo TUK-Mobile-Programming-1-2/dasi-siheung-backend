@@ -17,6 +17,7 @@ public record OptionsResponse(
         @Schema(description = "관리자 검수 결과") List<OptionItem> reviewDecisions,
         @Schema(description = "공간 검색 정렬") List<OptionItem> spaceSorts,
         @Schema(description = "신청 상태") List<OptionItem> applicationStatuses,
-        @Schema(description = "가격 협의 상태") List<OptionItem> negotiationStatuses
+        @Schema(description = "가격 협의 상태") List<OptionItem> negotiationStatuses,
+        @Schema(description = "가격 제안한 쪽") List<OptionItem> offerSides
 ) {
 }

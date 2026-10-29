@@ -25,13 +25,17 @@ import com.dasisiheung.dto.application.ApplicationRequest;
 import com.dasisiheung.dto.application.ApplicationResponse;
 import com.dasisiheung.dto.application.ApplicationSummaryResponse;
 import com.dasisiheung.dto.application.CancelApplicationRequest;
+import com.dasisiheung.dto.application.PriceOfferRequest;
+import com.dasisiheung.dto.application.PriceOfferResponse;
 import com.dasisiheung.dto.common.PageQuery;
 import com.dasisiheung.dto.common.PageResponse;
 import com.dasisiheung.entity.application.Application;
 import com.dasisiheung.entity.application.ApplicationStatus;
+import com.dasisiheung.entity.application.OfferSide;
 import com.dasisiheung.exception.BusinessException;
 import com.dasisiheung.exception.ErrorCode;
 import com.dasisiheung.service.ApplicationService;
+import com.dasisiheung.service.PriceNegotiationService;
 import com.dasisiheung.support.ApiDocsTest;
 import com.dasisiheung.support.ApiDocsTestSupport;
 import com.dasisiheung.support.ApplicationDocumentation;
@@ -58,6 +62,9 @@ class ApplicationControllerTest extends ApiDocsTestSupport {
 
     @MockitoBean
     private ApplicationService applicationService;
+
+    @MockitoBean
+    private PriceNegotiationService priceNegotiationService;
 
     @Test
     @DisplayName("신청서 제출")
@@ -175,6 +182,61 @@ class ApplicationControllerTest extends ApiDocsTestSupport {
                         responseFields(success(fields(ApplicationDocumentation.detailFields("data."))))));
     }
 
+    @Test
+    @DisplayName("가격 제안 · 역제안")
+    void offer() throws Exception {
+        given(priceNegotiationService.offer(eq(PROVIDER_ID), eq(7L), any(PriceOfferRequest.class))).willReturn(detail());
+
+        mockMvc.perform(post("/api/v1/applications/{applicationId}/offers", 7L)
+                        .header(HttpHeaders.AUTHORIZATION, providerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(new PriceOfferRequest(95_000, "9만 5천원까지 가능합니다."))))
+                .andExpect(status().isOk())
+                .andDo(document("application-offer",
+                        resource(TAG, "가격 제안 · 역제안", "신청자 · 공간 제공자 모두 보낼 수 있습니다. 검토 중인 신청만 "
+                                + "(아니면 409 INVALID_APPLICATION_STATUS), 금액은 1원~정가 합계 (400 INVALID_OFFER_PRICE), "
+                                + "내 제안에 상대가 답하기 전에는 다시 보낼 수 없습니다 (409 OFFER_NOT_ALLOWED)."),
+                        requestHeaders(authorization()),
+                        pathParameters(parameterWithName("applicationId").description("신청 ID")),
+                        requestFields(
+                                fieldWithPath("amount").type(JsonFieldType.NUMBER).description("제안 금액(원, 기간 합계)"),
+                                fieldWithPath("message").type(JsonFieldType.STRING).optional().description("한마디 (선택, 최대 300자)")),
+                        responseFields(success(fields(ApplicationDocumentation.detailFields("data."))))));
+    }
+
+    @Test
+    @DisplayName("가격 제안: 답을 기다리는 중에 다시 보내면 409 OFFER_NOT_ALLOWED")
+    void offerNotAllowed() throws Exception {
+        given(priceNegotiationService.offer(eq(USER_ID), eq(7L), any(PriceOfferRequest.class)))
+                .willThrow(new BusinessException(ErrorCode.OFFER_NOT_ALLOWED));
+
+        mockMvc.perform(post("/api/v1/applications/{applicationId}/offers", 7L)
+                        .header(HttpHeaders.AUTHORIZATION, userToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(new PriceOfferRequest(80_000, null))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("OFFER_NOT_ALLOWED"))
+                .andDo(document("application-offer-not-allowed",
+                        resource(TAG, "가격 제안 · 역제안", "상대 답변 대기 중 다시 제안한 예시"),
+                        responseFields(error())));
+    }
+
+    @Test
+    @DisplayName("받은 가격 제안 수락")
+    void acceptOffer() throws Exception {
+        given(priceNegotiationService.accept(USER_ID, 7L)).willReturn(detail());
+
+        mockMvc.perform(post("/api/v1/applications/{applicationId}/offers/accept", 7L)
+                        .header(HttpHeaders.AUTHORIZATION, userToken()))
+                .andExpect(status().isOk())
+                .andDo(document("application-offer-accept",
+                        resource(TAG, "받은 가격 제안 수락", "상대가 보낸 최근 제안 금액이 합의 금액(totalPrice)이 됩니다. "
+                                + "내가 답할 제안이 없으면 409 NO_PENDING_OFFER."),
+                        requestHeaders(authorization()),
+                        pathParameters(parameterWithName("applicationId").description("신청 ID")),
+                        responseFields(success(fields(ApplicationDocumentation.detailFields("data."))))));
+    }
+
     static Application application() {
         return ApplicationFixtures.application(7L,
                 ApplicationFixtures.publishedSpace(SpaceFixtures.space(10L, SpaceFixtures.provider(PROVIDER_ID),
@@ -183,7 +245,9 @@ class ApplicationControllerTest extends ApiDocsTestSupport {
     }
 
     static ApplicationResponse detail() {
-        return ApplicationResponse.of(application(), ProviderSpaceControllerTest.photos().get(0).url());
+        return ApplicationResponse.of(application(), ProviderSpaceControllerTest.photos().get(0).url(), List.of(
+                new PriceOfferResponse(1L, OfferSide.APPLICANT, "이이용", 90_000, "조금만 조정 부탁드립니다.", null,
+                        FixedClockConfig.FIXED_LOCAL_NOW)));
     }
 
     static ApplicationSummaryResponse summary() {

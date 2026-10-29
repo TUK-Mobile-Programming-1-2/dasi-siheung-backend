@@ -200,6 +200,14 @@ flowchart LR
 | `INVALID_APPLICATION_STATUS` | 409 | 이미 끝난 신청에 대한 작업 | 상세 새로고침 |
 | `APPLICATION_NOT_CANCELLABLE` | 409 | 이용 시작일부터 확정 예약 취소 | 제공자와 1:1 소통 안내 |
 
+**가격 협의**
+
+| `error.code` | HTTP 상태 | 언제 | 화면 처리 예시 |
+| --- | --- | --- | --- |
+| `INVALID_OFFER_PRICE` | 400 | 제안 금액이 1원 미만이거나 정가 합계 초과 | 입력 범위 안내 |
+| `OFFER_NOT_ALLOWED` | 409 | 보낸 제안에 상대가 아직 답하지 않음 | 제안 버튼 비활성화 |
+| `NO_PENDING_OFFER` | 409 | 내가 답할 제안이 없는데 수락 | 상세 새로고침 |
+
 ### 3-3-1. 목록 응답 (페이지)
 
 목록 API 는 `page`(0부터), `size`(기본 20, 최대 100) 쿼리 파라미터를 받고 아래 형식으로 응답합니다.
@@ -684,3 +692,5 @@ try {
 | GET | `/api/v1/applications` | USER | 내가 보낸 신청 (status 필터) |
 | GET | `/api/v1/applications/{applicationId}` | 신청자 · 공간 제공자 | 신청 상세 |
 | POST | `/api/v1/applications/{applicationId}/cancel` | USER | 신청 취소 |
+| POST | `/api/v1/applications/{applicationId}/offers` | 신청자 · 공간 제공자 | 가격 제안 · 역제안 (기간 합계 금액) |
+| POST | `/api/v1/applications/{applicationId}/offers/accept` | 신청자 · 공간 제공자 | 받은 가격 제안 수락 |
