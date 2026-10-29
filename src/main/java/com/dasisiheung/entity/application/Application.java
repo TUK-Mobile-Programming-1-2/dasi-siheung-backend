@@ -222,6 +222,25 @@ public class Application extends BaseTimeEntity {
     }
 
     /**
+     * 공간 제공자가 거절한다. 사유는 신청자에게 그대로 보인다.
+     *
+     * @throws BusinessException 받은 신청이 아니면 NOT_APPLICATION_PARTICIPANT, 검토 중이 아니면 INVALID_APPLICATION_STATUS
+     */
+    public void reject(Long providerId, String reason, LocalDateTime now) {
+        validateReceivedBy(providerId);
+        if (status != ApplicationStatus.PENDING) {
+            throw new BusinessException(ErrorCode.INVALID_APPLICATION_STATUS, "검토 중인 신청만 거절할 수 있습니다.");
+        }
+        finish(ApplicationStatus.REJECTED, blankToNull(reason), now);
+    }
+
+    private void validateReceivedBy(Long providerId) {
+        if (!isReceivedBy(providerId)) {
+            throw new BusinessException(ErrorCode.NOT_APPLICATION_PARTICIPANT);
+        }
+    }
+
+    /**
      * 신청자가 취소한다. 검토 중이면 언제든, 확정된 예약은 이용 시작 전까지만.
      */
     public void cancel(Long memberId, String reason, LocalDate today, LocalDateTime now) {
