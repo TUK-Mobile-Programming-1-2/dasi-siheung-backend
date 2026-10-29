@@ -44,6 +44,14 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    @DisplayName("겹치는 확정 예약(DB 배타 제약 23P01)은 409 PERIOD_ALREADY_BOOKED")
+    void exclusionViolation() throws Exception {
+        mockMvc.perform(get("/stub/double-booking"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("PERIOD_ALREADY_BOOKED"));
+    }
+
+    @Test
     @DisplayName("요청 본문 검증에 실패하면 400 과 필드별 오류 목록을 반환한다")
     void invalidRequestBody() throws Exception {
         mockMvc.perform(post("/stub/spaces")
@@ -154,6 +162,12 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/conflict")
         ApiResult<Void> conflict() {
             throw new DataIntegrityViolationException(INTERNAL_DETAIL);
+        }
+
+        @GetMapping("/double-booking")
+        ApiResult<Void> doubleBooking() {
+            throw new DataIntegrityViolationException("could not execute statement",
+                    new java.sql.SQLException("conflicting key value violates exclusion constraint", "23P01"));
         }
 
         @GetMapping("/admin-only")
