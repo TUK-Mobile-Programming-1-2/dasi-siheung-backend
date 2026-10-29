@@ -1,13 +1,18 @@
 package com.dasisiheung.repository;
 
+import com.dasisiheung.entity.space.Region;
 import com.dasisiheung.entity.space.Space;
 import com.dasisiheung.entity.space.SpaceStatus;
 import com.dasisiheung.exception.BusinessException;
 import com.dasisiheung.exception.ErrorCode;
+import com.dasisiheung.repository.projection.EnumCount;
+import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface SpaceRepository extends JpaRepository<Space, Long> {
 
@@ -25,4 +30,15 @@ public interface SpaceRepository extends JpaRepository<Space, Long> {
 
     @EntityGraph(attributePaths = "provider")
     Page<Space> findAllBy(Pageable pageable);
+
+    @Query("select new com.dasisiheung.repository.projection.EnumCount(s.status, count(s)) from Space s group by s.status")
+    List<EnumCount<SpaceStatus>> countByStatus();
+
+    @Query("""
+            select new com.dasisiheung.repository.projection.EnumCount(s.region, count(s))
+            from Space s where s.status = :status group by s.region
+            """)
+    List<EnumCount<Region>> countByRegion(@Param("status") SpaceStatus status);
+
+    List<Space> findTop5ByOrderByCreatedAtDesc();
 }

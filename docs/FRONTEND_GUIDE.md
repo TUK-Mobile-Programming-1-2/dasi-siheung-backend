@@ -642,3 +642,9 @@ try {
 | GET | `/api/v1/admin/spaces` | ADMIN | 공간 목록 (status=PENDING_REVIEW: 검수 대기, 생략: 전체 현황) |
 | GET | `/api/v1/admin/spaces/{spaceId}` | ADMIN | 검수 상세 (증빙 임시 주소·제공자·이력·공식 정보 링크) |
 | POST | `/api/v1/admin/spaces/{spaceId}/reviews` | ADMIN | 검수 결과 등록 (승인 / 수정 요청 / 공개 보류) |
+
+### 관리자 — 대시보드 (`http/admin-review.http`)
+
+| 메서드 | 경로 | 인증 | 설명 |
+| --- | --- | --- | --- |
+| GET | `/api/v1/admin/dashboard` | ADMIN | 검수 대기 · 상태/지역별 공간 · 역할별 회원 · 최근 등록 공간 |
