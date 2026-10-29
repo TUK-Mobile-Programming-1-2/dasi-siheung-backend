@@ -5,6 +5,7 @@ import com.dasisiheung.dto.space.SpaceDetailResponse;
 import com.dasisiheung.dto.space.ProviderSpaceSummaryResponse;
 import com.dasisiheung.dto.space.SpacePhotoResponse;
 import com.dasisiheung.dto.space.SpaceProofResponse;
+import com.dasisiheung.dto.space.SpaceSummaryResponse;
 import com.dasisiheung.entity.space.Space;
 import com.dasisiheung.entity.space.SpacePhoto;
 import java.time.LocalDate;
@@ -30,6 +31,10 @@ public class SpaceResponseMapper {
                 .sorted()
                 .toList();
         return SpaceDetailResponse.of(space, upcomingDates, photos(space));
+    }
+
+    public SpaceSummaryResponse spaceSummary(Space space) {
+        return SpaceSummaryResponse.of(space, thumbnailUrl(space));
     }
 
     public ProviderSpaceSummaryResponse providerSpaceSummary(Space space) {
