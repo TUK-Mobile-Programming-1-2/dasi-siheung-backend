@@ -187,6 +187,19 @@ flowchart LR
 | --- | --- | --- | --- |
 | `INVALID_SEARCH_PERIOD` | 400 | 검색 기간이 오늘 이전이거나 90일을 넘음 | 날짜 선택기를 오늘~90일로 제한 |
 
+**공간 이용 신청**
+
+| `error.code` | HTTP 상태 | 언제 | 화면 처리 예시 |
+| --- | --- | --- | --- |
+| `APPLICATION_NOT_FOUND` | 404 | 없는 신청 | 목록으로 돌아가기 |
+| `NOT_APPLICATION_PARTICIPANT` | 403 | 신청자도 공간 제공자도 아님 | 접근 불가 안내 |
+| `ACTIVITY_NOT_ALLOWED` | 400 | 공간이 허용하지 않는 활동으로 신청 | 허용 활동만 선택지로 보여주기 |
+| `INVALID_APPLICATION_PERIOD` | 400 | 지난 날짜 시작 · 30일 초과 | 날짜 선택기를 오늘~30일로 제한 |
+| `PERIOD_NOT_AVAILABLE` | 409 | 기간 중 사용 가능 날짜가 아닌 날이 있음 | 캘린더 다시 불러오기 |
+| `DUPLICATE_APPLICATION` | 409 | 같은 공간 · 겹치는 기간에 검토 중인 내 신청이 있음 | 기존 신청으로 이동 |
+| `INVALID_APPLICATION_STATUS` | 409 | 이미 끝난 신청에 대한 작업 | 상세 새로고침 |
+| `APPLICATION_NOT_CANCELLABLE` | 409 | 이용 시작일부터 확정 예약 취소 | 제공자와 1:1 소통 안내 |
+
 ### 3-3-1. 목록 응답 (페이지)
 
 목록 API 는 `page`(0부터), `size`(기본 20, 최대 100) 쿼리 파라미터를 받고 아래 형식으로 응답합니다.
@@ -662,3 +675,12 @@ try {
 | GET | `/api/v1/spaces/{spaceId}` | 없음 | 공간 상세 (공개 공간만, 오늘 이후 사용 가능 날짜) |
 | GET | `/api/v1/spaces` | 없음 | 공간 검색 (지역 · 활동 · 목적 · 기간 · 예산 · 시설 · 검색어 · 정렬) |
 | GET | `/api/v1/spaces/map` | 없음 | 지도 마커 (화면 영역 남서·북동 꼭짓점, 최대 300개) |
+
+### 공간 이용 신청 (`http/application.http`)
+
+| 메서드 | 경로 | 인증 | 설명 |
+| --- | --- | --- | --- |
+| POST | `/api/v1/applications` | USER | 신청서 제출 |
+| GET | `/api/v1/applications` | USER | 내가 보낸 신청 (status 필터) |
+| GET | `/api/v1/applications/{applicationId}` | 신청자 · 공간 제공자 | 신청 상세 |
+| POST | `/api/v1/applications/{applicationId}/cancel` | USER | 신청 취소 |
