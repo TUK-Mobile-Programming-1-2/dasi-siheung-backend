@@ -694,3 +694,10 @@ try {
 | POST | `/api/v1/applications/{applicationId}/cancel` | USER | 신청 취소 |
 | POST | `/api/v1/applications/{applicationId}/offers` | 신청자 · 공간 제공자 | 가격 제안 · 역제안 (기간 합계 금액) |
 | POST | `/api/v1/applications/{applicationId}/offers/accept` | 신청자 · 공간 제공자 | 받은 가격 제안 수락 |
+
+### 공간 제공자 — 받은 신청 (`http/application.http`)
+
+| 메서드 | 경로 | 인증 | 설명 |
+| --- | --- | --- | --- |
+| GET | `/api/v1/provider/applications` | PROVIDER | 받은 신청 목록 (status · spaceId 필터) |
+| POST | `/api/v1/provider/applications/{applicationId}/reject` | PROVIDER | 신청 거절 (사유 필수) |
