@@ -3,6 +3,8 @@ package com.dasisiheung.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyDouble;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
@@ -12,17 +14,23 @@ import static org.mockito.Mockito.mock;
 import com.dasisiheung.dto.common.PageQuery;
 import com.dasisiheung.dto.common.PageResponse;
 import com.dasisiheung.dto.space.SpaceDetailResponse;
+import com.dasisiheung.dto.space.SpaceMapRequest;
+import com.dasisiheung.dto.space.SpaceMapResponse;
 import com.dasisiheung.dto.space.SpaceSearchRequest;
 import com.dasisiheung.dto.space.SpaceSort;
 import com.dasisiheung.dto.space.SpaceSummaryResponse;
+import com.dasisiheung.entity.space.ActivityType;
+import com.dasisiheung.entity.space.Region;
 import com.dasisiheung.entity.space.Space;
 import com.dasisiheung.entity.space.SpaceStatus;
 import com.dasisiheung.exception.ErrorCode;
 import com.dasisiheung.repository.SpaceRepository;
+import com.dasisiheung.repository.projection.SpaceMarker;
 import com.dasisiheung.support.FixedClockConfig;
 import com.dasisiheung.support.SpaceFixtures;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.stream.IntStream;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
@@ -118,5 +126,70 @@ class SpaceQueryServiceTest {
 
     private static SpaceSearchRequest period(LocalDate startDate, LocalDate endDate) {
         return new SpaceSearchRequest(null, null, null, startDate, endDate, null, null, null, null, null);
+    }
+
+    @Test
+    @DisplayName("지도: 선택 조건이 없으면 '' · 최댓값으로 넘기고, 301개가 오면 300개만 주며 truncated")
+    void markersTruncated() {
+        List<SpaceMarker> found = IntStream.rangeClosed(1, SpaceQueryService.MAX_MAP_MARKERS + 1)
+                .mapToObj(SpaceQueryServiceTest::marker).toList();
+        given(spaceRepository.findMarkersWithin(anyDouble(), anyDouble(), anyDouble(), anyDouble(), eq(""),
+                eq(Integer.MAX_VALUE), eq(SpaceQueryService.MAX_MAP_MARKERS + 1))).willReturn(found);
+
+        SpaceMapResponse response = spaceQueryService.getMarkers(
+                new SpaceMapRequest(37.30, 126.65, 37.40, 126.80, null, null));
+
+        assertThat(response.truncated()).isTrue();
+        assertThat(response.markers()).hasSize(SpaceQueryService.MAX_MAP_MARKERS);
+        assertThat(response.markers().get(0).region()).isEqualTo(Region.JEONGWANG);
+    }
+
+    @Test
+    @DisplayName("지도: 활동 · 예산 조건을 그대로 넘기고 상한 안이면 truncated = false")
+    void markersWithFilters() {
+        given(spaceRepository.findMarkersWithin(37.30, 126.65, 37.40, 126.80, "POPUP_STORE", 50_000,
+                SpaceQueryService.MAX_MAP_MARKERS + 1)).willReturn(List.of(marker(1)));
+
+        SpaceMapResponse response = spaceQueryService.getMarkers(
+                new SpaceMapRequest(37.30, 126.65, 37.40, 126.80, ActivityType.POPUP_STORE, 50_000));
+
+        assertThat(response.truncated()).isFalse();
+        assertThat(response.markers()).extracting(SpaceMapResponse.Marker::id).containsExactly(1L);
+    }
+
+    @Test
+    @DisplayName("지도 영역: 남서 꼭짓점이 북동보다 남·서쪽이어야 한다")
+    void boundsValidation() {
+        assertThat(new SpaceMapRequest(37.30, 126.65, 37.40, 126.80, null, null).isBoundsValid()).isTrue();
+        assertThat(new SpaceMapRequest(37.40, 126.65, 37.30, 126.80, null, null).isBoundsValid()).isFalse();
+        assertThat(new SpaceMapRequest(37.30, 126.80, 37.40, 126.65, null, null).isBoundsValid()).isFalse();
+    }
+
+    private static SpaceMarker marker(int id) {
+        return new SpaceMarker() {
+            public Long getId() {
+                return (long) id;
+            }
+
+            public String getTitle() {
+                return "공간 " + id;
+            }
+
+            public String getRegion() {
+                return "JEONGWANG";
+            }
+
+            public Integer getDailyPrice() {
+                return 50_000;
+            }
+
+            public Double getLatitude() {
+                return SpaceFixtures.JEONGWANG_LAT;
+            }
+
+            public Double getLongitude() {
+                return SpaceFixtures.JEONGWANG_LNG;
+            }
+        };
     }
 }

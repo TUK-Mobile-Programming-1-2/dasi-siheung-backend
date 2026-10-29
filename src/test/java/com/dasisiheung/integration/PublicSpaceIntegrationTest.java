@@ -139,4 +139,28 @@ class PublicSpaceIntegrationTest {
         result.andExpect(jsonPath("$.data.totalElements").value(1))
                 .andExpect(jsonPath("$.data.content[0].id").value(spaceId));
     }
+
+    @Test
+    @DisplayName("지도: 화면 영역 안의 공개 공간만 마커로 나온다")
+    void markers() throws Exception {
+        TestAccounts.Account provider = testAccounts.create(Role.PROVIDER);
+        TestAccounts.Account admin = testAccounts.create(Role.ADMIN);
+        long geobukseom = spaceScenario.publishedSpace(provider, admin, SpaceFixtures.request("거북섬 지도 테스트",
+                SpaceFixtures.GEOBUKSEOM_LAT, SpaceFixtures.GEOBUKSEOM_LNG, CommercialTheme.WATERFRONT, 60_000,
+                Set.of(), Set.of(ActivityType.EXHIBITION), Set.of()));
+        long jeongwang = spaceScenario.publishedSpace(provider, admin, Set.of());
+
+        mockMvc.perform(get("/api/v1/spaces/map")
+                        .param("swLat", "37.300").param("swLng", "126.650")
+                        .param("neLat", "37.330").param("neLng", "126.700"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.markers[?(@.id == %d)].region".formatted(geobukseom)).value("GEOBUKSEOM"))
+                .andExpect(jsonPath("$.data.markers[?(@.id == %d)]".formatted(jeongwang)).isEmpty());
+
+        mockMvc.perform(get("/api/v1/spaces/map")
+                        .param("swLat", "37.300").param("swLng", "126.650")
+                        .param("neLat", "37.330").param("neLng", "126.700")
+                        .param("activityType", "POPUP_STORE"))
+                .andExpect(jsonPath("$.data.markers[?(@.id == %d)]".formatted(geobukseom)).isEmpty());
+    }
 }

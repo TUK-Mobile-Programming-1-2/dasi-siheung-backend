@@ -3,14 +3,18 @@ package com.dasisiheung.service;
 import com.dasisiheung.dto.common.PageQuery;
 import com.dasisiheung.dto.common.PageResponse;
 import com.dasisiheung.dto.space.SpaceDetailResponse;
+import com.dasisiheung.dto.space.SpaceMapRequest;
+import com.dasisiheung.dto.space.SpaceMapResponse;
 import com.dasisiheung.dto.space.SpaceSearchRequest;
 import com.dasisiheung.dto.space.SpaceSummaryResponse;
+import com.dasisiheung.entity.space.Region;
 import com.dasisiheung.entity.space.Space;
 import com.dasisiheung.entity.space.SpaceStatus;
 import com.dasisiheung.exception.BusinessException;
 import com.dasisiheung.exception.ErrorCode;
 import com.dasisiheung.repository.SpaceRepository;
 import com.dasisiheung.repository.SpaceSpecifications;
+import com.dasisiheung.repository.projection.SpaceMarker;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -29,6 +33,8 @@ public class SpaceQueryService {
 
     /** 기간 검색은 오늘부터 이 날수 안에서만 한다. */
     public static final int MAX_SEARCH_PERIOD_DAYS = 90;
+    /** 지도 한 번에 내려주는 마커 수 상한. 넘으면 truncated = true. */
+    public static final int MAX_MAP_MARKERS = 300;
 
     private final SpaceRepository spaceRepository;
     private final SpaceResponseMapper responseMapper;
@@ -54,6 +60,26 @@ public class SpaceQueryService {
         Page<Space> spaces = spaceRepository.findAll(toSpecification(request),
                 pageQuery.toPageable(request.sort().toSort()));
         return PageResponse.from(spaces, responseMapper::spaceSummary);
+    }
+
+    /** 지도 화면 영역 안의 공개 공간 마커. 상한보다 하나 더 읽어 잘렸는지 판단한다. */
+    public SpaceMapResponse getMarkers(SpaceMapRequest request) {
+        String activityType = request.activityType() == null ? "" : request.activityType().name();
+        int maxPrice = request.maxPrice() == null ? Integer.MAX_VALUE : request.maxPrice();
+        List<SpaceMarker> found = spaceRepository.findMarkersWithin(request.swLat(), request.swLng(),
+                request.neLat(), request.neLng(), activityType, maxPrice, MAX_MAP_MARKERS + 1);
+
+        boolean truncated = found.size() > MAX_MAP_MARKERS;
+        List<SpaceMapResponse.Marker> markers = found.stream()
+                .limit(MAX_MAP_MARKERS)
+                .map(SpaceQueryService::toMarker)
+                .toList();
+        return new SpaceMapResponse(markers, truncated);
+    }
+
+    private static SpaceMapResponse.Marker toMarker(SpaceMarker marker) {
+        return new SpaceMapResponse.Marker(marker.getId(), marker.getTitle(), Region.valueOf(marker.getRegion()),
+                marker.getDailyPrice(), marker.getLatitude(), marker.getLongitude());
     }
 
     private void validatePeriod(LocalDate startDate, LocalDate endDate) {
