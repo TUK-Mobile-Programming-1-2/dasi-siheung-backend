@@ -248,3 +248,20 @@ Authorization: Bearer {{reviewProviderToken}}
 > {%
     client.test("200 OK + PUBLISHED", () => client.assert(response.body.data.status === "PUBLISHED", `실제 ${response.body.data.status}`));
 %}
+
+### 관리자 대시보드
+# 인증: ADMIN
+# 기대값: 200 OK, 상태·지역·역할별 개수(0 포함), 공개 공간 1개 이상
+GET {{baseUrl}}/api/v1/admin/dashboard
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("200 OK + 수치", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        const d = response.body.data;
+        client.assert(Object.keys(d.spacesByStatus).length === 6, `상태 ${Object.keys(d.spacesByStatus)}`);
+        client.assert(Object.keys(d.publishedSpacesByRegion).join() === "JEONGWANG,GEOBUKSEOM,BAEGOT", "지역 순서");
+        client.assert(d.spacesByStatus.PUBLISHED >= 1, `공개 ${d.spacesByStatus.PUBLISHED}`);
+        client.assert(d.membersByRole.ADMIN >= 1, `관리자 ${d.membersByRole.ADMIN}`);
+    });
+%}
