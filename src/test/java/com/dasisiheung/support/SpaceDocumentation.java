@@ -86,7 +86,9 @@ public final class SpaceDocumentation {
                 fieldWithPath(prefix + "availableDates").type(JsonFieldType.ARRAY).description("오늘 이후 사용 가능 날짜 (오름차순)"),
                 fieldWithPath(prefix + "photos").type(JsonFieldType.ARRAY).description("사진 (순서대로, 첫 번째가 대표)"),
                 fieldWithPath(prefix + "provider.id").type(JsonFieldType.NUMBER).description("공간 제공자 회원 ID"),
-                fieldWithPath(prefix + "provider.name").type(JsonFieldType.STRING).description("공간 제공자 이름")));
+                fieldWithPath(prefix + "provider.name").type(JsonFieldType.STRING).description("공간 제공자 이름"),
+                fieldWithPath(prefix + "favoriteCount").type(JsonFieldType.NUMBER).description("찜 수"),
+                fieldWithPath(prefix + "favorited").type(JsonFieldType.BOOLEAN).description("내가 찜했는지 (비로그인이면 false)")));
         fields.addAll(photoFields(prefix + "photos[]."));
         return fields;
     }

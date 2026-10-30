@@ -34,17 +34,23 @@ public record SpaceDetailResponse(
         @Schema(description = "허용 활동") List<ActivityType> activityTypes,
         @Schema(description = "오늘 이후 사용 가능 날짜 (오름차순)") List<LocalDate> availableDates,
         @Schema(description = "사진 (순서대로, 첫 번째가 대표)") List<SpacePhotoResponse> photos,
-        @Schema(description = "공간 제공자") ProviderProfile provider
+        @Schema(description = "공간 제공자") ProviderProfile provider,
+        @Schema(description = "찜 수", example = "12") int favoriteCount,
+        @Schema(description = "내가 찜했는지 (비로그인이면 false)", example = "false") boolean favorited
 ) {
 
-    /** @param availableDates 오늘 이후로 거른 날짜 */
-    public static SpaceDetailResponse of(Space space, List<LocalDate> availableDates, List<SpacePhotoResponse> photos) {
+    /**
+     * @param availableDates 오늘 이후로 거른 날짜
+     * @param favorited      로그인 회원이 찜했는지
+     */
+    public static SpaceDetailResponse of(Space space, List<LocalDate> availableDates, List<SpacePhotoResponse> photos,
+                                         boolean favorited) {
         return new SpaceDetailResponse(space.getId(), space.getRegion(), space.getTitle(), space.getDescription(),
                 space.getRules(), space.getAddress(), space.getBuildingName(), space.getUnitNumber(),
                 space.latitude(), space.longitude(), space.getAreaSqm(), space.getBuildingUse(),
                 space.getCommercialTheme(), space.getDailyPrice(), SpaceResponses.sorted(space.getFacilities()),
                 SpaceResponses.sorted(space.getActivityTypes()), availableDates, photos,
-                ProviderProfile.from(space.getProvider()));
+                ProviderProfile.from(space.getProvider()), space.getFavoriteCount(), favorited);
     }
 
     /** 공개 프로필. 연락처는 1:1 소통으로만 주고받는다. */

@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
 import org.springframework.restdocs.payload.FieldDescriptor;
 import org.springframework.restdocs.payload.JsonFieldType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -132,7 +133,7 @@ class SpaceControllerTest extends ApiDocsTestSupport {
     @Test
     @DisplayName("공간 상세: 로그인 없이 조회한다")
     void getSpace() throws Exception {
-        given(spaceQueryService.getSpace(10L)).willReturn(spaceDetail());
+        given(spaceQueryService.getSpace(10L, null)).willReturn(spaceDetail());
 
         mockMvc.perform(get("/api/v1/spaces/{spaceId}", 10L))
                 .andExpect(status().isOk())
@@ -146,9 +147,18 @@ class SpaceControllerTest extends ApiDocsTestSupport {
     }
 
     @Test
+    @DisplayName("공간 상세: 토큰을 보내면 찜 여부를 함께 준다")
+    void getSpaceWithLogin() throws Exception {
+        given(spaceQueryService.getSpace(10L, USER_ID)).willReturn(spaceDetail());
+
+        mockMvc.perform(get("/api/v1/spaces/{spaceId}", 10L).header(HttpHeaders.AUTHORIZATION, userToken()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     @DisplayName("공간 상세: 공개 중이 아니면 404 SPACE_NOT_FOUND")
     void notPublished() throws Exception {
-        given(spaceQueryService.getSpace(99L)).willThrow(new BusinessException(ErrorCode.SPACE_NOT_FOUND));
+        given(spaceQueryService.getSpace(99L, null)).willThrow(new BusinessException(ErrorCode.SPACE_NOT_FOUND));
 
         mockMvc.perform(get("/api/v1/spaces/{spaceId}", 99L))
                 .andExpect(status().isNotFound())
@@ -162,7 +172,7 @@ class SpaceControllerTest extends ApiDocsTestSupport {
         return new SpaceSummaryResponse(10L, "정왕역 앞 1층 상가", Region.JEONGWANG, "경기도 시흥시 마유로 418",
                 ProviderSpaceControllerTest.photos().get(0).url(), 50_000, new BigDecimal("33.06"),
                 CommercialTheme.FOOD_ALLEY, List.of(ActivityType.POPUP_STORE, ActivityType.EXHIBITION),
-                37.3517, 126.7428);
+                37.3517, 126.7428, 12);
     }
 
     static FieldDescriptor[] summaryFields(String prefix) {
@@ -177,13 +187,14 @@ class SpaceControllerTest extends ApiDocsTestSupport {
                 fieldWithPath(prefix + "commercialTheme").type(JsonFieldType.STRING).optional().description("상권 테마"),
                 fieldWithPath(prefix + "activityTypes").type(JsonFieldType.ARRAY).description("허용 활동"),
                 fieldWithPath(prefix + "latitude").type(JsonFieldType.NUMBER).description("위도"),
-                fieldWithPath(prefix + "longitude").type(JsonFieldType.NUMBER).description("경도")};
+                fieldWithPath(prefix + "longitude").type(JsonFieldType.NUMBER).description("경도"),
+                fieldWithPath(prefix + "favoriteCount").type(JsonFieldType.NUMBER).description("찜 수")};
     }
 
     static SpaceDetailResponse spaceDetail() {
         return SpaceDetailResponse.of(
                 SpaceFixtures.space(10L, SpaceFixtures.provider(PROVIDER_ID),
                         Set.of(ProviderSpaceControllerTest.TOMORROW), FixedClockConfig.FIXED_TODAY),
-                List.of(ProviderSpaceControllerTest.TOMORROW), ProviderSpaceControllerTest.photos());
+                List.of(ProviderSpaceControllerTest.TOMORROW), ProviderSpaceControllerTest.photos(), false);
     }
 }

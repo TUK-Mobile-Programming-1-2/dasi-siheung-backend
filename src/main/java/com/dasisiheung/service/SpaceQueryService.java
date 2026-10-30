@@ -13,6 +13,7 @@ import com.dasisiheung.entity.space.SpaceStatus;
 import com.dasisiheung.exception.BusinessException;
 import com.dasisiheung.exception.ErrorCode;
 import com.dasisiheung.repository.ApplicationRepository;
+import com.dasisiheung.repository.FavoriteRepository;
 import com.dasisiheung.repository.SpaceRepository;
 import com.dasisiheung.repository.SpaceSpecifications;
 import com.dasisiheung.repository.projection.SpaceMarker;
@@ -41,16 +42,19 @@ public class SpaceQueryService {
 
     private final SpaceRepository spaceRepository;
     private final ApplicationRepository applicationRepository;
+    private final FavoriteRepository favoriteRepository;
     private final SpaceResponseMapper responseMapper;
     private final Clock clock;
 
     /**
+     * @param memberId 로그인 회원 (비로그인이면 null) — 찜 여부 표시용
      * @throws BusinessException 없거나 공개 중이 아니면 SPACE_NOT_FOUND (검수 대기·숨김 공간의 존재를 드러내지 않는다)
      */
-    public SpaceDetailResponse getSpace(Long spaceId) {
+    public SpaceDetailResponse getSpace(Long spaceId, Long memberId) {
         Space space = getPublishedSpace(spaceId);
         LocalDate today = LocalDate.now(clock);
-        return responseMapper.spaceDetail(space, today, bookedDates(spaceId, today));
+        boolean favorited = memberId != null && favoriteRepository.existsByMember_IdAndSpace_Id(memberId, spaceId);
+        return responseMapper.spaceDetail(space, today, bookedDates(spaceId, today), favorited);
     }
 
     /** 오늘 이후 확정 예약이 있는 날짜. */

@@ -721,3 +721,11 @@ try {
 | GET | `/api/v1/provider/applications` | PROVIDER | 받은 신청 목록 (status · spaceId 필터) |
 | POST | `/api/v1/provider/applications/{applicationId}/reject` | PROVIDER | 신청 거절 (사유 필수) |
 | POST | `/api/v1/provider/applications/{applicationId}/approve` | PROVIDER | 신청 승인 (예약 확정, 겹치는 신청 자동 마감) |
+
+### 공간 찜 (`http/favorite.http`)
+
+| 메서드 | 경로 | 인증 | 설명 |
+| --- | --- | --- | --- |
+| PUT | `/api/v1/spaces/{spaceId}/favorite` | USER | 찜하기 (멱등) |
+| DELETE | `/api/v1/spaces/{spaceId}/favorite` | USER | 찜 해제 (멱등) |
+| GET | `/api/v1/members/me/favorites` | USER | 내 찜 목록 (공개 공간만) |
