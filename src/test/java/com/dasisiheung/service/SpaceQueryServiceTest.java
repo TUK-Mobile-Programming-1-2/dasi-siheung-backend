@@ -25,6 +25,7 @@ import com.dasisiheung.entity.space.Space;
 import com.dasisiheung.entity.space.SpaceStatus;
 import com.dasisiheung.exception.ErrorCode;
 import com.dasisiheung.repository.ApplicationRepository;
+import com.dasisiheung.repository.FavoriteRepository;
 import com.dasisiheung.repository.SpaceRepository;
 import com.dasisiheung.repository.projection.SpaceMarker;
 import com.dasisiheung.support.ApplicationFixtures;
@@ -57,11 +58,14 @@ class SpaceQueryServiceTest {
     @Mock
     private ApplicationRepository applicationRepository;
 
+    @Mock
+    private FavoriteRepository favoriteRepository;
+
     private SpaceQueryService spaceQueryService;
 
     @BeforeEach
     void setUp() {
-        spaceQueryService = new SpaceQueryService(spaceRepository, applicationRepository,
+        spaceQueryService = new SpaceQueryService(spaceRepository, applicationRepository, favoriteRepository,
                 new SpaceResponseMapper(mock(FileUploadService.class)), FixedClockConfig.fixedClock());
     }
 
@@ -73,10 +77,11 @@ class SpaceQueryServiceTest {
         space.getAvailableDates().add(TODAY.minusDays(1)); // 등록 뒤 시간이 지나 과거가 된 날짜
         given(spaceRepository.findByIdAndStatus(10L, SpaceStatus.PUBLISHED)).willReturn(Optional.of(space));
 
-        SpaceDetailResponse response = spaceQueryService.getSpace(10L);
+        SpaceDetailResponse response = spaceQueryService.getSpace(10L, null);
 
         assertThat(response.availableDates()).containsExactly(TODAY, TODAY.plusDays(1), TODAY.plusDays(3));
         assertThat(response.provider().id()).isEqualTo(2L);
+        assertThat(response.favorited()).isFalse();
     }
 
     @Test
@@ -89,7 +94,7 @@ class SpaceQueryServiceTest {
                 ApplicationFixtures.application(7L, ApplicationFixtures.publishedSpace(space),
                         ApplicationFixtures.applicant(1L), TODAY.plusDays(1), TODAY.plusDays(2), TODAY)));
 
-        SpaceDetailResponse response = spaceQueryService.getSpace(10L);
+        SpaceDetailResponse response = spaceQueryService.getSpace(10L, null);
 
         assertThat(response.availableDates()).containsExactly(TODAY.plusDays(3));
     }
@@ -99,7 +104,7 @@ class SpaceQueryServiceTest {
     void notPublished() {
         given(spaceRepository.findByIdAndStatus(10L, SpaceStatus.PUBLISHED)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> spaceQueryService.getSpace(10L))
+        assertThatThrownBy(() -> spaceQueryService.getSpace(10L, null))
                 .extracting("errorCode").isEqualTo(ErrorCode.SPACE_NOT_FOUND);
     }
 
