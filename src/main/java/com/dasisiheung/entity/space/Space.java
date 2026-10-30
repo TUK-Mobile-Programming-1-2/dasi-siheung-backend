@@ -107,6 +107,13 @@ public class Space extends BaseTimeEntity {
     @Column(nullable = false)
     private Long version;
 
+    /**
+     * 찜 수. 동시에 찜해도 빠지지 않도록 저장소의 UPDATE 한 문장으로만 바꾸고,
+     * 엔티티 저장(공간 수정 등)이 옛 값을 덮어쓰지 않게 읽기 전용으로 둔다.
+     */
+    @Column(name = "favorite_count", nullable = false, insertable = false, updatable = false)
+    private int favoriteCount;
+
     @ElementCollection
     @CollectionTable(name = "space_facility", joinColumns = @JoinColumn(name = "space_id"))
     @Enumerated(EnumType.STRING)

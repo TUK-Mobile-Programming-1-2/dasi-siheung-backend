@@ -17,6 +17,7 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -40,6 +41,17 @@ public interface SpaceRepository extends JpaRepository<Space, Long>, JpaSpecific
     @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000"))
     @Query("select s from Space s where s.id = :spaceId")
     Optional<Space> findWithLockById(@Param("spaceId") Long spaceId);
+
+    /**
+     * 찜 수를 더하거나 뺀다 (delta = 1 / -1). 0 아래로는 내려가지 않는다.
+     * 영속성 컨텍스트의 공간은 옛 값을 들고 있으므로 실행 뒤 비운다.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update Space s set s.favoriteCount = s.favoriteCount + :delta where s.id = :spaceId and s.favoriteCount + :delta >= 0")
+    int addFavoriteCount(@Param("spaceId") Long spaceId, @Param("delta") int delta);
+
+    @Query("select s.favoriteCount from Space s where s.id = :spaceId")
+    int findFavoriteCountById(@Param("spaceId") Long spaceId);
 
     Page<Space> findByProvider_Id(Long providerId, Pageable pageable);
 
