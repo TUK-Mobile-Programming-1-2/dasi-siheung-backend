@@ -8,6 +8,8 @@ import com.dasisiheung.dto.space.SpaceMapRequest;
 import com.dasisiheung.dto.space.SpaceMapResponse;
 import com.dasisiheung.dto.space.SpaceSearchRequest;
 import com.dasisiheung.dto.space.SpaceSummaryResponse;
+import com.dasisiheung.security.AuthMember;
+import com.dasisiheung.security.LoginMember;
 import com.dasisiheung.service.SpaceQueryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -43,9 +45,11 @@ public class SpaceController {
         return ApiResult.ok(spaceQueryService.getMarkers(request));
     }
 
-    @Operation(summary = "공간 상세", description = "공개 중인 공간만 조회됩니다. 사용 가능 날짜는 오늘 이후만 내려갑니다.")
+    @Operation(summary = "공간 상세", description = "공개 중인 공간만 조회됩니다. 사용 가능 날짜는 오늘 이후 · 확정 예약 제외. "
+                    + "토큰을 보내면 favorited 에 찜 여부가 담깁니다.")
     @GetMapping("/{spaceId}")
-    public ApiResult<SpaceDetailResponse> getSpace(@PathVariable Long spaceId) {
-        return ApiResult.ok(spaceQueryService.getSpace(spaceId));
+    public ApiResult<SpaceDetailResponse> getSpace(@LoginMember AuthMember loginMember, @PathVariable Long spaceId) {
+        Long memberId = loginMember == null ? null : loginMember.id();
+        return ApiResult.ok(spaceQueryService.getSpace(spaceId, memberId));
     }
 }

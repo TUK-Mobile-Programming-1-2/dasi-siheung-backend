@@ -29,14 +29,16 @@ public class SpaceResponseMapper {
      * 이용자용 상세. 지난 날짜와 이미 확정된 예약 날짜는 빼고 보여준다.
      *
      * @param bookedDates 확정 예약이 있는 날짜
+     * @param favorited   로그인 회원이 찜했는지
      */
-    public SpaceDetailResponse spaceDetail(Space space, LocalDate today, Set<LocalDate> bookedDates) {
+    public SpaceDetailResponse spaceDetail(Space space, LocalDate today, Set<LocalDate> bookedDates,
+                                           boolean favorited) {
         List<LocalDate> upcomingDates = space.getAvailableDates().stream()
                 .filter(date -> !date.isBefore(today))
                 .filter(date -> !bookedDates.contains(date))
                 .sorted()
                 .toList();
-        return SpaceDetailResponse.of(space, upcomingDates, photos(space));
+        return SpaceDetailResponse.of(space, upcomingDates, photos(space), favorited);
     }
 
     public SpaceSummaryResponse spaceSummary(Space space) {

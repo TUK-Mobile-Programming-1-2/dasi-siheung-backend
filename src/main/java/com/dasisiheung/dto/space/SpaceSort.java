@@ -13,7 +13,8 @@ public enum SpaceSort implements LabeledEnum {
     LATEST("최근 공개 순", Sort.by(Sort.Direction.DESC, "reviewedAt")),
     PRICE_ASC("낮은 가격 순", Sort.by(Sort.Direction.ASC, "dailyPrice")),
     PRICE_DESC("높은 가격 순", Sort.by(Sort.Direction.DESC, "dailyPrice")),
-    AREA_DESC("넓은 순", Sort.by(Sort.Direction.DESC, "areaSqm"));
+    AREA_DESC("넓은 순", Sort.by(Sort.Direction.DESC, "areaSqm")),
+    POPULAR("찜 많은 순", Sort.by(Sort.Direction.DESC, "favoriteCount"));
 
     private static final Sort TIE_BREAKER = Sort.by(Sort.Direction.DESC, "id");
 
