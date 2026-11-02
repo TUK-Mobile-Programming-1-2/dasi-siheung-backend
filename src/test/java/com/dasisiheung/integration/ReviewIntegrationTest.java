@@ -68,6 +68,9 @@ class ReviewIntegrationTest {
         mockMvc.perform(get("/api/v1/spaces/{id}", spaceId))
                 .andExpect(jsonPath("$.data.reviewCount").value(1))
                 .andExpect(jsonPath("$.data.ratingAverage").value(5.0));
+        mockMvc.perform(get("/api/v1/spaces").param("sort", "RATING").param("size", "100"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].ratingAverage").exists());
 
         mockMvc.perform(put("/api/v1/reviews/{id}", reviewId)
                         .header(HttpHeaders.AUTHORIZATION, user.bearer())
