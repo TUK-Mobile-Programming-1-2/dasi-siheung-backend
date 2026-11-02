@@ -98,7 +98,8 @@ public class SpaceQueryService {
                 marker.getDailyPrice(), marker.getLatitude(), marker.getLongitude());
     }
 
-    private void validatePeriod(LocalDate startDate, LocalDate endDate) {
+    /** @throws BusinessException 기간이 오늘 이전이거나 90일을 넘으면 INVALID_SEARCH_PERIOD */
+    void validatePeriod(LocalDate startDate, LocalDate endDate) {
         LocalDate today = LocalDate.now(clock);
         boolean outOfWindow = startDate.isBefore(today) || endDate.isAfter(today.plusDays(MAX_SEARCH_PERIOD_DAYS));
         if (outOfWindow) {
