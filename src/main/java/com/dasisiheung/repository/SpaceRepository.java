@@ -50,6 +50,17 @@ public interface SpaceRepository extends JpaRepository<Space, Long>, JpaSpecific
     @Query("update Space s set s.favoriteCount = s.favoriteCount + :delta where s.id = :spaceId and s.favoriteCount + :delta >= 0")
     int addFavoriteCount(@Param("spaceId") Long spaceId, @Param("delta") int delta);
 
+    /**
+     * 후기 수 · 평점 합계를 바꾼다. 작성 (1, 평점), 수정 (0, 변화량), 삭제 (-1, -평점).
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = """
+            UPDATE space SET review_count = review_count + :countDelta, rating_sum = rating_sum + :ratingDelta
+            WHERE id = :spaceId
+            """, nativeQuery = true)
+    int addReviewStats(@Param("spaceId") Long spaceId, @Param("countDelta") int countDelta,
+                       @Param("ratingDelta") int ratingDelta);
+
     @Query("select s.favoriteCount from Space s where s.id = :spaceId")
     int findFavoriteCountById(@Param("spaceId") Long spaceId);
 
