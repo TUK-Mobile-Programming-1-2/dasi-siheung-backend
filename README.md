@@ -243,6 +243,7 @@ flowchart LR
 | --- | --- | --- |
 | `ci.yml` | 모든 PR, `develop`·`test` 푸시 | 빌드·테스트, 커버리지, 명세 최신 여부 경고, `.http` 시나리오 검증 |
 | `cd.yml` | `main` 푸시(문서·`.http` 만 바뀐 경우 제외), 수동 실행 | CI 통과 후 Cloudtype 배포 |
+| `db-backup.yml` | 매주 월요일 03:00 KST, 수동 실행 | 운영 DB `pg_dump` → 암호화 → 아티팩트 30일 보관 ([백업 · 복원 가이드](docs/BACKUP_GUIDE.md)) |
 | `dependabot.yml` | 매주 월요일 | 의존성 업데이트 PR (Spring Boot 는 3.x 유지) |
 
 CI 는 러너에 기본 설치된 PostgreSQL 에 PostGIS 를 apt 로 추가해 테스트 DB로 쓰고(`.github/actions/setup-postgis`),
@@ -265,6 +266,7 @@ CI 는 러너에 기본 설치된 PostgreSQL 에 PostGIS 를 apt 로 추가해 �
 | `JWT_SECRET` | JWT 서명 키. 32바이트 이상 임의 문자열 (`openssl rand -base64 48`) |
 | `SUPABASE_URL` | 운영 Supabase 프로젝트 주소 `https://<project-ref>.supabase.co` (파일 저장소) |
 | `SUPABASE_SERVICE_KEY` | 운영 Supabase **secret 키**(`sb_secret_...`) 또는 service_role 키. 서버에만 둔다 |
+| `BACKUP_PASSPHRASE` | DB 백업 암호화 암호 (`openssl rand -base64 32`). 잃으면 백업을 열 수 없으니 따로 보관 |
 
 배포 대상(`wonjongwoo01/dasi-siheung-backend`, 스테이지 `main`)과 실행 옵션은 `cd.yml` 에 적혀 있습니다.
 CD 는 배포할 때마다 Cloudtype 설정을 `cd.yml` 내용으로 덮어쓰므로, 설정 변경은 대시보드가 아니라 `cd.yml` 에서 합니다.
