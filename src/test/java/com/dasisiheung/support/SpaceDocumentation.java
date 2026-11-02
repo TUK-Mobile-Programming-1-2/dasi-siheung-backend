@@ -88,6 +88,8 @@ public final class SpaceDocumentation {
                 fieldWithPath(prefix + "provider.id").type(JsonFieldType.NUMBER).description("공간 제공자 회원 ID"),
                 fieldWithPath(prefix + "provider.name").type(JsonFieldType.STRING).description("공간 제공자 이름"),
                 fieldWithPath(prefix + "favoriteCount").type(JsonFieldType.NUMBER).description("찜 수"),
+                fieldWithPath(prefix + "reviewCount").type(JsonFieldType.NUMBER).description("후기 수"),
+                fieldWithPath(prefix + "ratingAverage").type(JsonFieldType.NUMBER).optional().description("평균 평점 (후기 없으면 null)"),
                 fieldWithPath(prefix + "favorited").type(JsonFieldType.BOOLEAN).description("내가 찜했는지 (비로그인이면 false)")));
         fields.addAll(photoFields(prefix + "photos[]."));
         return fields;
