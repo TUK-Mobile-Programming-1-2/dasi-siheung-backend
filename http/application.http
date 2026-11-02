@@ -662,3 +662,88 @@ GET {{baseUrl}}/api/v1/spaces?startDate={{appDay1}}&endDate={{appDay1}}&size=100
         client.assert(!ids.includes(String(client.global.get("appSpaceId"))), "확정된 공간이 검색되었습니다");
     });
 %}
+
+### 활동 사진 — 이용 전 (확정 예약 A, 내일 시작 → 오늘부터 가능)
+# 인증: 신청자 또는 공간 제공자
+# 기대값: 201 Created, 이 예약의 전체 사진 1장, APPLICANT, 임시 주소
+POST {{baseUrl}}/api/v1/applications/{{appAId}}/activity-photos
+Authorization: Bearer {{appUserAToken}}
+Content-Type: multipart/form-data; boundary=dasi-boundary
+
+--dasi-boundary
+Content-Disposition: form-data; name="phase"
+
+BEFORE
+--dasi-boundary
+Content-Disposition: form-data; name="files"; filename="space-photo.jpg"
+Content-Type: image/jpeg
+
+< ./fixtures/space-photo.jpg
+--dasi-boundary--
+
+> {%
+    client.test("201 Created + 이용 전 1장", () => {
+        client.assert(response.status === 201, `실제 ${response.status}`);
+        client.assert(response.body.data.length === 1, `실제 ${response.body.data.length}`);
+        client.assert(response.body.data[0].phase === "BEFORE" && response.body.data[0].uploaderSide === "APPLICANT", "시점 · 올린 쪽");
+        client.assert(response.body.data[0].url.length > 0, "임시 주소");
+    });
+    client.global.set("appActivityPhotoId", response.body.data[0].id);
+%}
+
+### 활동 사진 — 이용 후 사진은 이용 시작 전에 올릴 수 없다
+# 기대값: 409 ACTIVITY_PHOTO_NOT_ALLOWED
+POST {{baseUrl}}/api/v1/applications/{{appAId}}/activity-photos
+Authorization: Bearer {{appProviderToken}}
+Content-Type: multipart/form-data; boundary=dasi-boundary
+
+--dasi-boundary
+Content-Disposition: form-data; name="phase"
+
+AFTER
+--dasi-boundary
+Content-Disposition: form-data; name="files"; filename="space-photo.jpg"
+Content-Type: image/jpeg
+
+< ./fixtures/space-photo.jpg
+--dasi-boundary--
+
+> {%
+    client.test("409 ACTIVITY_PHOTO_NOT_ALLOWED", () => {
+        client.assert(response.status === 409, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "ACTIVITY_PHOTO_NOT_ALLOWED", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 활동 사진 목록 (공간 제공자)
+# 기대값: 200 OK, 1장
+GET {{baseUrl}}/api/v1/applications/{{appAId}}/activity-photos
+Authorization: Bearer {{appProviderToken}}
+
+> {%
+    client.test("200 OK + 1장", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.length === 1, `실제 ${response.body.data.length}`);
+    });
+%}
+
+### 남이 올린 사진 삭제
+# 기대값: 403 NOT_PHOTO_UPLOADER
+DELETE {{baseUrl}}/api/v1/applications/{{appAId}}/activity-photos/{{appActivityPhotoId}}
+Authorization: Bearer {{appProviderToken}}
+
+> {%
+    client.test("403 NOT_PHOTO_UPLOADER", () => {
+        client.assert(response.status === 403, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "NOT_PHOTO_UPLOADER", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 내가 올린 사진 삭제
+# 기대값: 200 OK
+DELETE {{baseUrl}}/api/v1/applications/{{appAId}}/activity-photos/{{appActivityPhotoId}}
+Authorization: Bearer {{appUserAToken}}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+%}

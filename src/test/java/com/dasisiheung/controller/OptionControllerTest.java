@@ -40,7 +40,8 @@ class OptionControllerTest extends ApiDocsTestSupport {
             {"spaceSorts", "공간 검색 정렬"},
             {"applicationStatuses", "신청 상태"},
             {"negotiationStatuses", "가격 협의 상태"},
-            {"offerSides", "가격 제안한 쪽"}
+            {"offerSides", "가격 제안한 쪽"},
+            {"photoPhases", "활동 사진 시점"}
     };
 
     @MockitoBean
