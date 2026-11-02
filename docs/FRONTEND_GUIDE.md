@@ -210,6 +210,15 @@ flowchart LR
 | `OFFER_NOT_ALLOWED` | 409 | 보낸 제안에 상대가 아직 답하지 않음 | 제안 버튼 비활성화 |
 | `NO_PENDING_OFFER` | 409 | 내가 답할 제안이 없는데 수락 | 상세 새로고침 |
 
+**이용 후기**
+
+| `error.code` | HTTP 상태 | 언제 | 화면 처리 예시 |
+| --- | --- | --- | --- |
+| `REVIEW_NOT_ALLOWED` | 409 | 확정 예약이 아니거나 아직 이용이 끝나지 않음 | 이용 종료 다음 날부터 버튼 활성화 |
+| `DUPLICATE_REVIEW` | 409 | 같은 예약에 후기를 또 씀 | 내 후기 수정으로 이동 |
+| `REVIEW_NOT_FOUND` | 404 | 없는 후기 | 목록 새로고침 |
+| `NOT_REVIEW_OWNER` | 403 | 남의 후기를 고치거나 지움 | 버튼 숨기기 |
+
 ### 3-3-1. 목록 응답 (페이지)
 
 목록 API 는 `page`(0부터), `size`(기본 20, 최대 100) 쿼리 파라미터를 받고 아래 형식으로 응답합니다.
@@ -729,3 +738,14 @@ try {
 | PUT | `/api/v1/spaces/{spaceId}/favorite` | USER | 찜하기 (멱등) |
 | DELETE | `/api/v1/spaces/{spaceId}/favorite` | USER | 찜 해제 (멱등) |
 | GET | `/api/v1/members/me/favorites` | USER | 내 찜 목록 (공개 공간만) |
+
+### 이용 후기 (`http/review.http`)
+
+| 메서드 | 경로 | 인증 | 설명 |
+| --- | --- | --- | --- |
+| GET | `/api/v1/spaces/{spaceId}/reviews` | 없음 | 공간 후기 목록 |
+| POST | `/api/v1/applications/{applicationId}/review` | USER | 후기 작성 (이용이 끝난 확정 예약) |
+| PUT | `/api/v1/reviews/{reviewId}` | USER | 후기 수정 |
+| DELETE | `/api/v1/reviews/{reviewId}` | USER | 후기 삭제 |
+| POST | `/api/v1/reviews/{reviewId}/reply` | PROVIDER | 후기 답글 |
+| GET | `/api/v1/members/me/reviews` | USER | 내가 쓴 후기 |

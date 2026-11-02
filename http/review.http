@@ -1,0 +1,257 @@
+# 이용 후기 — 작성 조건 · 공간 후기 목록 · 내 후기
+# 후기는 이용이 끝난(종료일이 지난) 확정 예약에만 쓸 수 있다. API 로는 지난 날짜를 신청할 수 없으므로
+# 정상 작성 → 수정 → 답글 → 삭제 흐름은 ReviewIntegrationTest(기간을 SQL 로 옮김)와 시연 데이터(demo 프로필)로 확인한다.
+
+### 준비: 공간 제공자 가입
+POST {{baseUrl}}/api/v1/auth/signup
+Content-Type: application/json
+
+{
+  "email": "http-rev-provider-{{$timestamp}}-{{$randomInt}}@test.dasisiheung.com",
+  "password": "password123",
+  "name": "rev 제공자",
+  "phone": "010-2000-0001",
+  "role": "PROVIDER"
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+    client.global.set("revProviderEmail", response.body.data.email);
+%}
+
+### 준비: 공간 제공자 로그인
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{revProviderEmail}}",
+  "password": "password123"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+    client.global.set("revProviderToken", response.body.data.accessToken);
+    const day = (offset) => new Date(Date.now() + 9 * 3600 * 1000 + offset * 86400 * 1000).toISOString().substring(0, 10);
+    for (let i = 1; i <= 3; i++) {
+        client.global.set(`revDay${i}`, day(i));
+    }
+%}
+
+### 준비: 공간 등록
+POST {{baseUrl}}/api/v1/provider/spaces
+Authorization: Bearer {{revProviderToken}}
+Content-Type: application/json
+
+{
+  "title": "정왕 먹자골목 코너",
+  "description": "정왕 먹자골목 코너 — 시나리오용 공간",
+  "address": "경기도 시흥시 시나리오로 1",
+  "latitude": 37.3517,
+  "longitude": 126.7428,
+  "areaSqm": 30.0,
+  "buildingUse": "NEIGHBORHOOD_1",
+  "commercialTheme": "FOOD_ALLEY",
+  "dailyPrice": 40000,
+  "facilities": ["WIFI"],
+  "activityTypes": ["POPUP_STORE"],
+  "availableDates": ["{{revDay1}}", "{{revDay2}}", "{{revDay3}}"]
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+    client.global.set("revSpaceId", response.body.data.id);
+%}
+
+### 준비: 증빙 제출
+POST {{baseUrl}}/api/v1/provider/spaces/{{revSpaceId}}/proofs
+Authorization: Bearer {{revProviderToken}}
+Content-Type: multipart/form-data; boundary=dasi-boundary
+
+--dasi-boundary
+Content-Disposition: form-data; name="proofType"
+
+LEASE_CONTRACT
+--dasi-boundary
+Content-Disposition: form-data; name="file"; filename="proof.pdf"
+Content-Type: application/pdf
+
+< ./fixtures/proof.pdf
+--dasi-boundary--
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+%}
+
+### 준비: 관리자 로그인
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+> {%
+    client.test("200 OK + ADMIN", () => {
+        client.assert(response.status === 200, `실제 ${response.status} — http-client.private.env.json 의 관리자 계정 확인`);
+        client.assert(response.body.data.member.role === "ADMIN", `실제 ${response.body.data.member.role}`);
+    });
+    client.global.set("adminToken", response.body.data.accessToken);
+%}
+
+### 준비: 공개 승인
+POST {{baseUrl}}/api/v1/admin/spaces/{{revSpaceId}}/reviews
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "decision": "APPROVE",
+  "checklist": { "authorityVerified": true, "addressMatched": true, "buildingUnitMatched": true, "areaMatched": true, "usageMatched": true }
+}
+
+> {%
+    client.test("PUBLISHED", () => client.assert(response.body.data.space.status === "PUBLISHED", `실제 ${response.body.data.space.status}`));
+%}
+
+### 준비: 이용자 가입
+POST {{baseUrl}}/api/v1/auth/signup
+Content-Type: application/json
+
+{
+  "email": "http-rev-user-{{$timestamp}}-{{$randomInt}}@test.dasisiheung.com",
+  "password": "password123",
+  "name": "후기 쓰는 이용자",
+  "phone": "010-2000-0002",
+  "role": "USER"
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+    client.global.set("revUserEmail", response.body.data.email);
+%}
+
+### 준비: 이용자 로그인
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{revUserEmail}}",
+  "password": "password123"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+    client.global.set("revUserToken", response.body.data.accessToken);
+%}
+
+
+### 준비: 신청 (내일~모레)
+POST {{baseUrl}}/api/v1/applications
+Authorization: Bearer {{revUserToken}}
+Content-Type: application/json
+
+{
+  "spaceId": {{revSpaceId}},
+  "activityType": "POPUP_STORE",
+  "activityTitle": "떡볶이 팝업",
+  "plan": "이틀 동안 떡볶이를 판매합니다.",
+  "headcount": 2,
+  "startDate": "{{revDay1}}",
+  "endDate": "{{revDay2}}"
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+    client.global.set("revApplicationId", response.body.data.id);
+%}
+
+### 준비: 승인 (예약 확정)
+POST {{baseUrl}}/api/v1/provider/applications/{{revApplicationId}}/approve
+Authorization: Bearer {{revProviderToken}}
+
+> {%
+    client.test("APPROVED", () => client.assert(response.body.data.status === "APPROVED", `실제 ${response.body.data.status}`));
+%}
+
+### 이용 전에는 후기를 쓸 수 없다
+# 인증: USER (신청자)
+# 기대값: 409 REVIEW_NOT_ALLOWED
+POST {{baseUrl}}/api/v1/applications/{{revApplicationId}}/review
+Authorization: Bearer {{revUserToken}}
+Content-Type: application/json
+
+{
+  "rating": 5,
+  "content": "아직 이용 전"
+}
+
+> {%
+    client.test("409 REVIEW_NOT_ALLOWED", () => {
+        client.assert(response.status === 409, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "REVIEW_NOT_ALLOWED", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 평점 범위 밖
+# 기대값: 400 INVALID_INPUT
+POST {{baseUrl}}/api/v1/applications/{{revApplicationId}}/review
+Authorization: Bearer {{revUserToken}}
+Content-Type: application/json
+
+{
+  "rating": 6,
+  "content": "평점 6"
+}
+
+> {%
+    client.test("400 INVALID_INPUT", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "INVALID_INPUT", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 공간 후기 목록 (로그인 없이)
+# 기대값: 200 OK, 새 공간이라 0건 / 상세의 reviewCount 0, ratingAverage 없음
+GET {{baseUrl}}/api/v1/spaces/{{revSpaceId}}/reviews
+
+> {%
+    client.test("200 OK + 0건", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.totalElements === 0, `실제 ${response.body.data.totalElements}`);
+    });
+%}
+
+### 공간 상세의 평점 필드
+GET {{baseUrl}}/api/v1/spaces/{{revSpaceId}}
+
+> {%
+    client.test("후기 0 · 평균 없음", () => {
+        client.assert(response.body.data.reviewCount === 0, `실제 ${response.body.data.reviewCount}`);
+        client.assert(response.body.data.ratingAverage === null || response.body.data.ratingAverage === undefined, "평균");
+    });
+%}
+
+### 내가 쓴 후기
+GET {{baseUrl}}/api/v1/members/me/reviews
+Authorization: Bearer {{revUserToken}}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+%}
+
+### 평점 높은 순 정렬 (후기 없는 공간은 맨 뒤)
+GET {{baseUrl}}/api/v1/spaces?sort=RATING&size=50
+
+> {%
+    client.test("평점 내림차순", () => {
+        const values = response.body.data.content.map(s => s.ratingAverage);
+        let seenNull = false;
+        for (let i = 0; i < values.length; i++) {
+            if (values[i] === null || values[i] === undefined) { seenNull = true; continue; }
+            client.assert(!seenNull, "후기 없는 공간 뒤에 평점 있는 공간이 나왔습니다");
+            if (i > 0 && values[i - 1] !== null && values[i - 1] !== undefined) {
+                client.assert(values[i - 1] >= values[i], "평점 순서");
+            }
+        }
+    });
+%}

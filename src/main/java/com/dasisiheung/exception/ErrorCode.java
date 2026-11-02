@@ -76,7 +76,13 @@ public enum ErrorCode {
     // 가격 협의
     INVALID_OFFER_PRICE(HttpStatus.BAD_REQUEST, "제안 금액은 1원 이상, 정가 합계 이하로 입력해 주세요."),
     OFFER_NOT_ALLOWED(HttpStatus.CONFLICT, "보낸 제안에 대한 상대방의 답변을 기다리는 중입니다."),
-    NO_PENDING_OFFER(HttpStatus.CONFLICT, "수락할 가격 제안이 없습니다.");
+    NO_PENDING_OFFER(HttpStatus.CONFLICT, "수락할 가격 제안이 없습니다."),
+
+    // 이용 후기
+    REVIEW_NOT_ALLOWED(HttpStatus.CONFLICT, "이용이 끝난 확정 예약에만 후기를 남길 수 있습니다."),
+    DUPLICATE_REVIEW(HttpStatus.CONFLICT, "이미 후기를 남긴 예약입니다."),
+    REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "후기를 찾을 수 없습니다."),
+    NOT_REVIEW_OWNER(HttpStatus.FORBIDDEN, "본인이 쓴 후기만 고치거나 지울 수 있습니다.");
 
     private final HttpStatus status;
     private final String message;

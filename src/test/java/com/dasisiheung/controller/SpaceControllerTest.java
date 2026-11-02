@@ -172,7 +172,7 @@ class SpaceControllerTest extends ApiDocsTestSupport {
         return new SpaceSummaryResponse(10L, "정왕역 앞 1층 상가", Region.JEONGWANG, "경기도 시흥시 마유로 418",
                 ProviderSpaceControllerTest.photos().get(0).url(), 50_000, new BigDecimal("33.06"),
                 CommercialTheme.FOOD_ALLEY, List.of(ActivityType.POPUP_STORE, ActivityType.EXHIBITION),
-                37.3517, 126.7428, 12);
+                37.3517, 126.7428, 12, 4, new BigDecimal("4.50"));
     }
 
     static FieldDescriptor[] summaryFields(String prefix) {
@@ -188,7 +188,9 @@ class SpaceControllerTest extends ApiDocsTestSupport {
                 fieldWithPath(prefix + "activityTypes").type(JsonFieldType.ARRAY).description("허용 활동"),
                 fieldWithPath(prefix + "latitude").type(JsonFieldType.NUMBER).description("위도"),
                 fieldWithPath(prefix + "longitude").type(JsonFieldType.NUMBER).description("경도"),
-                fieldWithPath(prefix + "favoriteCount").type(JsonFieldType.NUMBER).description("찜 수")};
+                fieldWithPath(prefix + "favoriteCount").type(JsonFieldType.NUMBER).description("찜 수"),
+                fieldWithPath(prefix + "reviewCount").type(JsonFieldType.NUMBER).description("후기 수"),
+                fieldWithPath(prefix + "ratingAverage").type(JsonFieldType.NUMBER).optional().description("평균 평점 (후기 없으면 null)")};
     }
 
     static SpaceDetailResponse spaceDetail() {

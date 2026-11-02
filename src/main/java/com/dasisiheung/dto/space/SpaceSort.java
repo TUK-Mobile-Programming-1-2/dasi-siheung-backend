@@ -14,7 +14,9 @@ public enum SpaceSort implements LabeledEnum {
     PRICE_ASC("낮은 가격 순", Sort.by(Sort.Direction.ASC, "dailyPrice")),
     PRICE_DESC("높은 가격 순", Sort.by(Sort.Direction.DESC, "dailyPrice")),
     AREA_DESC("넓은 순", Sort.by(Sort.Direction.DESC, "areaSqm")),
-    POPULAR("찜 많은 순", Sort.by(Sort.Direction.DESC, "favoriteCount"));
+    POPULAR("찜 많은 순", Sort.by(Sort.Direction.DESC, "favoriteCount")),
+    /** 후기 없는 공간은 맨 뒤 (정렬 키가 0). nullsLast() 는 Criteria 정렬에서 지원되지 않는다. */
+    RATING("평점 높은 순", Sort.by(Sort.Order.desc("ratingSortKey"), Sort.Order.desc("reviewCount")));
 
     private static final Sort TIE_BREAKER = Sort.by(Sort.Direction.DESC, "id");
 

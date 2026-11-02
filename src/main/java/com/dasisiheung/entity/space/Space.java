@@ -33,6 +33,7 @@ import java.util.Set;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Formula;
 import org.locationtech.jts.geom.Point;
 
 @Getter
@@ -113,6 +114,20 @@ public class Space extends BaseTimeEntity {
      */
     @Column(name = "favorite_count", nullable = false, insertable = false, updatable = false)
     private int favoriteCount;
+
+    /** 후기 수 · 평균 평점 (후기 없으면 null). 찜 수와 같이 저장소 UPDATE 로만 바뀌고 평균은 DB 가 계산한다. */
+    @Column(name = "review_count", nullable = false, insertable = false, updatable = false)
+    private int reviewCount;
+
+    @Column(name = "rating_average", insertable = false, updatable = false, precision = 3, scale = 2)
+    private BigDecimal ratingAverage;
+
+    /**
+     * 평점 높은 순 정렬 키. 후기가 없으면 0 이라 평점(1~5)이 있는 공간 뒤로 간다.
+     * Specification 검색의 정렬(Criteria)은 NULLS LAST 를 지원하지 않아 대신 쓴다.
+     */
+    @Formula("coalesce(rating_average, 0)")
+    private BigDecimal ratingSortKey;
 
     @ElementCollection
     @CollectionTable(name = "space_facility", joinColumns = @JoinColumn(name = "space_id"))
