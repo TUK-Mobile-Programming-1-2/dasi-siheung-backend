@@ -1,0 +1,329 @@
+# 신고 · 제재 — 신고 접수 · 관리자 처리(숨김 · 이용 정지) · 정지 해제
+# 관리자 계정: http-client.private.env.json
+
+### 준비: 공간 제공자 가입
+POST {{baseUrl}}/api/v1/auth/signup
+Content-Type: application/json
+
+{
+  "email": "http-rpt-provider-{{$timestamp}}-{{$randomInt}}@test.dasisiheung.com",
+  "password": "password123",
+  "name": "rpt 제공자",
+  "phone": "010-2000-0001",
+  "role": "PROVIDER"
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+    client.global.set("rptProviderEmail", response.body.data.email);
+%}
+
+### 준비: 공간 제공자 로그인
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{rptProviderEmail}}",
+  "password": "password123"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+    client.global.set("rptProviderToken", response.body.data.accessToken);
+    const day = (offset) => new Date(Date.now() + 9 * 3600 * 1000 + offset * 86400 * 1000).toISOString().substring(0, 10);
+    for (let i = 1; i <= 3; i++) {
+        client.global.set(`rptDay${i}`, day(i));
+    }
+%}
+
+### 준비: 공간 등록
+POST {{baseUrl}}/api/v1/provider/spaces
+Authorization: Bearer {{rptProviderToken}}
+Content-Type: application/json
+
+{
+  "title": "신고 시나리오 공간",
+  "description": "신고 시나리오 공간 — 시나리오용 공간",
+  "address": "경기도 시흥시 시나리오로 1",
+  "latitude": 37.3517,
+  "longitude": 126.7428,
+  "areaSqm": 30.0,
+  "buildingUse": "NEIGHBORHOOD_1",
+  "commercialTheme": "FOOD_ALLEY",
+  "dailyPrice": 30000,
+  "facilities": ["WIFI"],
+  "activityTypes": ["POPUP_STORE"],
+  "availableDates": ["{{rptDay1}}", "{{rptDay2}}", "{{rptDay3}}"]
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+    client.global.set("rptSpaceId", response.body.data.id);
+%}
+
+### 준비: 증빙 제출
+POST {{baseUrl}}/api/v1/provider/spaces/{{rptSpaceId}}/proofs
+Authorization: Bearer {{rptProviderToken}}
+Content-Type: multipart/form-data; boundary=dasi-boundary
+
+--dasi-boundary
+Content-Disposition: form-data; name="proofType"
+
+LEASE_CONTRACT
+--dasi-boundary
+Content-Disposition: form-data; name="file"; filename="proof.pdf"
+Content-Type: application/pdf
+
+< ./fixtures/proof.pdf
+--dasi-boundary--
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+%}
+
+### 준비: 관리자 로그인
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+> {%
+    client.test("200 OK + ADMIN", () => {
+        client.assert(response.status === 200, `실제 ${response.status} — http-client.private.env.json 의 관리자 계정 확인`);
+        client.assert(response.body.data.member.role === "ADMIN", `실제 ${response.body.data.member.role}`);
+    });
+    client.global.set("adminToken", response.body.data.accessToken);
+%}
+
+### 준비: 공개 승인
+POST {{baseUrl}}/api/v1/admin/spaces/{{rptSpaceId}}/reviews
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "decision": "APPROVE",
+  "checklist": { "authorityVerified": true, "addressMatched": true, "buildingUnitMatched": true, "areaMatched": true, "usageMatched": true }
+}
+
+> {%
+    client.test("PUBLISHED", () => client.assert(response.body.data.space.status === "PUBLISHED", `실제 ${response.body.data.space.status}`));
+%}
+
+### 준비: 이용자 가입
+POST {{baseUrl}}/api/v1/auth/signup
+Content-Type: application/json
+
+{
+  "email": "http-rpt-user-{{$timestamp}}-{{$randomInt}}@test.dasisiheung.com",
+  "password": "password123",
+  "name": "신고하는 이용자",
+  "phone": "010-2000-0002",
+  "role": "USER"
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+    client.global.set("rptUserEmail", response.body.data.email);
+%}
+
+### 준비: 이용자 로그인
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{rptUserEmail}}",
+  "password": "password123"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+    client.global.set("rptUserToken", response.body.data.accessToken);
+%}
+
+
+### 신고하기 (공간)
+# 인증: 로그인 회원
+# 기대값: 201 Created, PENDING
+POST {{baseUrl}}/api/v1/reports
+Authorization: Bearer {{rptUserToken}}
+Content-Type: application/json
+
+{
+  "targetType": "SPACE",
+  "targetId": {{rptSpaceId}},
+  "reason": "FALSE_INFORMATION",
+  "detail": "사진과 실제 공간이 전혀 다릅니다."
+}
+
+> {%
+    client.test("201 Created + PENDING", () => {
+        client.assert(response.status === 201, `실제 ${response.status}`);
+        client.assert(response.body.data.status === "PENDING", `실제 ${response.body.data.status}`);
+    });
+    client.global.set("rptReportId", response.body.data.id);
+%}
+
+### 같은 대상 다시 신고
+# 기대값: 409 DUPLICATE_REPORT
+POST {{baseUrl}}/api/v1/reports
+Authorization: Bearer {{rptUserToken}}
+Content-Type: application/json
+
+{
+  "targetType": "SPACE",
+  "targetId": {{rptSpaceId}},
+  "reason": "SPAM"
+}
+
+> {%
+    client.test("409 DUPLICATE_REPORT", () => {
+        client.assert(response.status === 409, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "DUPLICATE_REPORT", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 자기 공간 신고
+# 기대값: 400 CANNOT_REPORT_SELF
+POST {{baseUrl}}/api/v1/reports
+Authorization: Bearer {{rptProviderToken}}
+Content-Type: application/json
+
+{
+  "targetType": "SPACE",
+  "targetId": {{rptSpaceId}},
+  "reason": "OTHER"
+}
+
+> {%
+    client.test("400 CANNOT_REPORT_SELF", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "CANNOT_REPORT_SELF", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 관리자: 처리 대기 신고 목록
+# 인증: ADMIN
+# 기대값: 200 OK, 모두 PENDING
+GET {{baseUrl}}/api/v1/admin/reports?status=PENDING&size=100
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("200 OK + PENDING 만", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.content.every(r => r.status === "PENDING"), "처리된 신고가 섞였습니다");
+    });
+%}
+
+### 관리자: 정지 일수 없이 정지 처리
+# 기대값: 400 INVALID_INPUT
+POST {{baseUrl}}/api/v1/admin/reports/{{rptReportId}}/resolve
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "action": "SUSPEND"
+}
+
+> {%
+    client.test("400 INVALID_INPUT", () => client.assert(response.status === 400, `실제 ${response.status}`));
+%}
+
+### 관리자: 숨김 + 이용 정지 7일
+# 기대값: 200 OK, RESOLVED, 대상 숨김, 제공자 SUSPENDED
+POST {{baseUrl}}/api/v1/admin/reports/{{rptReportId}}/resolve
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "action": "HIDE_AND_SUSPEND",
+  "suspendDays": 7,
+  "note": "허위 사진 확인, 1주 정지"
+}
+
+> {%
+    client.test("RESOLVED + 숨김 + 정지", () => {
+        const d = response.body.data;
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(d.status === "RESOLVED" && d.targetVisible === false && d.ownerStatus === "SUSPENDED", JSON.stringify(d));
+    });
+%}
+
+### 숨긴 공간은 이용자에게 보이지 않는다
+# 기대값: 404 SPACE_NOT_FOUND
+GET {{baseUrl}}/api/v1/spaces/{{rptSpaceId}}
+
+> {%
+    client.test("404", () => client.assert(response.status === 404, `실제 ${response.status}`));
+%}
+
+### 정지된 제공자 로그인
+# 기대값: 403 ACCOUNT_SUSPENDED
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{rptProviderEmail}}",
+  "password": "password123"
+}
+
+> {%
+    client.test("403 ACCOUNT_SUSPENDED", () => {
+        client.assert(response.status === 403, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "ACCOUNT_SUSPENDED", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 이미 처리된 신고
+# 기대값: 409 REPORT_ALREADY_RESOLVED
+POST {{baseUrl}}/api/v1/admin/reports/{{rptReportId}}/resolve
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "action": "DISMISS"
+}
+
+> {%
+    client.test("409 REPORT_ALREADY_RESOLVED", () => client.assert(response.body.error.code === "REPORT_ALREADY_RESOLVED", `실제 ${response.body.error.code}`));
+%}
+
+### 관리자: 대시보드의 처리 대기 신고 수
+GET {{baseUrl}}/api/v1/admin/dashboard
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("대시보드 신고 수", () => client.assert(typeof response.body.data.pendingReportCount === "number", "pendingReportCount"));
+%}
+
+### 관리자: 제공자 회원 ID 확인 (검수 상세)
+GET {{baseUrl}}/api/v1/admin/spaces/{{rptSpaceId}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.global.set("rptProviderId", response.body.data.provider.id);
+%}
+
+### 관리자: 이용 정지 해제
+POST {{baseUrl}}/api/v1/admin/members/{{rptProviderId}}/unsuspend
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("ACTIVE", () => client.assert(response.body.data.status === "ACTIVE", `실제 ${response.body.data.status}`));
+%}
+
+### 해제 후 로그인
+# 기대값: 200 OK
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{rptProviderEmail}}",
+  "password": "password123"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+%}

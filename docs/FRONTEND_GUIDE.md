@@ -240,6 +240,18 @@ flowchart LR
 | `CONVERSATION_NOT_FOUND` | 404 | 없는 대화 | 대화 목록으로 |
 | `NOT_CONVERSATION_MEMBER` | 403 | 참여하지 않은 대화를 조회 · 전송 | 접근 불가 안내 |
 
+**신고 · 제재**
+
+| `error.code` | HTTP 상태 | 언제 | 화면 처리 예시 |
+| --- | --- | --- | --- |
+| `REPORT_NOT_FOUND` | 404 | 없는 신고 | 목록 새로고침 |
+| `REPORT_TARGET_NOT_FOUND` | 404 | 신고 대상이 없음 | 이미 지워진 대상 안내 |
+| `DUPLICATE_REPORT` | 409 | 처리 대기 중인 같은 신고가 있음 | 이미 신고했다고 안내 |
+| `CANNOT_REPORT_SELF` | 400 | 자기 자신 · 자기 글 신고 | 신고 버튼 숨기기 |
+| `REPORT_ALREADY_RESOLVED` | 409 | 이미 처리된 신고를 다시 처리 | 목록 새로고침 |
+| `INVALID_REPORT_ACTION` | 400 | 회원 신고를 숨김 처리 | 정지 · 기각만 보여주기 |
+| `CANNOT_SUSPEND_MEMBER` | 409 | 관리자 · 탈퇴 회원 정지 | 버튼 숨기기 |
+
 ### 3-3-1. 목록 응답 (페이지)
 
 목록 API 는 `page`(0부터), `size`(기본 20, 최대 100) 쿼리 파라미터를 받고 아래 형식으로 응답합니다.
@@ -815,3 +827,14 @@ try {
 | POST | `/api/v1/conversations/{conversationId}/messages` | 참여자 | 메시지 보내기 |
 | POST | `/api/v1/conversations/{conversationId}/read` | 참여자 | 읽음 처리 |
 | GET | `/api/v1/conversations/unread-count` | 로그인 | 안 읽은 메시지 수 (배지) |
+
+### 신고 · 제재 (`http/report.http`)
+
+| 메서드 | 경로 | 인증 | 설명 |
+| --- | --- | --- | --- |
+| POST | `/api/v1/reports` | 로그인 | 신고하기 (공간 · 게시글 · 댓글 · 회원) |
+| GET | `/api/v1/admin/reports` | ADMIN | 신고 목록 (status · targetType) |
+| GET | `/api/v1/admin/reports/{reportId}` | ADMIN | 신고 상세 (대상 요약) |
+| POST | `/api/v1/admin/reports/{reportId}/resolve` | ADMIN | 신고 처리 (기각 · 숨김 · 정지) |
+| POST | `/api/v1/admin/members/{memberId}/suspend` | ADMIN | 회원 이용 정지 |
+| POST | `/api/v1/admin/members/{memberId}/unsuspend` | ADMIN | 이용 정지 해제 |
