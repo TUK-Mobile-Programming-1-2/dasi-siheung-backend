@@ -4,11 +4,13 @@ import com.dasisiheung.dto.admin.DashboardResponse;
 import com.dasisiheung.dto.admin.DashboardResponse.RecentSpace;
 import com.dasisiheung.entity.application.ApplicationStatus;
 import com.dasisiheung.entity.member.MemberStatus;
+import com.dasisiheung.entity.report.ReportStatus;
 import com.dasisiheung.entity.member.Role;
 import com.dasisiheung.entity.space.Region;
 import com.dasisiheung.entity.space.SpaceStatus;
 import com.dasisiheung.repository.ApplicationRepository;
 import com.dasisiheung.repository.MemberRepository;
+import com.dasisiheung.repository.ReportRepository;
 import com.dasisiheung.repository.SpaceRepository;
 import com.dasisiheung.repository.projection.EnumCount;
 import java.time.Clock;
@@ -29,6 +31,7 @@ public class AdminDashboardService {
     private final SpaceRepository spaceRepository;
     private final MemberRepository memberRepository;
     private final ApplicationRepository applicationRepository;
+    private final ReportRepository reportRepository;
     private final Clock clock;
 
     public DashboardResponse getDashboard() {
@@ -42,6 +45,7 @@ public class AdminDashboardService {
                 zeroFilled(Role.class, memberRepository.countByRoleExcludingStatus(MemberStatus.WITHDRAWN)),
                 applicationsByStatus.get(ApplicationStatus.PENDING),
                 applicationsByStatus,
+                reportRepository.countByStatus(ReportStatus.PENDING),
                 spaceRepository.findTop5ByOrderByCreatedAtDesc().stream().map(RecentSpace::from).toList(),
                 LocalDateTime.now(clock));
     }
