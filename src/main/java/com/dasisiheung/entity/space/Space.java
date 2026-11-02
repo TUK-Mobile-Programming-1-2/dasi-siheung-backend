@@ -114,6 +114,13 @@ public class Space extends BaseTimeEntity {
     @Column(name = "favorite_count", nullable = false, insertable = false, updatable = false)
     private int favoriteCount;
 
+    /** 후기 수 · 평균 평점 (후기 없으면 null). 찜 수와 같이 저장소 UPDATE 로만 바뀌고 평균은 DB 가 계산한다. */
+    @Column(name = "review_count", nullable = false, insertable = false, updatable = false)
+    private int reviewCount;
+
+    @Column(name = "rating_average", insertable = false, updatable = false, precision = 3, scale = 2)
+    private BigDecimal ratingAverage;
+
     @ElementCollection
     @CollectionTable(name = "space_facility", joinColumns = @JoinColumn(name = "space_id"))
     @Enumerated(EnumType.STRING)
