@@ -86,7 +86,14 @@ public enum ErrorCode {
     REVIEW_NOT_ALLOWED(HttpStatus.CONFLICT, "이용이 끝난 확정 예약에만 후기를 남길 수 있습니다."),
     DUPLICATE_REVIEW(HttpStatus.CONFLICT, "이미 후기를 남긴 예약입니다."),
     REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "후기를 찾을 수 없습니다."),
-    NOT_REVIEW_OWNER(HttpStatus.FORBIDDEN, "본인이 쓴 후기만 고치거나 지울 수 있습니다.");
+    NOT_REVIEW_OWNER(HttpStatus.FORBIDDEN, "본인이 쓴 후기만 고치거나 지울 수 있습니다."),
+
+    // 커뮤니티
+    POST_NOT_FOUND(HttpStatus.NOT_FOUND, "게시글을 찾을 수 없습니다."),
+    COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "댓글을 찾을 수 없습니다."),
+    NOT_POST_AUTHOR(HttpStatus.FORBIDDEN, "본인이 쓴 글만 고치거나 지울 수 있습니다."),
+    NOT_COMMENT_AUTHOR(HttpStatus.FORBIDDEN, "본인이 쓴 댓글만 지울 수 있습니다."),
+    NOTICE_ADMIN_ONLY(HttpStatus.FORBIDDEN, "공지는 관리자만 쓸 수 있습니다.");
 
     private final HttpStatus status;
     private final String message;
