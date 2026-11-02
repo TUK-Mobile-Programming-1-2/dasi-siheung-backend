@@ -71,6 +71,10 @@ public enum ErrorCode {
     INVALID_APPLICATION_STATUS(HttpStatus.CONFLICT, "현재 신청 상태에서는 할 수 없는 작업입니다."),
     APPLICATION_NOT_CANCELLABLE(HttpStatus.CONFLICT, "이용 시작일부터는 확정된 예약을 취소할 수 없습니다. 공간 제공자와 상의해 주세요."),
     PERIOD_ALREADY_BOOKED(HttpStatus.CONFLICT, "선택한 기간에 이미 확정된 예약이 있습니다."),
+    ACTIVITY_PHOTO_NOT_ALLOWED(HttpStatus.CONFLICT, "확정된 예약의 이용 기간 앞뒤에만 활동 사진을 올릴 수 있습니다."),
+    ACTIVITY_PHOTO_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "이용 전 · 후 사진은 각각 최대 10장까지 올릴 수 있습니다."),
+    ACTIVITY_PHOTO_NOT_FOUND(HttpStatus.NOT_FOUND, "활동 사진을 찾을 수 없습니다."),
+    NOT_PHOTO_UPLOADER(HttpStatus.FORBIDDEN, "본인이 올린 사진만 지울 수 있습니다."),
     PRICE_NEGOTIATION_IN_PROGRESS(HttpStatus.CONFLICT, "가격 협의가 끝나지 않았습니다. 받은 제안을 수락하거나 상대 답변을 기다려 주세요."),
 
     // 가격 협의
