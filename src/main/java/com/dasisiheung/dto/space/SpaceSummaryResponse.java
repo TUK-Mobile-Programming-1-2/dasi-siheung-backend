@@ -21,13 +21,15 @@ public record SpaceSummaryResponse(
         @Schema(description = "허용 활동") List<ActivityType> activityTypes,
         @Schema(description = "위도", example = "37.3517") double latitude,
         @Schema(description = "경도", example = "126.7428") double longitude,
-        @Schema(description = "찜 수", example = "12") int favoriteCount
+        @Schema(description = "찜 수", example = "12") int favoriteCount,
+        @Schema(description = "후기 수", example = "4") int reviewCount,
+        @Schema(description = "평균 평점 (후기 없으면 null)", example = "4.50") BigDecimal ratingAverage
 ) {
 
     public static SpaceSummaryResponse of(Space space, String thumbnailUrl) {
         return new SpaceSummaryResponse(space.getId(), space.getTitle(), space.getRegion(), space.getAddress(),
                 thumbnailUrl, space.getDailyPrice(), space.getAreaSqm(), space.getCommercialTheme(),
                 SpaceResponses.sorted(space.getActivityTypes()), space.latitude(), space.longitude(),
-                space.getFavoriteCount());
+                space.getFavoriteCount(), space.getReviewCount(), space.getRatingAverage());
     }
 }

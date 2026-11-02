@@ -36,6 +36,8 @@ public record SpaceDetailResponse(
         @Schema(description = "사진 (순서대로, 첫 번째가 대표)") List<SpacePhotoResponse> photos,
         @Schema(description = "공간 제공자") ProviderProfile provider,
         @Schema(description = "찜 수", example = "12") int favoriteCount,
+        @Schema(description = "후기 수", example = "4") int reviewCount,
+        @Schema(description = "평균 평점 (후기 없으면 null)", example = "4.50") BigDecimal ratingAverage,
         @Schema(description = "내가 찜했는지 (비로그인이면 false)", example = "false") boolean favorited
 ) {
 
@@ -50,7 +52,8 @@ public record SpaceDetailResponse(
                 space.latitude(), space.longitude(), space.getAreaSqm(), space.getBuildingUse(),
                 space.getCommercialTheme(), space.getDailyPrice(), SpaceResponses.sorted(space.getFacilities()),
                 SpaceResponses.sorted(space.getActivityTypes()), availableDates, photos,
-                ProviderProfile.from(space.getProvider()), space.getFavoriteCount(), favorited);
+                ProviderProfile.from(space.getProvider()), space.getFavoriteCount(), space.getReviewCount(),
+                space.getRatingAverage(), favorited);
     }
 
     /** 공개 프로필. 연락처는 1:1 소통으로만 주고받는다. */
