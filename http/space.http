@@ -277,3 +277,40 @@ GET {{baseUrl}}/api/v1/spaces/map?swLat=37.330&swLng=126.650&neLat=37.300&neLng=
         client.assert(response.body.error.code === "INVALID_INPUT", `실제 ${response.body.error.code}`);
     });
 %}
+
+### 공간 추천 — 브랜드 홍보 · 전시 · 내일~모레
+# 인증: 없음
+# 기대값: 200 OK, 점수 내림차순, 준비한 거북섬(수변 관광지) 공간이 이유 "브랜드 홍보에 맞는 상권 (수변 관광지)" 와 함께 포함
+GET {{baseUrl}}/api/v1/spaces/recommendations?purpose=PROMOTION&activityType=EXHIBITION&startDate={{browseDay1}}&endDate={{browseDay2}}&limit=20
+
+> {%
+    client.test("200 OK + 점수 순", () => {
+        const data = response.body.data;
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        for (let i = 1; i < data.length; i++) {
+            client.assert(data[i - 1].score >= data[i].score, "점수 내림차순이 아닙니다");
+        }
+        const mine = data.find(r => String(r.space.id) === String(client.global.get("browseSpaceId")));
+        client.assert(mine, "준비한 공간이 없습니다");
+        client.assert(mine.reasons.includes("브랜드 홍보에 맞는 상권 (수변 관광지)"), JSON.stringify(mine.reasons));
+    });
+%}
+
+### 관리자: 상권 테마 보정 (수변 관광지 → 카페거리)
+# 인증: ADMIN
+# 기대값: 200 OK, 테마만 바뀌고 공개 상태 유지
+PUT {{baseUrl}}/api/v1/admin/spaces/{{browseSpaceId}}/theme
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "commercialTheme": "CAFE_STREET"
+}
+
+> {%
+    client.test("테마 보정 + PUBLISHED 유지", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.space.commercialTheme === "CAFE_STREET", `실제 ${response.body.data.space.commercialTheme}`);
+        client.assert(response.body.data.space.status === "PUBLISHED", `실제 ${response.body.data.space.status}`);
+    });
+%}
