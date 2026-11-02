@@ -20,6 +20,10 @@ public record OptionsResponse(
         @Schema(description = "가격 협의 상태") List<OptionItem> negotiationStatuses,
         @Schema(description = "가격 제안한 쪽") List<OptionItem> offerSides,
         @Schema(description = "활동 사진 시점") List<OptionItem> photoPhases,
-        @Schema(description = "커뮤니티 분류") List<OptionItem> postCategories
+        @Schema(description = "커뮤니티 분류") List<OptionItem> postCategories,
+        @Schema(description = "신고 대상 종류") List<OptionItem> reportTargetTypes,
+        @Schema(description = "신고 사유") List<OptionItem> reportReasons,
+        @Schema(description = "신고 처리 상태") List<OptionItem> reportStatuses,
+        @Schema(description = "신고 처리 방법") List<OptionItem> reportActions
 ) {
 }

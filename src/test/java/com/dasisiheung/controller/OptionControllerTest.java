@@ -42,7 +42,11 @@ class OptionControllerTest extends ApiDocsTestSupport {
             {"negotiationStatuses", "가격 협의 상태"},
             {"offerSides", "가격 제안한 쪽"},
             {"photoPhases", "활동 사진 시점"},
-            {"postCategories", "커뮤니티 분류"}
+            {"postCategories", "커뮤니티 분류"},
+            {"reportTargetTypes", "신고 대상 종류"},
+            {"reportReasons", "신고 사유"},
+            {"reportStatuses", "신고 처리 상태"},
+            {"reportActions", "신고 처리 방법"}
     };
 
     @MockitoBean

@@ -9,6 +9,10 @@ import com.dasisiheung.entity.application.PhotoPhase;
 import com.dasisiheung.entity.application.PriceNegotiationStatus;
 import com.dasisiheung.entity.community.PostCategory;
 import com.dasisiheung.entity.member.Role;
+import com.dasisiheung.entity.report.ReportAction;
+import com.dasisiheung.entity.report.ReportReason;
+import com.dasisiheung.entity.report.ReportStatus;
+import com.dasisiheung.entity.report.ReportTargetType;
 import com.dasisiheung.entity.space.ActivityType;
 import com.dasisiheung.entity.space.BuildingUse;
 import com.dasisiheung.entity.space.CommercialTheme;
@@ -40,7 +44,11 @@ public class OptionService {
             OptionItem.listOf(PriceNegotiationStatus.class),
             OptionItem.listOf(OfferSide.class),
             OptionItem.listOf(PhotoPhase.class),
-            OptionItem.listOf(PostCategory.class)
+            OptionItem.listOf(PostCategory.class),
+            OptionItem.listOf(ReportTargetType.class),
+            OptionItem.listOf(ReportReason.class),
+            OptionItem.listOf(ReportStatus.class),
+            OptionItem.listOf(ReportAction.class)
     );
 
     public OptionsResponse getOptions() {
