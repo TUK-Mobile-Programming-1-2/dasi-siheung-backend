@@ -1,0 +1,267 @@
+# 1:1 소통 (폴링) — 대화 열기 · 메시지 · 읽음 · 안 읽은 수
+# 앱은 대화방에서 5초마다 after=마지막 메시지 ID 로 새 메시지를, 탭 배지는 30초마다 안 읽은 수를 조회한다.
+
+### 준비: 공간 제공자 가입
+POST {{baseUrl}}/api/v1/auth/signup
+Content-Type: application/json
+
+{
+  "email": "http-chat-provider-{{$timestamp}}-{{$randomInt}}@test.dasisiheung.com",
+  "password": "password123",
+  "name": "chat 제공자",
+  "phone": "010-2000-0001",
+  "role": "PROVIDER"
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+    client.global.set("chatProviderEmail", response.body.data.email);
+%}
+
+### 준비: 공간 제공자 로그인
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{chatProviderEmail}}",
+  "password": "password123"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+    client.global.set("chatProviderToken", response.body.data.accessToken);
+    const day = (offset) => new Date(Date.now() + 9 * 3600 * 1000 + offset * 86400 * 1000).toISOString().substring(0, 10);
+    for (let i = 1; i <= 3; i++) {
+        client.global.set(`chatDay${i}`, day(i));
+    }
+%}
+
+### 준비: 공간 등록
+POST {{baseUrl}}/api/v1/provider/spaces
+Authorization: Bearer {{chatProviderToken}}
+Content-Type: application/json
+
+{
+  "title": "거북섬 수변 카페 공간",
+  "description": "거북섬 수변 카페 공간 — 시나리오용 공간",
+  "address": "경기도 시흥시 시나리오로 1",
+  "latitude": 37.3175,
+  "longitude": 126.6822,
+  "areaSqm": 30.0,
+  "buildingUse": "NEIGHBORHOOD_1",
+  "commercialTheme": "WATERFRONT",
+  "dailyPrice": 60000,
+  "facilities": ["WIFI"],
+  "activityTypes": ["EXHIBITION"],
+  "availableDates": ["{{chatDay1}}", "{{chatDay2}}", "{{chatDay3}}"]
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+    client.global.set("chatSpaceId", response.body.data.id);
+%}
+
+### 준비: 증빙 제출
+POST {{baseUrl}}/api/v1/provider/spaces/{{chatSpaceId}}/proofs
+Authorization: Bearer {{chatProviderToken}}
+Content-Type: multipart/form-data; boundary=dasi-boundary
+
+--dasi-boundary
+Content-Disposition: form-data; name="proofType"
+
+LEASE_CONTRACT
+--dasi-boundary
+Content-Disposition: form-data; name="file"; filename="proof.pdf"
+Content-Type: application/pdf
+
+< ./fixtures/proof.pdf
+--dasi-boundary--
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+%}
+
+### 준비: 관리자 로그인
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+> {%
+    client.test("200 OK + ADMIN", () => {
+        client.assert(response.status === 200, `실제 ${response.status} — http-client.private.env.json 의 관리자 계정 확인`);
+        client.assert(response.body.data.member.role === "ADMIN", `실제 ${response.body.data.member.role}`);
+    });
+    client.global.set("adminToken", response.body.data.accessToken);
+%}
+
+### 준비: 공개 승인
+POST {{baseUrl}}/api/v1/admin/spaces/{{chatSpaceId}}/reviews
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "decision": "APPROVE",
+  "checklist": { "authorityVerified": true, "addressMatched": true, "buildingUnitMatched": true, "areaMatched": true, "usageMatched": true }
+}
+
+> {%
+    client.test("PUBLISHED", () => client.assert(response.body.data.space.status === "PUBLISHED", `실제 ${response.body.data.space.status}`));
+%}
+
+### 준비: 이용자 가입
+POST {{baseUrl}}/api/v1/auth/signup
+Content-Type: application/json
+
+{
+  "email": "http-chat-user-{{$timestamp}}-{{$randomInt}}@test.dasisiheung.com",
+  "password": "password123",
+  "name": "문의하는 이용자",
+  "phone": "010-2000-0002",
+  "role": "USER"
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+    client.global.set("chatUserEmail", response.body.data.email);
+%}
+
+### 준비: 이용자 로그인
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{chatUserEmail}}",
+  "password": "password123"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+    client.global.set("chatUserToken", response.body.data.accessToken);
+%}
+
+
+### 대화 열기
+# 인증: USER
+# 기대값: 200 OK, 상대방 = 공간 제공자, 메시지 없음
+POST {{baseUrl}}/api/v1/spaces/{{chatSpaceId}}/conversations
+Authorization: Bearer {{chatUserToken}}
+
+> {%
+    client.test("200 OK", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.counterpart.role === "PROVIDER", `실제 ${response.body.data.counterpart.role}`);
+        client.assert(response.body.data.lastMessageAt === null || response.body.data.lastMessageAt === undefined, "메시지 없음");
+    });
+    client.global.set("chatConversationId", response.body.data.id);
+%}
+
+### 한 번 더 열면 같은 대화 (멱등)
+POST {{baseUrl}}/api/v1/spaces/{{chatSpaceId}}/conversations
+Authorization: Bearer {{chatUserToken}}
+
+> {%
+    client.test("같은 대화", () => client.assert(String(response.body.data.id) === String(client.global.get("chatConversationId")), "대화 ID"));
+%}
+
+### 공간 제공자는 대화를 열 수 없다
+# 기대값: 403
+POST {{baseUrl}}/api/v1/spaces/{{chatSpaceId}}/conversations
+Authorization: Bearer {{chatProviderToken}}
+
+> {%
+    client.test("403", () => client.assert(response.status === 403, `실제 ${response.status}`));
+%}
+
+### 메시지 보내기 (이용자)
+# 기대값: 201 Created, mine = true
+POST {{baseUrl}}/api/v1/conversations/{{chatConversationId}}/messages
+Authorization: Bearer {{chatUserToken}}
+Content-Type: application/json
+
+{
+  "content": "안녕하세요! 다음 주말 전시 가능할까요?"
+}
+
+> {%
+    client.test("201 Created", () => {
+        client.assert(response.status === 201, `실제 ${response.status}`);
+        client.assert(response.body.data.mine === true, "mine");
+    });
+    client.global.set("chatFirstMessageId", response.body.data.id);
+%}
+
+### 안 읽은 수 (제공자 배지)
+# 기대값: 200 OK, 1 이상
+GET {{baseUrl}}/api/v1/conversations/unread-count
+Authorization: Bearer {{chatProviderToken}}
+
+> {%
+    client.test("1 이상", () => client.assert(response.body.data.count >= 1, `실제 ${response.body.data.count}`));
+%}
+
+### 내 대화 목록 (제공자)
+# 기대값: 200 OK, 이 대화의 안 읽은 수 1
+GET {{baseUrl}}/api/v1/conversations
+Authorization: Bearer {{chatProviderToken}}
+
+> {%
+    client.test("안 읽은 1", () => {
+        const c = response.body.data.content.find(c => String(c.id) === String(client.global.get("chatConversationId")));
+        client.assert(c && c.unreadCount === 1, JSON.stringify(c));
+    });
+%}
+
+### 메시지 조회 (제공자, 처음 열기)
+# 기대값: 200 OK, 1건, mine = false
+GET {{baseUrl}}/api/v1/conversations/{{chatConversationId}}/messages
+Authorization: Bearer {{chatProviderToken}}
+
+> {%
+    client.test("1건", () => {
+        client.assert(response.body.data.length === 1, `실제 ${response.body.data.length}`);
+        client.assert(response.body.data[0].mine === false, "mine");
+    });
+%}
+
+### 읽음 처리 (제공자)
+# 기대값: 200 OK, unreadCount 0
+POST {{baseUrl}}/api/v1/conversations/{{chatConversationId}}/read
+Authorization: Bearer {{chatProviderToken}}
+Content-Type: application/json
+
+{
+  "lastMessageId": {{chatFirstMessageId}}
+}
+
+> {%
+    client.test("안 읽은 0", () => client.assert(response.body.data.unreadCount === 0, `실제 ${response.body.data.unreadCount}`));
+%}
+
+### 답장 (제공자)
+POST {{baseUrl}}/api/v1/conversations/{{chatConversationId}}/messages
+Authorization: Bearer {{chatProviderToken}}
+Content-Type: application/json
+
+{
+  "content": "네 가능합니다. 신청서 보내 주세요!"
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+%}
+
+### 폴링 (이용자): 마지막으로 받은 메시지 뒤의 새 메시지만
+# 기대값: 200 OK, 답장 1건
+GET {{baseUrl}}/api/v1/conversations/{{chatConversationId}}/messages?after={{chatFirstMessageId}}
+Authorization: Bearer {{chatUserToken}}
+
+> {%
+    client.test("새 메시지 1건", () => {
+        client.assert(response.body.data.length === 1, `실제 ${response.body.data.length}`);
+        client.assert(response.body.data[0].content.startsWith("네 가능합니다"), response.body.data[0].content);
+    });
+%}

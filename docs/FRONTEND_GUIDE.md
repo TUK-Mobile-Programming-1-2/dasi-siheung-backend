@@ -233,6 +233,13 @@ flowchart LR
 | `NOT_COMMENT_AUTHOR` | 403 | 남의 댓글을 지움 | 삭제 버튼 숨기기 |
 | `NOTICE_ADMIN_ONLY` | 403 | 관리자가 아닌데 공지 작성 | 분류 선택지에서 공지 빼기 |
 
+**1:1 소통**
+
+| `error.code` | HTTP 상태 | 언제 | 화면 처리 예시 |
+| --- | --- | --- | --- |
+| `CONVERSATION_NOT_FOUND` | 404 | 없는 대화 | 대화 목록으로 |
+| `NOT_CONVERSATION_MEMBER` | 403 | 참여하지 않은 대화를 조회 · 전송 | 접근 불가 안내 |
+
 ### 3-3-1. 목록 응답 (페이지)
 
 목록 API 는 `page`(0부터), `size`(기본 20, 최대 100) 쿼리 파라미터를 받고 아래 형식으로 응답합니다.
@@ -306,6 +313,19 @@ HIDDEN(숨김): 신고 처리로 관리자가 내린 공간 — 수정 불가
 - **결제는 앱 밖**에서 합니다. 서버는 합의 금액(`totalPrice`)만 기록합니다.
 - **겹치는 예약**: 같은 공간 · 겹치는 기간의 확정은 1건뿐입니다. 동시에 승인해도 서버가 막고 `PERIOD_ALREADY_BOOKED` 를 줍니다.
 - 이용자 화면의 `availableDates` 와 기간 검색은 **확정 예약 날짜를 뺀 값**입니다. 제공자 화면(내 공간)의 캘린더는 제공자가 연 날짜 그대로입니다.
+
+### 3-3-7. 1:1 소통 (폴링)
+
+실시간 연결(WebSocket) 없이 **주기적으로 조회**합니다.
+
+| 화면 | 호출 | 주기 |
+| --- | --- | --- |
+| 대화방 | `GET /conversations/{id}/messages?after={마지막 메시지 ID}` → 받은 게 있으면 목록 끝에 붙이고 `POST /read` | 5초 (화면을 떠나면 멈춤) |
+| 대화방 위로 스크롤 | `GET /conversations/{id}/messages?before={첫 메시지 ID}` | 필요할 때 |
+| 탭 배지 | `GET /conversations/unread-count` | 30초 |
+
+- 메시지 ID 는 클수록 최근입니다. 응답은 항상 **오래된 순**입니다.
+- 읽음 위치는 뒤로 돌아가지 않으므로 같은 ID 를 여러 번 보내도 됩니다.
 
 ### 3-4. 인증 (JWT)
 
@@ -784,3 +804,14 @@ try {
 | GET | `/api/v1/community/posts/{postId}/comments` | 없음 | 댓글 목록 (오래된 순) |
 | POST | `/api/v1/community/posts/{postId}/comments` | 로그인 | 댓글 쓰기 |
 | DELETE | `/api/v1/community/comments/{commentId}` | 작성자 · ADMIN | 댓글 삭제 |
+
+### 1:1 소통 (`http/conversation.http`)
+
+| 메서드 | 경로 | 인증 | 설명 |
+| --- | --- | --- | --- |
+| POST | `/api/v1/spaces/{spaceId}/conversations` | USER | 대화 열기 (멱등) |
+| GET | `/api/v1/conversations` | 로그인 | 내 대화 목록 (안 읽은 수 포함) |
+| GET | `/api/v1/conversations/{conversationId}/messages` | 참여자 | 메시지 조회 (after · before 폴링) |
+| POST | `/api/v1/conversations/{conversationId}/messages` | 참여자 | 메시지 보내기 |
+| POST | `/api/v1/conversations/{conversationId}/read` | 참여자 | 읽음 처리 |
+| GET | `/api/v1/conversations/unread-count` | 로그인 | 안 읽은 메시지 수 (배지) |
