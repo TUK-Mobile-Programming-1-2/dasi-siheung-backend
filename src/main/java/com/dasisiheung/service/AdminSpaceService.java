@@ -6,6 +6,7 @@ import com.dasisiheung.dto.admin.AdminSpaceDetailResponse.ReferenceLink;
 import com.dasisiheung.dto.admin.AdminSpaceSummaryResponse;
 import com.dasisiheung.dto.admin.SpaceReviewRequest;
 import com.dasisiheung.dto.admin.SpaceReviewResponse;
+import com.dasisiheung.dto.admin.ThemeCorrectionRequest;
 import com.dasisiheung.dto.common.PageQuery;
 import com.dasisiheung.dto.common.PageResponse;
 import com.dasisiheung.entity.member.Member;
@@ -76,6 +77,15 @@ public class AdminSpaceService {
         SpaceReview review = space.review(admin, request.decision(), request.reason(), request.toChecklist(),
                 LocalDateTime.now(clock));
         spaceReviewRepository.save(review);
+        spaceRepository.flush();
+        return toDetail(space);
+    }
+
+    /** 상권 테마 보정. 추천 · 목적 검색에 쓰이며 다시 검수하지 않는다. */
+    @Transactional
+    public AdminSpaceDetailResponse correctTheme(Long spaceId, ThemeCorrectionRequest request) {
+        Space space = spaceRepository.getSpace(spaceId);
+        space.correctTheme(request.commercialTheme());
         spaceRepository.flush();
         return toDetail(space);
     }
