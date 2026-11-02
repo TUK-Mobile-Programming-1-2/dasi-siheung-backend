@@ -1,0 +1,99 @@
+name: DB 주간 백업
+
+# 매주 월요일 03:00 KST(일요일 18:00 UTC)에 운영 DB 를 pg_dump 로 백업해 암호화한 뒤 Actions 아티팩트로 보관한다.
+# 필요한 Secrets: DB_URL · DB_USERNAME · DB_PASSWORD (운영과 같음), BACKUP_PASSPHRASE (복호화 암호)
+# 선택 Secret: BACKUP_DB_URL — DB_URL 이 트랜잭션 풀러(6543)면 세션 연결(5432) 주소를 따로 넣는다. (docs/BACKUP_GUIDE.md)
+on:
+  schedule:
+    - cron: "0 18 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: pg_dump → 암호화 → 아티팩트
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PG_MAJOR: "17"
+    steps:
+      - name: Secrets 확인
+        env:
+          DB_URL: ${{ secrets.DB_URL }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          missing=0
+          for name in DB_URL DB_USERNAME DB_PASSWORD BACKUP_PASSPHRASE; do
+            if [ -z "${!name}" ]; then echo "::error::GitHub Secret $name 이 없습니다."; missing=1; fi
+          done
+          exit $missing
+
+      - name: PostgreSQL ${{ env.PG_MAJOR }} 클라이언트 설치 (서버와 같은 메이저 버전)
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq "postgresql-client-${PG_MAJOR}"
+          echo "/usr/lib/postgresql/${PG_MAJOR}/bin" >> "$GITHUB_PATH"
+
+      - name: 백업 (public 스키마, custom 형식)
+        env:
+          DB_URL: ${{ secrets.BACKUP_DB_URL || secrets.DB_URL }}
+          PGUSER: ${{ secrets.DB_USERNAME }}
+          PGPASSWORD: ${{ secrets.DB_PASSWORD }}
+          PGCONNECT_TIMEOUT: "15"
+        run: |
+          set -euo pipefail
+          pg_dump --version
+          # JDBC 주소(jdbc:postgresql://...)를 libpq 주소(postgresql://...)로 바꾼다
+          uri="${DB_URL#jdbc:}"
+          stamp="$(TZ=Asia/Seoul date +%Y%m%d-%H%M)"
+          echo "STAMP=$stamp" >> "$GITHUB_ENV"
+          pg_dump "$uri" --format=custom --compress=9 --schema=public --no-owner --no-privileges \
+            --file="dasi-siheung-$stamp.dump"
+          # 덤프가 읽히는지 목차로 확인하고 핵심 테이블이 들어 있는지 본다
+          pg_restore --list "dasi-siheung-$stamp.dump" > toc.txt
+          for table in member space space_application flyway_schema_history; do
+            grep -q "TABLE DATA public $table " toc.txt || { echo "::error::$table 데이터가 덤프에 없습니다."; exit 1; }
+          done
+          echo "덤프 크기: $(du -h "dasi-siheung-$stamp.dump" | cut -f1), 항목 $(grep -vc '^;' toc.txt)개"
+
+      - name: 암호화 (AES-256)
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          gpg --batch --yes --pinentry-mode loopback --symmetric --cipher-algo AES256 \
+            --passphrase "$BACKUP_PASSPHRASE" --output "dasi-siheung-$STAMP.dump.gpg" "dasi-siheung-$STAMP.dump"
+          sha256sum "dasi-siheung-$STAMP.dump.gpg" > "dasi-siheung-$STAMP.dump.gpg.sha256"
+          # 평문 덤프는 아티팩트에 올리지 않는다
+          shred -u "dasi-siheung-$STAMP.dump"
+
+      - name: 아티팩트 보관 (30일)
+        uses: actions/upload-artifact@v7
+        with:
+          name: db-backup-${{ env.STAMP }}
+          path: |
+            dasi-siheung-${{ env.STAMP }}.dump.gpg
+            dasi-siheung-${{ env.STAMP }}.dump.gpg.sha256
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: 요약
+        run: |
+          {
+            echo "### DB 백업 완료"
+            echo "- 파일: \`dasi-siheung-$STAMP.dump.gpg\` (보관 30일)"
+            echo "- 복원: docs/BACKUP_GUIDE.md"
+          } >> "$GITHUB_STEP_SUMMARY"
