@@ -241,6 +241,15 @@ public class Space extends BaseTimeEntity {
         }
     }
 
+    /**
+     * 관리자가 상권 테마를 바로잡는다. 추천 · 목적 검색 품질을 위한 보정이라 다시 검수하지 않는다.
+     *
+     * @param theme null 이면 테마 없음
+     */
+    public void correctTheme(CommercialTheme theme) {
+        this.commercialTheme = theme;
+    }
+
     /** 신고 처리로 관리자가 숨긴다. 이용자 화면에서 사라지고 제공자는 수정할 수 없다. */
     public void hide(String reason, LocalDateTime now) {
         this.status = SpaceStatus.HIDDEN;

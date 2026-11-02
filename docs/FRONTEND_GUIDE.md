@@ -743,6 +743,7 @@ try {
 | GET | `/api/v1/admin/spaces` | ADMIN | 공간 목록 (status=PENDING_REVIEW: 검수 대기, 생략: 전체 현황) |
 | GET | `/api/v1/admin/spaces/{spaceId}` | ADMIN | 검수 상세 (증빙 임시 주소·제공자·이력·공식 정보 링크) |
 | POST | `/api/v1/admin/spaces/{spaceId}/reviews` | ADMIN | 검수 결과 등록 (승인 / 수정 요청 / 공개 보류) |
+| PUT | `/api/v1/admin/spaces/{spaceId}/theme` | ADMIN | 상권 테마 보정 (재검수 없음, 시연: space.http) |
 
 ### 관리자 — 대시보드 (`http/admin-review.http`)
 
@@ -757,6 +758,7 @@ try {
 | GET | `/api/v1/spaces/{spaceId}` | 없음 | 공간 상세 (공개 공간만, 오늘 이후 사용 가능 날짜) |
 | GET | `/api/v1/spaces` | 없음 | 공간 검색 (지역 · 활동 · 목적 · 기간 · 예산 · 시설 · 검색어 · 정렬) |
 | GET | `/api/v1/spaces/map` | 없음 | 지도 마커 (화면 영역 남서·북동 꼭짓점, 최대 300개) |
+| GET | `/api/v1/spaces/recommendations` | 없음 | 공간 추천 (목적 · 활동 · 기간, 점수와 이유) |
 
 ### 공간 이용 신청 (`http/application.http`)
 

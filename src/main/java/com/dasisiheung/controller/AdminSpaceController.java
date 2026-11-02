@@ -4,6 +4,7 @@ import com.dasisiheung.config.OpenApiConfig;
 import com.dasisiheung.dto.admin.AdminSpaceDetailResponse;
 import com.dasisiheung.dto.admin.AdminSpaceSummaryResponse;
 import com.dasisiheung.dto.admin.SpaceReviewRequest;
+import com.dasisiheung.dto.admin.ThemeCorrectionRequest;
 import com.dasisiheung.dto.common.ApiResult;
 import com.dasisiheung.dto.common.PageQuery;
 import com.dasisiheung.dto.common.PageResponse;
@@ -20,6 +21,7 @@ import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -55,5 +57,12 @@ public class AdminSpaceController {
     public ApiResult<AdminSpaceDetailResponse> review(@LoginMember AuthMember loginMember, @PathVariable Long spaceId,
                                                       @Valid @RequestBody SpaceReviewRequest request) {
         return ApiResult.ok(adminSpaceService.review(loginMember.id(), spaceId, request));
+    }
+
+    @Operation(summary = "상권 테마 보정", description = "제공자가 고른 테마를 바로잡습니다. 추천 · 목적 검색에 쓰이며 다시 검수하지 않습니다.")
+    @PutMapping("/{spaceId}/theme")
+    public ApiResult<AdminSpaceDetailResponse> correctTheme(@PathVariable Long spaceId,
+                                                            @Valid @RequestBody ThemeCorrectionRequest request) {
+        return ApiResult.ok(adminSpaceService.correctTheme(spaceId, request));
     }
 }

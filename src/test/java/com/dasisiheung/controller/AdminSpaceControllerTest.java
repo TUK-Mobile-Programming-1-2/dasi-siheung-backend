@@ -12,6 +12,7 @@ import static org.mockito.BDDMockito.given;
 import static org.springframework.restdocs.headers.HeaderDocumentation.requestHeaders;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.get;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.post;
+import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.put;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.restdocs.payload.PayloadDocumentation.requestFields;
 import static org.springframework.restdocs.payload.PayloadDocumentation.responseFields;
@@ -27,8 +28,10 @@ import com.dasisiheung.dto.admin.AdminSpaceDetailResponse.ReferenceLink;
 import com.dasisiheung.dto.admin.AdminSpaceSummaryResponse;
 import com.dasisiheung.dto.admin.SpaceReviewRequest;
 import com.dasisiheung.dto.admin.SpaceReviewResponse;
+import com.dasisiheung.dto.admin.ThemeCorrectionRequest;
 import com.dasisiheung.dto.common.PageQuery;
 import com.dasisiheung.dto.common.PageResponse;
+import com.dasisiheung.entity.space.CommercialTheme;
 import com.dasisiheung.entity.space.Region;
 import com.dasisiheung.entity.space.ReviewDecision;
 import com.dasisiheung.entity.space.SpaceStatus;
@@ -150,6 +153,25 @@ class AdminSpaceControllerTest extends ApiDocsTestSupport {
                 .andDo(document("admin-space-review-incomplete",
                         resource(TAG, "검수 결과 등록", "검수 항목 미확인 승인 예시"),
                         responseFields(error())));
+    }
+
+    @Test
+    @DisplayName("상권 테마 보정")
+    void correctTheme() throws Exception {
+        given(adminSpaceService.correctTheme(eq(10L), any(ThemeCorrectionRequest.class))).willReturn(detail());
+
+        mockMvc.perform(put("/api/v1/admin/spaces/{spaceId}/theme", 10L)
+                        .header(HttpHeaders.AUTHORIZATION, adminToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(new ThemeCorrectionRequest(CommercialTheme.CAFE_STREET))))
+                .andExpect(status().isOk())
+                .andDo(document("admin-space-theme",
+                        resource(TAG, "상권 테마 보정", "추천 · 목적 검색 품질을 위한 보정이라 다시 검수하지 않습니다."),
+                        requestHeaders(authorization()),
+                        pathParameters(parameterWithName("spaceId").description("공간 ID")),
+                        requestFields(fieldWithPath("commercialTheme").type(JsonFieldType.STRING).optional()
+                                .description("상권 테마 (선택지 commercialThemes, null 이면 비움)")),
+                        responseFields(success(detailFields()))));
     }
 
     @Test

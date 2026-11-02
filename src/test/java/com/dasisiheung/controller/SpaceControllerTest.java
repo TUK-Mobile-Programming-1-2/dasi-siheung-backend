@@ -30,6 +30,9 @@ import com.dasisiheung.entity.space.Facility;
 import com.dasisiheung.entity.space.Region;
 import com.dasisiheung.exception.BusinessException;
 import com.dasisiheung.exception.ErrorCode;
+import com.dasisiheung.dto.space.RecommendationResponse;
+import com.dasisiheung.entity.space.UsePurpose;
+import com.dasisiheung.service.RecommendationService;
 import com.dasisiheung.service.SpaceQueryService;
 import com.dasisiheung.support.ApiDocsTest;
 import com.dasisiheung.support.ApiDocsTestSupport;
@@ -37,6 +40,9 @@ import com.dasisiheung.support.FixedClockConfig;
 import com.dasisiheung.support.SpaceDocumentation;
 import com.dasisiheung.support.SpaceFixtures;
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
@@ -53,6 +59,9 @@ class SpaceControllerTest extends ApiDocsTestSupport {
 
     @MockitoBean
     private SpaceQueryService spaceQueryService;
+
+    @MockitoBean
+    private RecommendationService recommendationService;
 
     @Test
     @DisplayName("공간 검색: 조건을 쿼리 파라미터로 받아 공개 공간 카드를 페이지로 준다")
@@ -87,6 +96,31 @@ class SpaceControllerTest extends ApiDocsTestSupport {
                                 parameterWithName("page").optional().description("페이지 (0부터)"),
                                 parameterWithName("size").optional().description("페이지 크기 (최대 100)")),
                         responseFields(page(summaryFields("data.content[].")))));
+    }
+
+    @Test
+    @DisplayName("공간 추천: 점수 · 이유와 함께 높은 순")
+    void recommend() throws Exception {
+        given(recommendationService.recommend(UsePurpose.PROMOTION, ActivityType.POPUP_STORE,
+                LocalDate.parse("2026-10-24"), LocalDate.parse("2026-10-25"), 5))
+                .willReturn(List.of(new RecommendationResponse(spaceSummary(), 78.5,
+                        List.of("브랜드 홍보에 맞는 상권 (카페거리)", "평점 4.5 (후기 4개)", "찜 12"))));
+
+        mockMvc.perform(get("/api/v1/spaces/recommendations")
+                        .param("purpose", "PROMOTION").param("activityType", "POPUP_STORE")
+                        .param("startDate", "2026-10-24").param("endDate", "2026-10-25").param("limit", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].score").value(78.5))
+                .andDo(document("space-recommendations",
+                        resource(TAG, "공간 추천", "활동 · 기간은 반드시 맞는 공간만 후보로, 점수 = 목적에 맞는 상권 40 + 평점×6(최대 30) "
+                                + "+ 후기 수(최대 10) + 찜×0.5(최대 15) + 사진 5. 로그인 없이 호출합니다."),
+                        queryParameters(
+                                parameterWithName("purpose").optional().description("이용 목적 (선택지 usePurposes)"),
+                                parameterWithName("activityType").optional().description("하고 싶은 활동 (허용한 공간만)"),
+                                parameterWithName("startDate").optional().description("이용 시작일 (endDate 와 함께)"),
+                                parameterWithName("endDate").optional().description("이용 종료일 — 기간 내내 비어 있는 공간만"),
+                                parameterWithName("limit").optional().description("개수 (기본 10, 최대 20)")),
+                        responseFields(recommendationFields())));
     }
 
     @Test
@@ -166,6 +200,15 @@ class SpaceControllerTest extends ApiDocsTestSupport {
                 .andDo(document("space-detail-not-found",
                         resource(TAG, "공간 상세", "없거나 공개 중이 아닌 공간 (검수 대기 · 일시 중단 · 숨김)"),
                         responseFields(error())));
+    }
+
+    private static List<FieldDescriptor> recommendationFields() {
+        List<FieldDescriptor> fields = new ArrayList<>();
+        fields.add(fieldWithPath("success").type(JsonFieldType.BOOLEAN).description("요청 성공 여부 (true)"));
+        fields.addAll(Arrays.asList(summaryFields("data[].space.")));
+        fields.add(fieldWithPath("data[].score").type(JsonFieldType.NUMBER).description("추천 점수 (0~100)"));
+        fields.add(fieldWithPath("data[].reasons").type(JsonFieldType.ARRAY).description("추천 이유 (화면에 그대로 표시)"));
+        return fields;
     }
 
     static SpaceSummaryResponse spaceSummary() {
