@@ -97,7 +97,16 @@ public enum ErrorCode {
 
     // 1:1 소통
     CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "대화를 찾을 수 없습니다."),
-    NOT_CONVERSATION_MEMBER(HttpStatus.FORBIDDEN, "본인이 참여한 대화만 볼 수 있습니다.");
+    NOT_CONVERSATION_MEMBER(HttpStatus.FORBIDDEN, "본인이 참여한 대화만 볼 수 있습니다."),
+
+    // 신고 · 제재
+    REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "신고를 찾을 수 없습니다."),
+    REPORT_TARGET_NOT_FOUND(HttpStatus.NOT_FOUND, "신고할 대상을 찾을 수 없습니다."),
+    DUPLICATE_REPORT(HttpStatus.CONFLICT, "이미 신고한 대상입니다. 관리자가 확인 중입니다."),
+    CANNOT_REPORT_SELF(HttpStatus.BAD_REQUEST, "본인 또는 본인이 쓴 글은 신고할 수 없습니다."),
+    REPORT_ALREADY_RESOLVED(HttpStatus.CONFLICT, "이미 처리된 신고입니다."),
+    INVALID_REPORT_ACTION(HttpStatus.BAD_REQUEST, "회원 신고는 숨길 수 없습니다. 이용 정지 또는 기각으로 처리해 주세요."),
+    CANNOT_SUSPEND_MEMBER(HttpStatus.CONFLICT, "관리자 · 탈퇴 회원은 이용 정지할 수 없습니다.");
 
     private final HttpStatus status;
     private final String message;

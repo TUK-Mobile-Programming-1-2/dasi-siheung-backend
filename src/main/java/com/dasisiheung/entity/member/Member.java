@@ -143,6 +143,19 @@ public class Member extends BaseTimeEntity {
         return status == MemberStatus.ACTIVE;
     }
 
+    /**
+     * 이용 정지. 정지 기간이 끝난 뒤 처음 로그인할 때 자동으로 풀린다.
+     *
+     * @throws BusinessException 관리자 · 탈퇴 회원이면 CANNOT_SUSPEND_MEMBER
+     */
+    public void suspend(LocalDateTime until) {
+        if (role == Role.ADMIN || status == MemberStatus.WITHDRAWN) {
+            throw new BusinessException(ErrorCode.CANNOT_SUSPEND_MEMBER);
+        }
+        this.status = MemberStatus.SUSPENDED;
+        this.suspendedUntil = until;
+    }
+
     public void liftSuspension() {
         this.status = MemberStatus.ACTIVE;
         this.suspendedUntil = null;
