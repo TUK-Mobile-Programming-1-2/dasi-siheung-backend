@@ -18,6 +18,7 @@ public record DashboardResponse(
         @Schema(description = "역할별 회원 수 (탈퇴 제외)") Map<Role, Long> membersByRole,
         @Schema(description = "제공자 답변을 기다리는(검토 중) 신청 수", example = "5") long pendingApplicationCount,
         @Schema(description = "상태별 신청 수") Map<ApplicationStatus, Long> applicationsByStatus,
+        @Schema(description = "처리 대기 신고 수", example = "1") long pendingReportCount,
         @Schema(description = "최근 등록된 공간 5개") List<RecentSpace> recentSpaces,
         @Schema(description = "집계 시각") LocalDateTime generatedAt
 ) {
