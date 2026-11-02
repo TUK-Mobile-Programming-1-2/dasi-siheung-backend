@@ -19,6 +19,7 @@ public record OptionsResponse(
         @Schema(description = "신청 상태") List<OptionItem> applicationStatuses,
         @Schema(description = "가격 협의 상태") List<OptionItem> negotiationStatuses,
         @Schema(description = "가격 제안한 쪽") List<OptionItem> offerSides,
-        @Schema(description = "활동 사진 시점") List<OptionItem> photoPhases
+        @Schema(description = "활동 사진 시점") List<OptionItem> photoPhases,
+        @Schema(description = "커뮤니티 분류") List<OptionItem> postCategories
 ) {
 }

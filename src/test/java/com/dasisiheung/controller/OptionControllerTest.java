@@ -41,7 +41,8 @@ class OptionControllerTest extends ApiDocsTestSupport {
             {"applicationStatuses", "신청 상태"},
             {"negotiationStatuses", "가격 협의 상태"},
             {"offerSides", "가격 제안한 쪽"},
-            {"photoPhases", "활동 사진 시점"}
+            {"photoPhases", "활동 사진 시점"},
+            {"postCategories", "커뮤니티 분류"}
     };
 
     @MockitoBean

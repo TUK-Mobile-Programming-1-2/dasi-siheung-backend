@@ -1,0 +1,161 @@
+# 커뮤니티 — 게시글 · 댓글 · 공지 권한 (조회는 로그인 없이)
+
+### 준비: 회원 가입
+POST {{baseUrl}}/api/v1/auth/signup
+Content-Type: application/json
+
+{
+  "email": "http-community-{{$timestamp}}-{{$randomInt}}@test.dasisiheung.com",
+  "password": "password123",
+  "name": "커뮤니티 이용자",
+  "phone": "010-3000-0001",
+  "role": "USER"
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+    client.global.set("communityEmail", response.body.data.email);
+%}
+
+### 준비: 로그인
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{communityEmail}}",
+  "password": "password123"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+    client.global.set("communityToken", response.body.data.accessToken);
+    client.global.set("communityKeyword", "http" + Date.now());
+%}
+
+### 게시글 쓰기
+# 인증: 로그인 회원
+# 기대값: 201 Created, mine = true, 조회 · 댓글 0
+POST {{baseUrl}}/api/v1/community/posts
+Authorization: Bearer {{communityToken}}
+Content-Type: application/json
+
+{
+  "category": "RECRUIT",
+  "title": "{{communityKeyword}} 배곧 플리마켓 같이 하실 분",
+  "content": "11월 둘째 주말, 핸드메이드 소품 팝업을 함께 열 팀을 찾습니다."
+}
+
+> {%
+    client.test("201 Created", () => {
+        client.assert(response.status === 201, `실제 ${response.status}`);
+        client.assert(response.body.data.mine === true && response.body.data.viewCount === 0, JSON.stringify(response.body.data));
+    });
+    client.global.set("communityPostId", response.body.data.id);
+%}
+
+### 일반 회원은 공지를 쓸 수 없다
+# 기대값: 403 NOTICE_ADMIN_ONLY
+POST {{baseUrl}}/api/v1/community/posts
+Authorization: Bearer {{communityToken}}
+Content-Type: application/json
+
+{
+  "category": "NOTICE",
+  "title": "공지",
+  "content": "일반 회원 공지"
+}
+
+> {%
+    client.test("403 NOTICE_ADMIN_ONLY", () => {
+        client.assert(response.status === 403, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "NOTICE_ADMIN_ONLY", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 게시글 목록 — 분류 · 검색어 (로그인 없이)
+# 기대값: 200 OK, 방금 쓴 글 1건
+GET {{baseUrl}}/api/v1/community/posts?category=RECRUIT&keyword={{communityKeyword}}
+
+> {%
+    client.test("200 OK + 1건", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.totalElements === 1, `실제 ${response.body.data.totalElements}`);
+    });
+%}
+
+### 게시글 상세 (로그인 없이)
+# 기대값: 200 OK, 조회 수 1, mine = false
+GET {{baseUrl}}/api/v1/community/posts/{{communityPostId}}
+
+> {%
+    client.test("조회 수 1", () => {
+        client.assert(response.body.data.viewCount === 1, `실제 ${response.body.data.viewCount}`);
+        client.assert(response.body.data.mine === false, "mine");
+    });
+%}
+
+### 댓글 쓰기
+# 기대값: 201 Created
+POST {{baseUrl}}/api/v1/community/posts/{{communityPostId}}/comments
+Authorization: Bearer {{communityToken}}
+Content-Type: application/json
+
+{
+  "content": "관심 있는 분은 댓글 남겨 주세요!"
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+    client.global.set("communityCommentId", response.body.data.id);
+%}
+
+### 댓글 목록 (로그인 없이)
+# 기대값: 200 OK, 1건
+GET {{baseUrl}}/api/v1/community/posts/{{communityPostId}}/comments
+
+> {%
+    client.test("200 OK + 1건", () => client.assert(response.body.data.totalElements === 1, `실제 ${response.body.data.totalElements}`));
+%}
+
+### 게시글 수정
+# 기대값: 200 OK, 분류 QUESTION
+PUT {{baseUrl}}/api/v1/community/posts/{{communityPostId}}
+Authorization: Bearer {{communityToken}}
+Content-Type: application/json
+
+{
+  "category": "QUESTION",
+  "title": "{{communityKeyword}} 플리마켓 준비물 질문",
+  "content": "테이블은 직접 가져가야 하나요?"
+}
+
+> {%
+    client.test("200 OK + QUESTION", () => client.assert(response.body.data.category === "QUESTION", `실제 ${response.body.data.category}`));
+%}
+
+### 댓글 삭제
+DELETE {{baseUrl}}/api/v1/community/comments/{{communityCommentId}}
+Authorization: Bearer {{communityToken}}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+%}
+
+### 게시글 삭제
+DELETE {{baseUrl}}/api/v1/community/posts/{{communityPostId}}
+Authorization: Bearer {{communityToken}}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+%}
+
+### 지운 글
+# 기대값: 404 POST_NOT_FOUND
+GET {{baseUrl}}/api/v1/community/posts/{{communityPostId}}
+
+> {%
+    client.test("404 POST_NOT_FOUND", () => {
+        client.assert(response.status === 404, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "POST_NOT_FOUND", `실제 ${response.body.error.code}`);
+    });
+%}

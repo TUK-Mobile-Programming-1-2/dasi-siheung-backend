@@ -223,6 +223,16 @@ flowchart LR
 | `REVIEW_NOT_FOUND` | 404 | 없는 후기 | 목록 새로고침 |
 | `NOT_REVIEW_OWNER` | 403 | 남의 후기를 고치거나 지움 | 버튼 숨기기 |
 
+**커뮤니티**
+
+| `error.code` | HTTP 상태 | 언제 | 화면 처리 예시 |
+| --- | --- | --- | --- |
+| `POST_NOT_FOUND` | 404 | 없거나 숨김(신고 처리)된 글 | 목록으로 돌아가기 |
+| `COMMENT_NOT_FOUND` | 404 | 없는 댓글 | 댓글 새로고침 |
+| `NOT_POST_AUTHOR` | 403 | 남의 글을 고치거나 지움 | 수정 · 삭제 버튼은 mine 일 때만 |
+| `NOT_COMMENT_AUTHOR` | 403 | 남의 댓글을 지움 | 삭제 버튼 숨기기 |
+| `NOTICE_ADMIN_ONLY` | 403 | 관리자가 아닌데 공지 작성 | 분류 선택지에서 공지 빼기 |
+
 ### 3-3-1. 목록 응답 (페이지)
 
 목록 API 는 `page`(0부터), `size`(기본 20, 최대 100) 쿼리 파라미터를 받고 아래 형식으로 응답합니다.
@@ -761,3 +771,16 @@ try {
 | POST | `/api/v1/applications/{applicationId}/activity-photos` | 신청자 · 공간 제공자 | 활동 사진 올리기 (multipart files + phase) |
 | GET | `/api/v1/applications/{applicationId}/activity-photos` | 신청자 · 공간 제공자 | 활동 사진 목록 (임시 주소) |
 | DELETE | `/api/v1/applications/{applicationId}/activity-photos/{photoId}` | 올린 사람 | 활동 사진 삭제 |
+
+### 커뮤니티 (`http/community.http`)
+
+| 메서드 | 경로 | 인증 | 설명 |
+| --- | --- | --- | --- |
+| GET | `/api/v1/community/posts` | 없음 | 게시글 목록 (category · keyword) |
+| GET | `/api/v1/community/posts/{postId}` | 없음 | 게시글 상세 (조회 수 +1, 토큰 있으면 mine) |
+| POST | `/api/v1/community/posts` | 로그인 | 게시글 쓰기 (공지는 ADMIN) |
+| PUT | `/api/v1/community/posts/{postId}` | 작성자 | 게시글 수정 |
+| DELETE | `/api/v1/community/posts/{postId}` | 작성자 · ADMIN | 게시글 삭제 |
+| GET | `/api/v1/community/posts/{postId}/comments` | 없음 | 댓글 목록 (오래된 순) |
+| POST | `/api/v1/community/posts/{postId}/comments` | 로그인 | 댓글 쓰기 |
+| DELETE | `/api/v1/community/comments/{commentId}` | 작성자 · ADMIN | 댓글 삭제 |

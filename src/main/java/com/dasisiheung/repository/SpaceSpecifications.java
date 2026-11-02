@@ -8,6 +8,7 @@ import com.dasisiheung.entity.space.Facility;
 import com.dasisiheung.entity.space.Region;
 import com.dasisiheung.entity.space.Space;
 import com.dasisiheung.entity.space.SpaceStatus;
+import com.dasisiheung.util.LikePatterns;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
@@ -15,7 +16,6 @@ import jakarta.persistence.criteria.Subquery;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.Collection;
-import java.util.Locale;
 import org.springframework.data.jpa.domain.Specification;
 
 /**
@@ -23,8 +23,6 @@ import org.springframework.data.jpa.domain.Specification;
  * 집합 컬럼(시설·활동)은 join 대신 member of 로 검사해 결과가 중복되지 않는다.
  */
 public final class SpaceSpecifications {
-
-    private static final char LIKE_ESCAPE = '\\';
 
     private SpaceSpecifications() {
     }
@@ -61,10 +59,10 @@ public final class SpaceSpecifications {
 
     /** 공간 이름 또는 주소에 검색어가 들어 있다. (대소문자 무시, % _ 는 글자 그대로) */
     public static Specification<Space> containsKeyword(String keyword) {
-        String pattern = "%" + escapeLike(keyword.toLowerCase(Locale.ROOT)) + "%";
+        String pattern = LikePatterns.containsIgnoreCase(keyword);
         return (root, query, cb) -> cb.or(
-                cb.like(cb.lower(root.get("title")), pattern, LIKE_ESCAPE),
-                cb.like(cb.lower(root.get("address")), pattern, LIKE_ESCAPE));
+                cb.like(cb.lower(root.get("title")), pattern, LikePatterns.ESCAPE),
+                cb.like(cb.lower(root.get("address")), pattern, LikePatterns.ESCAPE));
     }
 
     /** 기간의 모든 날짜가 사용 가능 날짜에 들어 있다. (기간 안의 가능 날짜 수 = 기간 일수) */
@@ -92,9 +90,5 @@ public final class SpaceSpecifications {
                             cb.greaterThanOrEqualTo(application.<LocalDate>get("endDate"), startDate));
             return cb.not(cb.exists(booked));
         };
-    }
-
-    private static String escapeLike(String value) {
-        return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 }
