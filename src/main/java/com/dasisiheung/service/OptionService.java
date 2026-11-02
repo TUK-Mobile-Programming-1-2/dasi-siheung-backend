@@ -5,6 +5,7 @@ import com.dasisiheung.dto.option.OptionsResponse;
 import com.dasisiheung.dto.space.SpaceSort;
 import com.dasisiheung.entity.application.ApplicationStatus;
 import com.dasisiheung.entity.application.OfferSide;
+import com.dasisiheung.entity.application.PhotoPhase;
 import com.dasisiheung.entity.application.PriceNegotiationStatus;
 import com.dasisiheung.entity.member.Role;
 import com.dasisiheung.entity.space.ActivityType;
@@ -36,7 +37,8 @@ public class OptionService {
             OptionItem.listOf(SpaceSort.class),
             OptionItem.listOf(ApplicationStatus.class),
             OptionItem.listOf(PriceNegotiationStatus.class),
-            OptionItem.listOf(OfferSide.class)
+            OptionItem.listOf(OfferSide.class),
+            OptionItem.listOf(PhotoPhase.class)
     );
 
     public OptionsResponse getOptions() {
