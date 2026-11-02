@@ -201,6 +201,10 @@ flowchart LR
 | `APPLICATION_NOT_CANCELLABLE` | 409 | 이용 시작일부터 확정 예약 취소 | 제공자와 1:1 소통 안내 |
 | `PERIOD_ALREADY_BOOKED` | 409 | 같은 기간에 확정된 예약이 있음 (동시 승인 포함) | 캘린더 다시 불러오기 |
 | `PRICE_NEGOTIATION_IN_PROGRESS` | 409 | 가격 제안이 답을 기다리는 중에 승인 | 협의 마무리 안내 |
+| `ACTIVITY_PHOTO_NOT_ALLOWED` | 409 | 확정 예약이 아니거나 시점별 기간 밖에 활동 사진을 올림 | 시점 버튼을 기간에 맞춰 활성화 |
+| `ACTIVITY_PHOTO_LIMIT_EXCEEDED` | 400 | 시점별 10장 초과 | 남은 장수 표시 |
+| `ACTIVITY_PHOTO_NOT_FOUND` | 404 | 없는 활동 사진 | 목록 새로고침 |
+| `NOT_PHOTO_UPLOADER` | 403 | 남이 올린 사진을 지움 | 삭제 버튼 숨기기 |
 
 **가격 협의**
 
@@ -749,3 +753,11 @@ try {
 | DELETE | `/api/v1/reviews/{reviewId}` | USER | 후기 삭제 |
 | POST | `/api/v1/reviews/{reviewId}/reply` | PROVIDER | 후기 답글 |
 | GET | `/api/v1/members/me/reviews` | USER | 내가 쓴 후기 |
+
+### 활동 전후 사진 (`http/application.http`)
+
+| 메서드 | 경로 | 인증 | 설명 |
+| --- | --- | --- | --- |
+| POST | `/api/v1/applications/{applicationId}/activity-photos` | 신청자 · 공간 제공자 | 활동 사진 올리기 (multipart files + phase) |
+| GET | `/api/v1/applications/{applicationId}/activity-photos` | 신청자 · 공간 제공자 | 활동 사진 목록 (임시 주소) |
+| DELETE | `/api/v1/applications/{applicationId}/activity-photos/{photoId}` | 올린 사람 | 활동 사진 삭제 |
