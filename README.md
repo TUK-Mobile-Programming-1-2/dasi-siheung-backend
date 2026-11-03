@@ -16,14 +16,23 @@
 **앱 · 관리자 웹 담당자는 [백엔드 연동 가이드](docs/FRONTEND_GUIDE.md) 를 먼저 읽어주세요.**
 연결 방법, 응답 형식, 오류 코드, API 확인·요청 방법이 정리되어 있습니다.
 관리자 계정은 가입이 아니라 DB 승격으로 만듭니다 → [관리자 계정 운영 가이드](docs/ADMIN_GUIDE.md)
-개인정보 보관 기간과 자동 파기 → [개인정보 보관 · 파기 기준](docs/PRIVACY_POLICY.md)
 
-| 핵심 기능 (P0) | 백엔드 책임 |
+| 기능 | 백엔드가 맡는 일 |
 | --- | --- |
-| 공간 등록 · 관리자 검수 | 권한 증빙 제출, 검수 결과(공개 승인 / 수정 요청 / 공개 보류) |
-| 지도 · 목록 탐색 | PostGIS 좌표 저장, 지역·날짜·예산·활동 필터 검색 |
-| 신청 · 승인 · 상태 조회 | **승인 시점에만 확정**, 기간이 겹치는 대기 신청은 같은 트랜잭션에서 자동 마감 |
-| 계정 · 역할 | 이용자 / 공간 제공자 / 관리자 역할별 접근 제어 |
+| 계정 · 역할 | 이메일 가입 · JWT 로그인(리프레시 토큰 교체), 이용자 / 공간 제공자 / 관리자 접근 제어, 탈퇴 즉시 비식별화 |
+| 공간 등록 · 검수 | 사진 · 권한 증빙 업로드(비공개 버킷), 좌표로 지역 판정(PostGIS), 관리자 5항목 검수 · 이력, 중요 항목 수정 시 재검수 |
+| 둘러보기 | 지역 · 활동 · 목적(상권 테마) · 기간 · 예산 · 시설 검색, 지도 영역 마커, 설명 가능한 추천, 찜 |
+| 신청 · 협의 · 확정 | 가격 제안 · 역제안, **승인 시점에만 확정**(공간 행 잠금 + DB 배타 제약), 겹치는 대기 신청 자동 마감, 활동 전후 사진 |
+| 후기 · 커뮤니티 · 소통 | 이용 후 후기 · 평점 · 답글, 게시판 5종 · 댓글, 공간별 1:1 대화(폴링) |
+| 운영 | 관리자 대시보드, 신고 처리(숨김 · 이용 정지), 테마 보정, 개인정보 자동 파기 · 월별 통계, DB 주간 백업 |
+
+| 문서 | 내용 |
+| --- | --- |
+| [백엔드 연동 가이드](docs/FRONTEND_GUIDE.md) | 앱 · 관리자 웹 연결, 응답 형식, 오류 코드, 상태 흐름, 기능별 API 목록 |
+| [관리자 계정 운영 가이드](docs/ADMIN_GUIDE.md) | 관리자 승격(DB), `.http` 관리자 계정 |
+| [개인정보 보관 · 파기 기준](docs/PRIVACY_POLICY.md) | 보관 기간, 자동 파기, 통계 보존 |
+| [DB 백업 · 복원 가이드](docs/BACKUP_GUIDE.md) | 주간 백업 워크플로, 복원 절차 |
+| [시연 가이드](docs/DEMO_GUIDE.md) | 시연 데이터 · 계정 · 순서 · 리허설 |
 
 ---
 
@@ -77,26 +86,30 @@ flowchart LR
 ```
 src/main/java/com/dasisiheung
 ├── controller   요청·응답 변환, 입력 검증 (비즈니스 로직 없음)
+│   └── advice   전역 예외 처리 (예외 → 공통 응답 형식)
 ├── service      비즈니스 규칙, 트랜잭션 경계
 ├── repository   Spring Data JPA, PostGIS 공간 쿼리
-├── entity       JPA 엔티티 (BaseTimeEntity: 생성·수정 시각 자동 기록)
-├── dto          요청·응답 객체 (common: 공통 응답 형식)
-│   └── advice   전역 예외 처리 (예외 → 공통 응답 형식)
+├── entity       JPA 엔티티 — member · auth · space · application · review · community · message · report · privacy
+├── dto          요청·응답 객체 (common: 공통 응답 형식, 기능별 하위 패키지)
 ├── exception    ErrorCode, BusinessException
 ├── storage      파일 저장소 (운영: Supabase Storage / 로컬·CI: 디스크)
 ├── security     JWT 발급·검증 필터, 로그인 회원 주입(@LoginMember), 401/403 JSON 응답
-├── scheduler    정기 작업 (만료 토큰 정리 등)
+├── scheduler    정기 작업 (만료 토큰 정리 04:00, 개인정보 파기 · 통계 04:30)
 ├── config       Security, CORS, JPA Auditing, Clock, OpenAPI, 스케줄링 설정
-└── util         GeoPoints (위도·경도 → WGS84 Point), FileType (파일 시그니처 판별)
+└── util         GeoPoints (위도·경도 → WGS84 Point), FileType (파일 시그니처 판별), LikePatterns (검색어 이스케이프)
 
 src/main/resources
 ├── application.yml          공통 설정
 ├── application-local.yml    로컬 (기본 프로필)
 ├── application-prod.yml     운영 (Cloudtype + Supabase)
-├── db/migration             Flyway 마이그레이션 (V1 PostGIS → V2 회원 → V3 리프레시 토큰 …)
+├── application-demo.yml     시연 데이터 (local 과 함께: local,demo)
+├── db/migration             Flyway 마이그레이션 V1 ~ V16 (PostGIS → 회원 → … → 개인정보 파기 · 통계)
 └── static/docs/openapi3.yaml   테스트로 검증된 API 명세
 
-http/                        IntelliJ HTTP Client 요청 + 기대값 검증
+http/                        IntelliJ HTTP Client 요청 + 기대값 검증 (CI 가 http/*.http 실행)
+http/demo/                   시연 시나리오 (demo 데이터 필요, CI 제외)
+scripts/demo-rehearsal.sh    시연 시나리오 10회 반복 리허설
+docs/                        연동 · 운영 · 시연 문서
 ```
 
 ArchUnit이 검사하는 규칙
@@ -141,6 +154,7 @@ ArchUnit이 검사하는 규칙
 | `local` (기본) | 로컬 개발, SQL 로그 출력 | `DB_*` 환경 변수 (없으면 localhost) |
 | `test` | 자동 테스트 | `TEST_DB_*` 환경 변수 (CI 는 러너의 PostgreSQL) |
 | `prod` | Cloudtype 운영 | Supabase (환경 변수 필수) |
+| `demo` | 시연 데이터 생성 (`local,demo` 처럼 함께 켬, 운영 금지) | 함께 켠 프로필의 DB |
 
 ## API 문서와 협업
 
@@ -219,9 +233,10 @@ GET {{baseUrl}}/api/v1/system/ping
 
 | 종류 | 예시 | DB | 목적 |
 | --- | --- | --- | --- |
-| 단위 | `GeoPointsTest`, `GlobalExceptionHandlerTest` | 없음 | 규칙·예외 처리 검증 |
-| API 문서 | `SystemControllerTest` (`@ApiDocsTest`) | 없음 | 응답 필드 검증 + 명세 생성 |
-| 통합 | `SecurityIntegrationTest`, `PostgisMigrationTest` (`@IntegrationTest`) | 실제 PostgreSQL + PostGIS | 보안·CORS·마이그레이션·공간 연산 |
+| 단위 | `ApplicationTest`, `SpaceRecommenderTest`, `PrivacyServiceTest` | 없음 | 도메인 규칙 · 서비스 흐름 |
+| API 문서 | `ApplicationControllerTest` 등 (`@ApiDocsTest`) | 없음 | 요청 · 응답 필드 검증 + 명세 생성 |
+| 통합 | `BookingIntegrationTest`, `ReviewIntegrationTest` (`@IntegrationTest`) | 실제 PostgreSQL + PostGIS | 실제 API 흐름 · 쿼리 · 마이그레이션 |
+| 동시성 | `BookingConcurrencyIntegrationTest` | 실제 PostgreSQL | 동시 승인 10건 → 확정 1건, DB 배타 제약 |
 | 구조 | `LayeredArchitectureTest` | 없음 | 계층형 구조 강제 |
 | HTTP 시나리오 | `http/*.http` | 실제 서버 | 기대값 검증 (CI). 관리자 시나리오는 `http/http-client.private.env.json` 의 관리자 계정 사용 |
 
@@ -250,7 +265,8 @@ flowchart LR
 CI 는 러너에 기본 설치된 PostgreSQL 에 PostGIS 를 apt 로 추가해 테스트 DB로 쓰고(`.github/actions/setup-postgis`),
 `.http` 검증은 IntelliJ HTTP Client CLI 를 내려받아 실행합니다.
 
-**브랜치 흐름**: `feature/*` → PR → `develop` → (`test` 에서 QA 검증) → `main` 배포
+**브랜치 흐름**: 기능 브랜치(`feat/*` · `test/*` · `docs/*` · `ci/*`) → PR → CI 통과 → **Rebase and merge** 로 `main` → 자동 배포.
+`main` 에 직접 커밋하지 않습니다. (`develop` · `test` 브랜치를 쓰게 되면 푸시만으로도 CI 가 돕니다)
 
 > 배포 관련 Secrets가 아직 없으면 CD는 **경고만 남기고 배포를 건너뜁니다.** 설정 전에 `main` 에 푸시해도 실패하지 않습니다.
 
