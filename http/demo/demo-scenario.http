@@ -1,0 +1,207 @@
+# 시연 시나리오 — demo 프로필 서버에서 위에서부터 실행한다. (docs/DEMO_GUIDE.md)
+# 여러 번 반복해도 되도록 신청 날짜를 runIndex 로 바꾼다: scripts/demo-rehearsal.sh 가 -V runIndex=1..N 을 넘긴다.
+# IntelliJ 에서 직접 실행하면 runIndex 가 없어 0 으로 본다.
+# CI 의 .http 검증(http/*.http)에는 포함되지 않는다. (demo 데이터가 필요해서)
+
+### 1. 둘러보기 — 추천 (비로그인)
+# 기대값: 200 OK, 브랜드 홍보 목적이면 카페거리 · 대학가 · 수변 공간이 위로
+GET {{baseUrl}}/api/v1/spaces/recommendations?purpose=PROMOTION&limit=5
+
+> {%
+    client.test("추천 5곳 이하 + 점수 순", () => {
+        const data = response.body.data;
+        client.assert(response.status === 200 && data.length > 0, `실제 ${response.status} / ${data.length}`);
+        client.assert(data[0].reasons.some(r => r.includes("브랜드 홍보")), JSON.stringify(data[0].reasons));
+    });
+    const index = Number(request.environment.get("runIndex") || client.global.get("runIndex") || 0);
+    const day = (offset) => new Date(Date.now() + 9 * 3600 * 1000 + offset * 86400 * 1000).toISOString().substring(0, 10);
+    client.global.set("demoStart", day(22 + index * 2));
+    client.global.set("demoEnd", day(23 + index * 2));
+%}
+
+### 2. 둘러보기 — 지도 (시흥 전체)
+GET {{baseUrl}}/api/v1/spaces/map?swLat=37.30&swLng=126.65&neLat=37.40&neLng=126.80
+
+> {%
+    client.test("마커 5개 이상", () => client.assert(response.body.data.markers.length >= 5, `실제 ${response.body.data.markers.length}`));
+    const marina = response.body.data.markers.find(m => m.title === "거북섬 마리나 전망 공간");
+    client.assert(marina, "마리나 공간이 지도에 없습니다");
+    client.global.set("demoMarinaId", marina.id);
+%}
+
+### 3. 이용자 로그인 (최팝업)
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "user1@demo.dasisiheung.com",
+  "password": "demo1234!"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+    client.global.set("demoUserToken", response.body.data.accessToken);
+%}
+
+### 4. 공간 상세 — 평점 · 후기 · 찜 여부
+GET {{baseUrl}}/api/v1/spaces/{{demoMarinaId}}
+Authorization: Bearer {{demoUserToken}}
+
+> {%
+    client.test("후기 · 찜", () => {
+        client.assert(response.body.data.reviewCount >= 1, `후기 ${response.body.data.reviewCount}`);
+        client.assert(response.body.data.favorited === true, "최팝업은 마리나를 찜했습니다");
+    });
+%}
+
+### 5. 가격 제안과 함께 신청 (2일, 정가 160000 → 140000 제안)
+POST {{baseUrl}}/api/v1/applications
+Authorization: Bearer {{demoUserToken}}
+Content-Type: application/json
+
+{
+  "spaceId": {{demoMarinaId}},
+  "activityType": "POPUP_STORE",
+  "activityTitle": "시흥 로컬 굿즈 팝업",
+  "plan": "주말 이틀 동안 시흥 캐릭터 굿즈를 판매합니다.",
+  "headcount": 3,
+  "startDate": "{{demoStart}}",
+  "endDate": "{{demoEnd}}",
+  "offerAmount": 140000,
+  "offerMessage": "주말 이틀 연속이라 조금만 조정 부탁드려요."
+}
+
+> {%
+    client.test("201 + 제공자 답변 대기", () => {
+        client.assert(response.status === 201, `실제 ${response.status} ${JSON.stringify(response.body.error)}`);
+        client.assert(response.body.data.negotiationStatus === "WAITING_PROVIDER", response.body.data.negotiationStatus);
+    });
+    client.global.set("demoApplicationId", response.body.data.id);
+%}
+
+### 6. 공간 제공자 로그인 (이거북)
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "provider3@demo.dasisiheung.com",
+  "password": "demo1234!"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+    client.global.set("demoProviderToken", response.body.data.accessToken);
+%}
+
+### 7. 받은 신청 확인 → 역제안 150000
+POST {{baseUrl}}/api/v1/applications/{{demoApplicationId}}/offers
+Authorization: Bearer {{demoProviderToken}}
+Content-Type: application/json
+
+{
+  "amount": 150000,
+  "message": "15만원까지 가능합니다. 주차 2대 포함이에요."
+}
+
+> {%
+    client.test("신청자 답변 대기", () => client.assert(response.body.data.negotiationStatus === "WAITING_APPLICANT", response.body.data.negotiationStatus));
+%}
+
+### 8. 이용자가 역제안 수락
+POST {{baseUrl}}/api/v1/applications/{{demoApplicationId}}/offers/accept
+Authorization: Bearer {{demoUserToken}}
+
+> {%
+    client.test("합의 150000", () => client.assert(response.body.data.totalPrice === 150000, `실제 ${response.body.data.totalPrice}`));
+%}
+
+### 9. 제공자 승인 (예약 확정)
+POST {{baseUrl}}/api/v1/provider/applications/{{demoApplicationId}}/approve
+Authorization: Bearer {{demoProviderToken}}
+
+> {%
+    client.test("APPROVED", () => client.assert(response.body.data.status === "APPROVED", `실제 ${response.body.data.status}`));
+%}
+
+### 10. 확정 날짜는 이용자 화면에서 빠진다
+GET {{baseUrl}}/api/v1/spaces/{{demoMarinaId}}
+
+> {%
+    client.test("확정 날짜 제외", () => client.assert(!response.body.data.availableDates.includes(client.global.get("demoStart")), "확정 날짜가 보입니다"));
+%}
+
+### 11. 1:1 대화 — 오체험이 문의 (대화 열기는 멱등)
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "user4@demo.dasisiheung.com",
+  "password": "demo1234!"
+}
+
+> {%
+    client.global.set("demoMakerToken", response.body.data.accessToken);
+%}
+
+###
+POST {{baseUrl}}/api/v1/spaces/{{demoMarinaId}}/conversations
+Authorization: Bearer {{demoMakerToken}}
+
+> {%
+    client.test("대화 열기", () => client.assert(response.status === 200, `실제 ${response.status}`));
+    client.global.set("demoConversationId", response.body.data.id);
+%}
+
+###
+POST {{baseUrl}}/api/v1/conversations/{{demoConversationId}}/messages
+Authorization: Bearer {{demoMakerToken}}
+Content-Type: application/json
+
+{
+  "content": "혹시 전날 저녁에 짐을 미리 들여놓을 수 있을까요?"
+}
+
+> {%
+    client.test("201", () => client.assert(response.status === 201, `실제 ${response.status}`));
+%}
+
+### 12. 제공자 배지 — 안 읽은 메시지
+GET {{baseUrl}}/api/v1/conversations/unread-count
+Authorization: Bearer {{demoProviderToken}}
+
+> {%
+    client.test("1 이상", () => client.assert(response.body.data.count >= 1, `실제 ${response.body.data.count}`));
+%}
+
+### 13. 관리자 로그인
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+> {%
+    client.test("ADMIN", () => client.assert(response.body.data.member.role === "ADMIN", "관리자 승격 필요 (docs/ADMIN_GUIDE.md)"));
+    client.global.set("adminToken", response.body.data.accessToken);
+%}
+
+### 14. 관리자 대시보드
+GET {{baseUrl}}/api/v1/admin/dashboard
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("수치", () => client.assert(response.body.data.applicationsByStatus.APPROVED >= 1, "확정 예약"));
+    const month = (offset) => new Date(Date.now() + 9 * 3600 * 1000 + offset * 86400 * 1000).toISOString().substring(0, 7);
+    client.global.set("demoStatFrom", month(-62));
+    client.global.set("demoStatTo", month(0));
+%}
+
+### 15. 월별 이용 통계 (최근 3개월) — 시연 데이터의 지난 이용 5건이 들어 있다
+GET {{baseUrl}}/api/v1/admin/statistics/monthly?from={{demoStatFrom}}&to={{demoStatTo}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("지난 이용 5건 이상", () => client.assert(response.body.data.totalBookings >= 5, `실제 ${response.body.data.totalBookings}`));
+%}
