@@ -72,3 +72,18 @@ CI 는 서버를 띄운 뒤 같은 방식(SQL)으로 테스트용 관리자를 �
 - 승격 쿼리는 **이메일 조건을 꼭 확인**하고 실행합니다. `WHERE` 없이 실행하면 전원이 관리자가 됩니다.
 - 운영 DB 작업 전에는 Supabase SQL Editor 상단의 프로젝트 이름(`dasi-siheung-prod`)을 한 번 더 확인합니다.
 - 관리자 계정은 꼭 필요한 사람에게만 부여하고, 시범 운영이 끝나면 해제합니다.
+
+## 5. 관리자 웹이 쓰는 기능
+
+승격한 계정으로 로그인하면 `/api/v1/admin/**` 를 쓸 수 있습니다. 자세한 요청 · 응답은 Swagger UI 의 Admin 태그를 보세요.
+
+| 화면 | API | `.http` |
+| --- | --- | --- |
+| 대시보드 | `GET /admin/dashboard` — 검수 대기 · 검토 중 신청 · 처리 대기 신고 수, 상태 · 지역 · 역할별 개수 | `admin-review.http` |
+| 공간 검수 | `GET /admin/spaces`, `GET /admin/spaces/{id}`, `POST /admin/spaces/{id}/reviews`, `PUT /admin/spaces/{id}/theme` | `admin-review.http`, `space.http` |
+| 신고 처리 | `GET /admin/reports`, `POST /admin/reports/{id}/resolve` (기각 · 숨김 · 정지), `POST /admin/members/{id}/suspend · unsuspend` | `report.http` |
+| 개인정보 · 통계 | `GET /admin/privacy/purge-preview`, `POST /admin/privacy/purge`, `GET /admin/statistics/monthly` | `admin-privacy.http` |
+
+- 이용 정지된 회원은 로그인 · 토큰 재발급이 막힙니다. 이미 받은 액세스 토큰은 최대 30분 동안 유효합니다.
+- 숨김 처리한 공간은 이용자에게 보이지 않고 제공자도 수정할 수 없습니다. 되돌릴 때는 DB 에서 상태를 바꾸고 다시 검수합니다.
+

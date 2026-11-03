@@ -755,10 +755,10 @@ try {
 
 | 메서드 | 경로 | 인증 | 설명 |
 | --- | --- | --- | --- |
-| GET | `/api/v1/spaces/{spaceId}` | 없음 | 공간 상세 (공개 공간만, 오늘 이후 사용 가능 날짜) |
-| GET | `/api/v1/spaces` | 없음 | 공간 검색 (지역 · 활동 · 목적 · 기간 · 예산 · 시설 · 검색어 · 정렬) |
-| GET | `/api/v1/spaces/map` | 없음 | 지도 마커 (화면 영역 남서·북동 꼭짓점, 최대 300개) |
-| GET | `/api/v1/spaces/recommendations` | 없음 | 공간 추천 (목적 · 활동 · 기간, 점수와 이유) |
+| GET | `/api/v1/spaces/{spaceId}` | 공개 | 공간 상세 (공개 공간만, 오늘 이후 사용 가능 날짜) |
+| GET | `/api/v1/spaces` | 공개 | 공간 검색 (지역 · 활동 · 목적 · 기간 · 예산 · 시설 · 검색어 · 정렬) |
+| GET | `/api/v1/spaces/map` | 공개 | 지도 마커 (화면 영역 남서·북동 꼭짓점, 최대 300개) |
+| GET | `/api/v1/spaces/recommendations` | 공개 | 공간 추천 (목적 · 활동 · 기간, 점수와 이유) |
 
 ### 공간 이용 신청 (`http/application.http`)
 
@@ -791,7 +791,7 @@ try {
 
 | 메서드 | 경로 | 인증 | 설명 |
 | --- | --- | --- | --- |
-| GET | `/api/v1/spaces/{spaceId}/reviews` | 없음 | 공간 후기 목록 |
+| GET | `/api/v1/spaces/{spaceId}/reviews` | 공개 | 공간 후기 목록 |
 | POST | `/api/v1/applications/{applicationId}/review` | USER | 후기 작성 (이용이 끝난 확정 예약) |
 | PUT | `/api/v1/reviews/{reviewId}` | USER | 후기 수정 |
 | DELETE | `/api/v1/reviews/{reviewId}` | USER | 후기 삭제 |
@@ -810,12 +810,12 @@ try {
 
 | 메서드 | 경로 | 인증 | 설명 |
 | --- | --- | --- | --- |
-| GET | `/api/v1/community/posts` | 없음 | 게시글 목록 (category · keyword) |
-| GET | `/api/v1/community/posts/{postId}` | 없음 | 게시글 상세 (조회 수 +1, 토큰 있으면 mine) |
+| GET | `/api/v1/community/posts` | 공개 | 게시글 목록 (category · keyword) |
+| GET | `/api/v1/community/posts/{postId}` | 공개 | 게시글 상세 (조회 수 +1, 토큰 있으면 mine) |
 | POST | `/api/v1/community/posts` | 로그인 | 게시글 쓰기 (공지는 ADMIN) |
 | PUT | `/api/v1/community/posts/{postId}` | 작성자 | 게시글 수정 |
 | DELETE | `/api/v1/community/posts/{postId}` | 작성자 · ADMIN | 게시글 삭제 |
-| GET | `/api/v1/community/posts/{postId}/comments` | 없음 | 댓글 목록 (오래된 순) |
+| GET | `/api/v1/community/posts/{postId}/comments` | 공개 | 댓글 목록 (오래된 순) |
 | POST | `/api/v1/community/posts/{postId}/comments` | 로그인 | 댓글 쓰기 |
 | DELETE | `/api/v1/community/comments/{commentId}` | 작성자 · ADMIN | 댓글 삭제 |
 
