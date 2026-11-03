@@ -840,3 +840,12 @@ try {
 | POST | `/api/v1/admin/reports/{reportId}/resolve` | ADMIN | 신고 처리 (기각 · 숨김 · 정지) |
 | POST | `/api/v1/admin/members/{memberId}/suspend` | ADMIN | 회원 이용 정지 |
 | POST | `/api/v1/admin/members/{memberId}/unsuspend` | ADMIN | 이용 정지 해제 |
+
+### 관리자 — 개인정보 파기 · 통계 (`http/admin-privacy.http`)
+
+| 메서드 | 경로 | 인증 | 설명 |
+| --- | --- | --- | --- |
+| GET | `/api/v1/admin/privacy/purge-preview` | ADMIN | 파기 미리보기 (기준일 · 건수) |
+| POST | `/api/v1/admin/privacy/purge` | ADMIN | 파기 실행 (매일 04:30 자동) |
+| GET | `/api/v1/admin/privacy/purge-logs` | ADMIN | 파기 실행 기록 |
+| GET | `/api/v1/admin/statistics/monthly` | ADMIN | 월별 이용 통계 (from · to = yyyy-MM) |

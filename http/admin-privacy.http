@@ -1,0 +1,97 @@
+# 관리자 — 개인정보 파기 · 월별 이용 통계
+# 관리자 계정: http-client.private.env.json
+
+### 준비: 관리자 로그인
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+> {%
+    client.test("200 OK + ADMIN", () => {
+        client.assert(response.status === 200, `실제 ${response.status} — http-client.private.env.json 의 관리자 계정 확인`);
+        client.assert(response.body.data.member.role === "ADMIN", `실제 ${response.body.data.member.role}`);
+    });
+    client.global.set("adminToken", response.body.data.accessToken);
+    const now = new Date(Date.now() + 9 * 3600 * 1000);
+    client.global.set("statTo", now.toISOString().substring(0, 7));
+    const from = new Date(now.getTime() - 330 * 86400 * 1000);
+    client.global.set("statFrom", from.toISOString().substring(0, 7));
+%}
+
+### 파기 미리보기
+# 인증: ADMIN
+# 기대값: 200 OK, 기준일 = 오늘 - 365일 (신청서) / - 90일 (활동 사진), 건수는 0 이상
+GET {{baseUrl}}/api/v1/admin/privacy/purge-preview
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("200 OK + 기준일", () => {
+        const d = response.body.data;
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        const days = (date) => Math.round((Date.now() - new Date(date + "T00:00:00+09:00").getTime()) / 86400000);
+        client.assert(Math.abs(days(d.applicationCutoff) - 365) <= 1, `신청서 기준일 ${d.applicationCutoff}`);
+        client.assert(Math.abs(days(d.activityPhotoCutoff) - 90) <= 1, `사진 기준일 ${d.activityPhotoCutoff}`);
+        client.assert(d.applicationsToAnonymize >= 0 && d.conversationsToDelete >= 0 && d.activityPhotosToDelete >= 0, "건수");
+    });
+%}
+
+### 파기 실행
+# 기대값: 200 OK, 실행 기록 (executedBy = 나)
+POST {{baseUrl}}/api/v1/admin/privacy/purge
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("200 OK + 기록", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.executedBy !== null, "실행한 관리자");
+    });
+    client.global.set("purgeLogId", response.body.data.id);
+%}
+
+### 한 번 더 실행 — 바로 다시 실행하면 처리할 것이 없다 (멱등)
+# 기대값: 200 OK, 통계 0 · 비식별화 0
+POST {{baseUrl}}/api/v1/admin/privacy/purge
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("처리 0건", () => {
+        client.assert(response.body.data.countedBookings === 0, `통계 ${response.body.data.countedBookings}`);
+        client.assert(response.body.data.anonymizedApplications === 0, `비식별화 ${response.body.data.anonymizedApplications}`);
+    });
+%}
+
+### 파기 실행 기록
+# 기대값: 200 OK, 방금 기록이 맨 위
+GET {{baseUrl}}/api/v1/admin/privacy/purge-logs?size=5
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("최근 순", () => client.assert(response.body.data.content[0].id > client.global.get("purgeLogId"), "최근 기록"));
+%}
+
+### 월별 이용 통계 (최근 12개월)
+# 기대값: 200 OK, 합계 = 행 합
+GET {{baseUrl}}/api/v1/admin/statistics/monthly?from={{statFrom}}&to={{statTo}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("합계 일치", () => {
+        const d = response.body.data;
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(d.totalBookings === d.rows.reduce((sum, r) => sum + r.bookingCount, 0), "건수 합계");
+        client.assert(d.totalAmount === d.rows.reduce((sum, r) => sum + r.totalAmount, 0), "금액 합계");
+    });
+%}
+
+### 통계 기간이 거꾸로
+# 기대값: 400 INVALID_INPUT
+GET {{baseUrl}}/api/v1/admin/statistics/monthly?from={{statTo}}&to={{statFrom}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("400 INVALID_INPUT", () => client.assert(response.status === 400, `실제 ${response.status}`));
+%}
