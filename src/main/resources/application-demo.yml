@@ -1,0 +1,5 @@
+# 시연 데이터 (DemoDataInitializer). 다른 프로필과 함께 켠다: --spring.profiles.active=local,demo
+# 시연 계정이 없을 때 한 번만 만들고, 관리자 계정은 만들지 않는다. (docs/DEMO_GUIDE.md)
+logging:
+  level:
+    com.dasisiheung.service.DemoDataInitializer: INFO
