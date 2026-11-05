@@ -57,7 +57,13 @@ Content-Type: application/json
   "dailyPrice": 70000,
   "facilities": ["WIFI", "ELECTRICITY", "AIR_CONDITIONER"],
   "activityTypes": ["EXHIBITION", "POPUP_STORE"],
-  "availableDates": ["{{browseDay1}}", "{{browseDay2}}", "{{browseDay3}}"]
+  "availableDates": ["{{browseDay1}}", "{{browseDay2}}", "{{browseDay3}}"],
+  "maxCapacity": 20,
+  "equipment": [
+    { "name": "작품 거치대", "quantity": 6 },
+    { "name": "스탠드 조명", "quantity": 3 }
+  ],
+  "priceNegotiable": true
 }
 
 > {%
@@ -151,7 +157,7 @@ Content-Type: application/json
 
 ### 공간 상세 (로그인 없이)
 # 인증: 없음
-# 기대값: 200 OK, 사용 가능 날짜 3개(오름차순), 사진 1장, 제공자 이름, 증빙·검수 사유는 없음
+# 기대값: 200 OK, 사용 가능 날짜 3개(오름차순), 사진 1장, 제공자 이름, 수용 인원 · 비품 · 협의 여부, 증빙·검수 사유는 없음
 GET {{baseUrl}}/api/v1/spaces/{{browseSpaceId}}
 
 > {%
@@ -163,6 +169,13 @@ GET {{baseUrl}}/api/v1/spaces/{{browseSpaceId}}
         client.assert(data.photos.length === 1, `사진 ${data.photos.length}`);
         client.assert(data.provider.name === "둘러보기 제공자", `실제 ${data.provider.name}`);
         client.assert(data.proofs === undefined && data.reviewComment === undefined, "검수 정보가 노출되면 안 됩니다");
+    });
+    client.test("수용 인원 · 비품 · 협의 여부", () => {
+        const data = response.body.data;
+        client.assert(data.maxCapacity === 20, `실제 ${data.maxCapacity}`);
+        client.assert(data.equipment.map(e => `${e.name}:${e.quantity}`).join() === "작품 거치대:6,스탠드 조명:3",
+            JSON.stringify(data.equipment));
+        client.assert(data.priceNegotiable === true, `실제 ${data.priceNegotiable}`);
     });
 %}
 
@@ -202,6 +215,31 @@ GET {{baseUrl}}/api/v1/spaces?region=GEOBUKSEOM&activityType=EXHIBITION&purpose=
         for (let i = 1; i < content.length; i++) {
             client.assert(content[i - 1].dailyPrice <= content[i].dailyPrice, "낮은 가격 순이 아닙니다");
         }
+    });
+%}
+
+### 공간 검색 — 운영 인원 20명 · 가격 협의 가능
+# 기대값: 200 OK, 준비한 공간(수용 20명 · 협의 가능) 포함, 결과는 모두 수용 20명 이상 · 협의 가능
+GET {{baseUrl}}/api/v1/spaces?region=GEOBUKSEOM&headcount=20&negotiableOnly=true&size=100
+
+> {%
+    client.test("200 OK + 포함", () => {
+        const content = response.body.data.content;
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(content.some(s => String(s.id) === String(client.global.get("browseSpaceId"))), "준비한 공간이 없습니다");
+        client.assert(content.every(s => s.maxCapacity >= 20 && s.priceNegotiable === true), "조건에 맞지 않는 공간이 섞였습니다");
+    });
+%}
+
+### 공간 검색 — 수용 인원보다 많으면 빠진다
+# 기대값: 200 OK, 준비한 공간(수용 20명)은 없음
+GET {{baseUrl}}/api/v1/spaces?region=GEOBUKSEOM&headcount=21&size=100
+
+> {%
+    client.test("200 OK + 제외", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        const ids = response.body.data.content.map(s => String(s.id));
+        client.assert(!ids.includes(String(client.global.get("browseSpaceId"))), "수용 인원을 넘는 공간이 나왔습니다");
     });
 %}
 

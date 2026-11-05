@@ -36,7 +36,7 @@ Content-Type: application/json
     }
 %}
 
-### 준비: 공간 등록 (정왕, 1일 5만원, 내일부터 5일)
+### 준비: 공간 등록 (정왕, 1일 5만원, 내일부터 5일, 최대 6명)
 POST {{baseUrl}}/api/v1/provider/spaces
 Authorization: Bearer {{appProviderToken}}
 Content-Type: application/json
@@ -53,7 +53,8 @@ Content-Type: application/json
   "dailyPrice": 50000,
   "facilities": ["ELECTRICITY", "WATER"],
   "activityTypes": ["POPUP_STORE", "EXPERIENCE"],
-  "availableDates": ["{{appDay1}}", "{{appDay2}}", "{{appDay3}}", "{{appDay4}}", "{{appDay5}}"]
+  "availableDates": ["{{appDay1}}", "{{appDay2}}", "{{appDay3}}", "{{appDay4}}", "{{appDay5}}"],
+  "maxCapacity": 6
 }
 
 > {%
@@ -215,6 +216,29 @@ Content-Type: application/json
     client.test("400 ACTIVITY_NOT_ALLOWED", () => {
         client.assert(response.status === 400, `실제 ${response.status}`);
         client.assert(response.body.error.code === "ACTIVITY_NOT_ALLOWED", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 수용 인원 초과
+# 기대값: 400 HEADCOUNT_EXCEEDS_CAPACITY (최대 6명 공간에 7명)
+POST {{baseUrl}}/api/v1/applications
+Authorization: Bearer {{appUserAToken}}
+Content-Type: application/json
+
+{
+  "spaceId": {{appSpaceId}},
+  "activityType": "POPUP_STORE",
+  "activityTitle": "단체 팝업",
+  "plan": "수용 인원보다 많은 인원",
+  "headcount": 7,
+  "startDate": "{{appDay3}}",
+  "endDate": "{{appDay3}}"
+}
+
+> {%
+    client.test("400 HEADCOUNT_EXCEEDS_CAPACITY", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "HEADCOUNT_EXCEEDS_CAPACITY", `실제 ${response.body.error.code}`);
     });
 %}
 

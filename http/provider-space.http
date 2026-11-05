@@ -38,7 +38,7 @@ Content-Type: application/json
 
 ### 공간 등록 (정왕역 앞)
 # 인증: PROVIDER
-# 기대값: 201 Created, status = PENDING_REVIEW, region = JEONGWANG (좌표로 판정)
+# 기대값: 201 Created, status = PENDING_REVIEW, region = JEONGWANG (좌표로 판정), 수용 인원 · 비품(입력 순서) · 협의 여부 그대로
 POST {{baseUrl}}/api/v1/provider/spaces
 Authorization: Bearer {{providerToken}}
 Content-Type: application/json
@@ -58,7 +58,13 @@ Content-Type: application/json
   "dailyPrice": 50000,
   "facilities": ["WIFI", "ELECTRICITY"],
   "activityTypes": ["POPUP_STORE", "EXHIBITION"],
-  "availableDates": ["{{day1}}", "{{day2}}"]
+  "availableDates": ["{{day1}}", "{{day2}}"],
+  "maxCapacity": 10,
+  "equipment": [
+    { "name": "접이식 테이블", "quantity": 4 },
+    { "name": "의자", "quantity": 8 }
+  ],
+  "priceNegotiable": true
 }
 
 > {%
@@ -67,6 +73,12 @@ Content-Type: application/json
         client.assert(response.body.data.status === "PENDING_REVIEW", `실제 ${response.body.data.status}`);
         client.assert(response.body.data.region === "JEONGWANG", `실제 ${response.body.data.region}`);
         client.assert(response.body.data.availableDates.length === 2, `실제 ${response.body.data.availableDates}`);
+    });
+    client.test("수용 인원 · 비품 · 협의 여부", () => {
+        const data = response.body.data;
+        client.assert(data.maxCapacity === 10, `실제 ${data.maxCapacity}`);
+        client.assert(data.equipment.map(e => e.name).join() === "접이식 테이블,의자", JSON.stringify(data.equipment));
+        client.assert(data.priceNegotiable === true, `실제 ${data.priceNegotiable}`);
     });
     client.global.set("providerSpaceId", response.body.data.id);
 %}
@@ -288,7 +300,8 @@ Authorization: Bearer {{providerToken}}
 %}
 
 ### 공간 정보 수정 (가격 변경, 캘린더는 그대로)
-# 기대값: 200 OK, dailyPrice = 60000, availableDates 2개 유지
+# 수정은 통째로 바꾼다: 수용 인원 · 비품 · 협의 여부도 함께 보낸다. (보내지 않으면 없음 · 없음 · 협의 가능)
+# 기대값: 200 OK, dailyPrice = 60000, availableDates 2개 유지, 비품은 보낸 목록으로 교체, 정가 고정
 PUT {{baseUrl}}/api/v1/provider/spaces/{{providerSpaceId}}
 Authorization: Bearer {{providerToken}}
 Content-Type: application/json
@@ -307,7 +320,13 @@ Content-Type: application/json
   "commercialTheme": "FOOD_ALLEY",
   "dailyPrice": 60000,
   "facilities": ["WIFI", "ELECTRICITY", "RESTROOM"],
-  "activityTypes": ["POPUP_STORE", "EXHIBITION"]
+  "activityTypes": ["POPUP_STORE", "EXHIBITION"],
+  "maxCapacity": 12,
+  "equipment": [
+    { "name": "빔프로젝터", "quantity": 1 },
+    { "name": "의자", "quantity": 12 }
+  ],
+  "priceNegotiable": false
 }
 
 > {%
@@ -315,6 +334,41 @@ Content-Type: application/json
         client.assert(response.status === 200, `실제 ${response.status}`);
         client.assert(response.body.data.dailyPrice === 60000, `실제 ${response.body.data.dailyPrice}`);
         client.assert(response.body.data.availableDates.length === 2, `실제 ${response.body.data.availableDates}`);
+    });
+    client.test("비품 교체 · 정가 고정", () => {
+        const data = response.body.data;
+        client.assert(data.maxCapacity === 12, `실제 ${data.maxCapacity}`);
+        client.assert(data.equipment.map(e => e.name).join() === "빔프로젝터,의자", JSON.stringify(data.equipment));
+        client.assert(data.priceNegotiable === false, `실제 ${data.priceNegotiable}`);
+    });
+%}
+
+### 같은 이름의 비품을 두 줄로 → 400
+# 기대값: 400 INVALID_INPUT (같은 비품은 수량으로 합친다)
+PUT {{baseUrl}}/api/v1/provider/spaces/{{providerSpaceId}}
+Authorization: Bearer {{providerToken}}
+Content-Type: application/json
+
+{
+  "title": "정왕역 앞 1층 상가",
+  "description": "유동 인구가 많은 역 앞 코너 상가입니다.",
+  "address": "경기도 시흥시 마유로 418",
+  "latitude": 37.3517,
+  "longitude": 126.7428,
+  "areaSqm": 33.06,
+  "buildingUse": "NEIGHBORHOOD_1",
+  "dailyPrice": 60000,
+  "activityTypes": ["POPUP_STORE"],
+  "equipment": [
+    { "name": "의자", "quantity": 4 },
+    { "name": "의자", "quantity": 2 }
+  ]
+}
+
+> {%
+    client.test("400 INVALID_INPUT", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "INVALID_INPUT", `실제 ${response.body.error.code}`);
     });
 %}
 

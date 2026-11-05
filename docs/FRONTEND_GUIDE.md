@@ -86,6 +86,7 @@ flowchart LR
 | `user4@demo.dasisiheung.com` | 오체험 | 이용자 | 검토 중 신청 1건(마리나), 제공자와 1:1 대화, 지난 이용 후기 1개 |
 
 - 공개 공간의 사용 가능 날짜는 데이터를 만든 다음 날부터 **180일**입니다. 이 안에서 신청을 테스트하세요.
+- 모든 시연 공간에 수용 인원 · 비품이 있고, **정왕역 앞 코너 상가는 정가 고정**(가격 협의 불가) 공간입니다.
 - 모두가 같은 계정을 쓰므로 **비밀번호 변경 · 탈퇴는 하지 마세요.** 그런 테스트는 직접 가입한 계정으로 합니다.
 - **관리자 계정은 없습니다.** 관리자 웹은 테스트용으로 가입한 계정을 백엔드 담당에게 알려주면 관리자로 바꿔 드립니다.
 - 데이터가 꼬였거나 처음 상태로 되돌리고 싶으면 백엔드 담당에게 알려주세요. 시연 데이터를 지우고 다시 만듭니다.
@@ -214,6 +215,7 @@ flowchart LR
 | `APPLICATION_NOT_FOUND` | 404 | 없는 신청 | 목록으로 돌아가기 |
 | `NOT_APPLICATION_PARTICIPANT` | 403 | 신청자도 공간 제공자도 아님 | 접근 불가 안내 |
 | `ACTIVITY_NOT_ALLOWED` | 400 | 공간이 허용하지 않는 활동으로 신청 | 허용 활동만 선택지로 보여주기 |
+| `HEADCOUNT_EXCEEDS_CAPACITY` | 400 | 운영 인원이 공간의 최대 수용 인원(`maxCapacity`)을 넘음 | 인원 입력의 최댓값을 `maxCapacity` 로 제한 |
 | `INVALID_APPLICATION_PERIOD` | 400 | 지난 날짜 시작 · 30일 초과 | 날짜 선택기를 오늘~30일로 제한 |
 | `PERIOD_NOT_AVAILABLE` | 409 | 기간 중 사용 가능 날짜가 아닌 날이 있음 | 캘린더 다시 불러오기 |
 | `DUPLICATE_APPLICATION` | 409 | 같은 공간 · 겹치는 기간에 검토 중인 내 신청이 있음 | 기존 신청으로 이동 |
@@ -233,6 +235,7 @@ flowchart LR
 | `INVALID_OFFER_PRICE` | 400 | 제안 금액이 1원 미만이거나 정가 합계 초과 | 입력 범위 안내 |
 | `OFFER_NOT_ALLOWED` | 409 | 보낸 제안에 상대가 아직 답하지 않음 | 제안 버튼 비활성화 |
 | `NO_PENDING_OFFER` | 409 | 내가 답할 제안이 없는데 수락 | 상세 새로고침 |
+| `PRICE_NEGOTIATION_NOT_ALLOWED` | 409 | 가격 협의를 받지 않는 공간(`priceNegotiable=false`)에 제안 | 그 공간에서는 제안 입력 · 버튼 숨기기 |
 
 **이용 후기**
 
@@ -365,6 +368,9 @@ HIDDEN(숨김): 신고 처리로 관리자가 내린 공간 — 수정 불가
   - 신청자 제안 → `WAITING_PROVIDER` → 제공자가 수락하거나 역제안 → `WAITING_APPLICANT` → … → 수락하면 `AGREED`
   - 내가 보낸 제안에 상대가 답하기 전에는 다시 보낼 수 없습니다 (`OFFER_NOT_ALLOWED`). 버튼을 비활성화하세요.
   - `*_WAITING` 상태에서는 승인할 수 없습니다 (`PRICE_NEGOTIATION_IN_PROGRESS`). 화면에 "협의 중" 배지를 보여주세요.
+  - 공간의 `priceNegotiable` 이 `false` 면 **정가로만** 신청합니다. 신청서의 `offerAmount` · 제안 API 모두 `PRICE_NEGOTIATION_NOT_ALLOWED`.
+    (협의 중에 제공자가 협의를 끄면 새 제안만 막히고, 이미 받은 제안은 수락할 수 있습니다)
+- **수용 인원**: 공간에 `maxCapacity` 가 있으면 신청서의 `headcount` 는 그 이하여야 합니다 (`HEADCOUNT_EXCEEDS_CAPACITY`). `null` 이면 제한 없음.
 - **결제는 앱 밖**에서 합니다. 서버는 합의 금액(`totalPrice`)만 기록합니다.
 - **겹치는 예약**: 같은 공간 · 겹치는 기간의 확정은 1건뿐입니다. 동시에 승인해도 서버가 막고 `PERIOD_ALREADY_BOOKED` 를 줍니다.
 - 이용자 화면의 `availableDates` 와 기간 검색은 **확정 예약 날짜를 뺀 값**입니다. 제공자 화면(내 공간)의 캘린더는 제공자가 연 날짜 그대로입니다.
@@ -783,11 +789,23 @@ try {
 | DELETE | `/api/v1/provider/spaces/{spaceId}/proofs/{proofId}` | PROVIDER | 권한 증빙 삭제 |
 | GET | `/api/v1/provider/spaces` | PROVIDER | 내 공간 목록 (검수 상태·사유, status 필터) |
 | GET | `/api/v1/provider/spaces/{spaceId}` | PROVIDER | 내 공간 상세 (사진·증빙 포함) |
-| PUT | `/api/v1/provider/spaces/{spaceId}` | PROVIDER | 공간 정보 수정 (검수 항목 변경 시 재검수) |
+| PUT | `/api/v1/provider/spaces/{spaceId}` | PROVIDER | 공간 정보 수정 (검수 항목 변경 시 재검수, 통째로 바꿈) |
 | PUT | `/api/v1/provider/spaces/{spaceId}/available-dates` | PROVIDER | 사용 가능 날짜(캘린더) 설정 |
 | POST | `/api/v1/provider/spaces/{spaceId}/pause` | PROVIDER | 공개 일시 중단 |
 | POST | `/api/v1/provider/spaces/{spaceId}/resume` | PROVIDER | 공개 재개 |
 | POST | `/api/v1/provider/spaces/{spaceId}/resubmit` | PROVIDER | 수정 후 다시 검수 요청 |
+
+공간 등록 · 수정 본문의 **수용 인원 · 비품 · 가격 협의** (모두 선택)
+
+| 필드 | 형식 | 설명 |
+| --- | --- | --- |
+| `maxCapacity` | 숫자 1~500 | 최대 수용 인원. 없으면 인원 제한 없음 |
+| `equipment` | `[{ "name": "접이식 테이블", "quantity": 4 }]` | 빌려주는 비품 (최대 20줄, 이름 40자, 수량 1~999). 같은 이름은 한 줄로 |
+| `priceNegotiable` | true / false | 가격 협의 가능 여부 (기본 true) |
+
+- 보유 시설(`facilities`)은 정해진 목록에서 고르고, 비품(`equipment`)은 제공자가 자유롭게 적습니다.
+- **수정(PUT)은 통째로 바꿉니다.** 수정 화면에서도 세 필드를 항상 함께 보내세요. 빼면 수용 인원 없음 · 비품 없음 · 협의 가능이 됩니다.
+- 세 항목은 관리자 검수 항목이 아니라, 공개 중에 바꿔도 다시 검수받지 않습니다.
 
 ### 관리자 — 공간 검수 (`http/admin-review.http`)
 
@@ -809,9 +827,12 @@ try {
 | 메서드 | 경로 | 인증 | 설명 |
 | --- | --- | --- | --- |
 | GET | `/api/v1/spaces/{spaceId}` | 공개 | 공간 상세 (공개 공간만, 오늘 이후 사용 가능 날짜) |
-| GET | `/api/v1/spaces` | 공개 | 공간 검색 (지역 · 활동 · 목적 · 기간 · 예산 · 시설 · 검색어 · 정렬) |
+| GET | `/api/v1/spaces` | 공개 | 공간 검색 (지역 · 활동 · 목적 · 기간 · 예산 · 시설 · 운영 인원 · 협의 가능 · 검색어 · 정렬) |
 | GET | `/api/v1/spaces/map` | 공개 | 지도 마커 (화면 영역 남서·북동 꼭짓점, 최대 300개) |
 | GET | `/api/v1/spaces/recommendations` | 공개 | 공간 추천 (목적 · 활동 · 기간, 점수와 이유) |
+
+- 검색의 `headcount=8` 은 **수용 인원을 정한 공간 중** 8명 이상 수용하는 공간만, `negotiableOnly=true` 는 가격 협의가 되는 공간만 보여줍니다.
+- 상세 응답에 `maxCapacity` · `equipment` · `priceNegotiable` 이, 검색 카드에 `maxCapacity` · `priceNegotiable` 이 있습니다.
 
 ### 공간 이용 신청 (`http/application.http`)
 
