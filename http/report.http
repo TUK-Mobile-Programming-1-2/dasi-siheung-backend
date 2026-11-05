@@ -320,6 +320,24 @@ Content-Type: application/json
     });
 %}
 
+### 내 신고 내역
+# 인증: 로그인 회원
+# 기대값: 200 OK, 방금 한 신고 1건 (PENDING, 사진 2장, 대상 요약 = 공간 이름), 관리자 메모 · 사진 주소 없음
+GET {{baseUrl}}/api/v1/members/me/reports
+Authorization: Bearer {{rptUserToken}}
+
+> {%
+    client.test("200 OK + 1건 PENDING", () => {
+        const items = response.body.data.content;
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.totalElements === 1, `실제 ${response.body.data.totalElements}`);
+        client.assert(items[0].id === client.global.get("rptReportId"), JSON.stringify(items[0]));
+        client.assert(items[0].status === "PENDING" && items[0].photoCount === 2, JSON.stringify(items[0]));
+        client.assert(items[0].targetSummary === "신고 시나리오 공간" && items[0].resolvedAt === null, JSON.stringify(items[0]));
+        client.assert(items[0].adminNote === undefined && items[0].photos === undefined, "관리자 메모 · 사진은 주지 않아야 합니다");
+    });
+%}
+
 ### 관리자: 처리 대기 신고 목록
 # 인증: ADMIN
 # 기대값: 200 OK, 모두 PENDING
@@ -380,6 +398,20 @@ Content-Type: application/json
         const d = response.body.data;
         client.assert(response.status === 200, `실제 ${response.status}`);
         client.assert(d.status === "RESOLVED" && d.targetVisible === false && d.ownerStatus === "SUSPENDED", JSON.stringify(d));
+    });
+%}
+
+### 내 신고 내역 — 처리 완료만
+# 기대값: 200 OK, RESOLVED 1건, 처리 시각 있음
+GET {{baseUrl}}/api/v1/members/me/reports?status=RESOLVED
+Authorization: Bearer {{rptUserToken}}
+
+> {%
+    client.test("200 OK + RESOLVED 1건", () => {
+        const items = response.body.data.content;
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.totalElements === 1, `실제 ${response.body.data.totalElements}`);
+        client.assert(items[0].status === "RESOLVED" && items[0].resolvedAt !== null, JSON.stringify(items[0]));
     });
 %}
 

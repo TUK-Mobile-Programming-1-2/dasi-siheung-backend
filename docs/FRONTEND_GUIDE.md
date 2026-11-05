@@ -90,6 +90,7 @@ flowchart LR
 - 모두가 같은 계정을 쓰므로 **비밀번호 변경 · 탈퇴는 하지 마세요.** 그런 테스트는 직접 가입한 계정으로 합니다.
 - **관리자 계정은 없습니다.** 관리자 웹은 테스트용으로 가입한 계정을 백엔드 담당에게 알려주면 관리자로 바꿔 드립니다.
 - 데이터가 꼬였거나 처음 상태로 되돌리고 싶으면 백엔드 담당에게 알려주세요. 시연 데이터를 지우고 다시 만듭니다.
+- 공간 · 신청 · 후기 · 대화 등 준비된 데이터 전체와 기능별 테스트 방법은 [TEST_ACCOUNTS.md](TEST_ACCOUNTS.md) 에 있습니다.
 
 ---
 
@@ -168,6 +169,7 @@ flowchart LR
 | `MEMBER_NOT_FOUND` | 404 | 없는 회원 | "찾을 수 없습니다" 안내 |
 | `PASSWORD_MISMATCH` | 400 | 비밀번호 변경·탈퇴 시 현재 비밀번호 불일치 | 비밀번호 입력칸에 사유 표시 |
 | `SAME_AS_CURRENT_PASSWORD` | 400 | 새 비밀번호가 현재와 같음 | "다른 비밀번호를 입력하세요" |
+| `WITHDRAWAL_BLOCKED_BY_APPLICATION` | 409 | 진행 중인 신청 · 예약이 있는데 탈퇴 (검토 중, 이용이 끝나지 않은 확정 예약, 제공자는 받은 신청 포함) | `error.message` 표시 후 신청 내역으로 안내 |
 
 **파일**
 
@@ -665,6 +667,10 @@ try {
 
 두 명세에 같은 API가 있으면 내용도 같아야 합니다. 다르면 백엔드 버그이니 알려주세요.
 
+**화면 개발 기준은 배포 서버의 [`/docs/openapi3.yaml`](https://port-0-dasi-siheung-backend-mvi7gzqc5a140e65.sel3.cloudtype.app/docs/openapi3.yaml) 하나입니다.**
+파일로 따로 전달받은 명세나 로컬 빌드 결과물(`build/api-spec`)은 오래됐을 수 있으니 쓰지 마세요.
+사진 · 파일을 올리는 API(신고하기, 활동 사진, 공간 사진 · 증빙)는 명세의 `requestBody` 에 multipart 파트 이름 · 종류(글 / 파일 / 여러 파일) · 필수 여부가 있습니다.
+
 ### 6-3. 명세 파일(openapi3.yaml) 활용
 
 명세 파일은 OpenAPI 3 표준 형식이라 여러 도구에서 그대로 쓸 수 있습니다.
@@ -768,7 +774,7 @@ try {
 | GET | `/api/v1/members/me` | 로그인 | 내 정보 조회 |
 | PATCH | `/api/v1/members/me` | 로그인 | 이름·휴대폰 번호 수정 (보낸 값만) |
 | PATCH | `/api/v1/members/me/password` | 로그인 | 비밀번호 변경 (다른 기기 로그아웃) |
-| POST | `/api/v1/members/me/withdraw` | 로그인 | 회원 탈퇴 (개인정보 즉시 삭제) |
+| POST | `/api/v1/members/me/withdraw` | 로그인 | 회원 탈퇴 (개인정보 즉시 삭제, 진행 중인 신청 · 예약이 있으면 409) |
 
 ### 선택지 (`http/option.http`)
 
@@ -888,7 +894,7 @@ try {
 
 | 메서드 | 경로 | 인증 | 설명 |
 | --- | --- | --- | --- |
-| GET | `/api/v1/community/posts` | 공개 | 게시글 목록 (category · keyword) |
+| GET | `/api/v1/community/posts` | 공개 | 게시글 목록 (category · keyword, 본문 미리보기 `contentPreview` 앞 100자) |
 | GET | `/api/v1/community/posts/{postId}` | 공개 | 게시글 상세 (조회 수 +1, 토큰 있으면 mine) |
 | POST | `/api/v1/community/posts` | 로그인 | 게시글 쓰기 (공지는 ADMIN) |
 | PUT | `/api/v1/community/posts/{postId}` | 작성자 | 게시글 수정 |
@@ -914,6 +920,7 @@ try {
 | 메서드 | 경로 | 인증 | 설명 |
 | --- | --- | --- | --- |
 | POST | `/api/v1/reports` | 로그인 | 신고하기 (multipart: targetType · targetId · reason · detail + 증거 사진 photos 최대 5장) |
+| GET | `/api/v1/members/me/reports` | 로그인 | 내 신고 내역 (최근 순, status 로 거르기, 처리 결과는 상태만) |
 | GET | `/api/v1/admin/reports` | ADMIN | 신고 목록 (status · targetType, 사진은 photoCount 만) |
 | GET | `/api/v1/admin/reports/{reportId}` | ADMIN | 신고 상세 (대상 요약, 증거 사진 임시 주소) |
 | POST | `/api/v1/admin/reports/{reportId}/resolve` | ADMIN | 신고 처리 (기각 · 숨김 · 정지) |

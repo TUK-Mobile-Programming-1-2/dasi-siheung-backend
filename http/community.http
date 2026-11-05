@@ -73,13 +73,15 @@ Content-Type: application/json
 %}
 
 ### 게시글 목록 — 분류 · 검색어 (로그인 없이)
-# 기대값: 200 OK, 방금 쓴 글 1건
+# 기대값: 200 OK, 방금 쓴 글 1건, contentPreview = 본문 앞 100자 (줄바꿈은 공백으로)
 GET {{baseUrl}}/api/v1/community/posts?category=RECRUIT&keyword={{communityKeyword}}
 
 > {%
-    client.test("200 OK + 1건", () => {
+    client.test("200 OK + 1건 + 본문 미리보기", () => {
         client.assert(response.status === 200, `실제 ${response.status}`);
         client.assert(response.body.data.totalElements === 1, `실제 ${response.body.data.totalElements}`);
+        const preview = response.body.data.content[0].contentPreview;
+        client.assert(preview === "11월 둘째 주말, 핸드메이드 소품 팝업을 함께 열 팀을 찾습니다.", `실제 ${preview}`);
     });
 %}
 
