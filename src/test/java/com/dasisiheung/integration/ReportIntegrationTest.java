@@ -35,6 +35,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.mock.web.MockPart;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -160,6 +161,50 @@ class ReportIntegrationTest {
     }
 
     @Test
+    @DisplayName("내 신고 내역: 내 것만 최근 순, 대상 요약 · 사진 장수, 처리되면 상태 · 처리 시각, 상태로 거른다")
+    void myReports() throws Exception {
+        TestAccounts.Account provider = testAccounts.create(Role.PROVIDER);
+        TestAccounts.Account admin = testAccounts.create(Role.ADMIN);
+        TestAccounts.Account reporter = testAccounts.create(Role.USER);
+        TestAccounts.Account other = testAccounts.create(Role.USER);
+        long spaceId = spaceScenario.publishedSpace(provider, admin, Set.of());
+
+        long spaceReportId = report(reporter, "SPACE", spaceId, TestFiles.jpeg("photos"))
+                .andExpect(status().isCreated()).andReturn()
+                .getResponse().getContentAsString(StandardCharsets.UTF_8).transform(this::idOf);
+        long memberReportId = report(reporter, "MEMBER", provider.id())
+                .andExpect(status().isCreated()).andReturn()
+                .getResponse().getContentAsString(StandardCharsets.UTF_8).transform(this::idOf);
+        report(other, "SPACE", spaceId).andExpect(status().isCreated());
+
+        myReports(reporter, null)
+                .andExpect(jsonPath("$.data.totalElements").value(2))
+                .andExpect(jsonPath("$.data.content[0].id").value(memberReportId))
+                .andExpect(jsonPath("$.data.content[0].targetSummary").value("통합테스트"))
+                .andExpect(jsonPath("$.data.content[0].photoCount").value(0))
+                .andExpect(jsonPath("$.data.content[1].id").value(spaceReportId))
+                .andExpect(jsonPath("$.data.content[1].targetSummary").value("정왕역 앞 1층 상가"))
+                .andExpect(jsonPath("$.data.content[1].photoCount").value(1))
+                .andExpect(jsonPath("$.data.content[1].status").value("PENDING"))
+                .andExpect(jsonPath("$.data.content[1].resolvedAt").isEmpty())
+                .andExpect(jsonPath("$.data.content[1].adminNote").doesNotExist());
+
+        mockMvc.perform(post("/api/v1/admin/reports/{id}/resolve", spaceReportId)
+                        .header(HttpHeaders.AUTHORIZATION, admin.bearer())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"action\": \"DISMISS\", \"note\": \"확인 결과 문제 없음\"}"))
+                .andExpect(status().isOk());
+
+        myReports(reporter, "PENDING")
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.content[0].id").value(memberReportId));
+        myReports(reporter, "DISMISSED")
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.content[0].status").value("DISMISSED"))
+                .andExpect(jsonPath("$.data.content[0].resolvedAt").isNotEmpty());
+        myReports(other, null).andExpect(jsonPath("$.data.totalElements").value(1));
+    }
+
+    @Test
     @DisplayName("사진 6장이면 400 REPORT_PHOTO_LIMIT_EXCEEDED, 파일을 올리기 전에 막는다")
     void photoLimit() throws Exception {
         TestAccounts.Account writer = testAccounts.create(Role.USER);
@@ -184,6 +229,14 @@ class ReportIntegrationTest {
         return mockMvc.perform(request.part(text("targetType", targetType), text("targetId", String.valueOf(targetId)),
                         text("reason", "FALSE_INFORMATION"))
                 .header(HttpHeaders.AUTHORIZATION, reporter.bearer()));
+    }
+
+    /** @param statusFilter null 이면 전체 */
+    private ResultActions myReports(TestAccounts.Account account, String statusFilter) throws Exception {
+        MockHttpServletRequestBuilder request = get("/api/v1/members/me/reports")
+                .header(HttpHeaders.AUTHORIZATION, account.bearer());
+        return mockMvc.perform(statusFilter == null ? request : request.param("status", statusFilter))
+                .andExpect(status().isOk());
     }
 
     private static MockPart text(String name, String value) {
