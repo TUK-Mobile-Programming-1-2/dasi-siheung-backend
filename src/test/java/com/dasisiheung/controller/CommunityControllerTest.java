@@ -63,7 +63,8 @@ class CommunityControllerTest extends ApiDocsTestSupport {
     void getPosts() throws Exception {
         given(communityService.getPosts(eq(PostCategory.RECRUIT), eq("플리마켓"), any(PageQuery.class)))
                 .willReturn(new PageResponse<>(List.of(new PostSummaryResponse(1L, PostCategory.RECRUIT,
-                        "배곧 플리마켓 같이 하실 분 구해요", AUTHOR, 3, 42, FixedClockConfig.FIXED_LOCAL_NOW)), 0, 20, 1, 1, false));
+                        "배곧 플리마켓 같이 하실 분 구해요", "11월 둘째 주말, 핸드메이드 소품 팝업을 함께 열 팀을 찾습니다.",
+                        AUTHOR, 3, 42, FixedClockConfig.FIXED_LOCAL_NOW)), 0, 20, 1, 1, false));
 
         mockMvc.perform(get("/api/v1/community/posts").param("category", "RECRUIT").param("keyword", "플리마켓"))
                 .andExpect(status().isOk())
@@ -78,6 +79,8 @@ class CommunityControllerTest extends ApiDocsTestSupport {
                                 fieldWithPath("data.content[].id").type(JsonFieldType.NUMBER).description("게시글 ID"),
                                 fieldWithPath("data.content[].category").type(JsonFieldType.STRING).description("분류"),
                                 fieldWithPath("data.content[].title").type(JsonFieldType.STRING).description("제목"),
+                                fieldWithPath("data.content[].contentPreview").type(JsonFieldType.STRING)
+                                        .description("본문 미리보기 — 줄바꿈 · 연속 공백을 공백 하나로 줄인 앞 100자"),
                                 fieldWithPath("data.content[].author.id").type(JsonFieldType.NUMBER).description("글쓴이 회원 ID"),
                                 fieldWithPath("data.content[].author.name").type(JsonFieldType.STRING).description("글쓴이 이름"),
                                 fieldWithPath("data.content[].author.role").type(JsonFieldType.STRING).description("글쓴이 역할"),

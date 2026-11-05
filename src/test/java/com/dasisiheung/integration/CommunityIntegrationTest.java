@@ -51,7 +51,8 @@ class CommunityIntegrationTest {
         long postId = objectMapper.readTree(body).at("/data/id").asLong();
 
         mockMvc.perform(get("/api/v1/community/posts").param("keyword", token).param("category", "RECRUIT"))
-                .andExpect(jsonPath("$.data.totalElements").value(1));
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.content[0].contentPreview").value("함께해요 100%"));
         mockMvc.perform(get("/api/v1/community/posts").param("keyword", token).param("category", "QUESTION"))
                 .andExpect(jsonPath("$.data.totalElements").value(0));
 

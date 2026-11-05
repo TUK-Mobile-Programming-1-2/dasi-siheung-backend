@@ -17,6 +17,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+import java.util.regex.Pattern;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -27,6 +28,11 @@ import lombok.NoArgsConstructor;
 @Table(name = "community_post")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Post extends BaseTimeEntity {
+
+    /** 목록 미리보기 최대 글자 수. (이모지 등도 한 글자) */
+    public static final int PREVIEW_LENGTH = 100;
+
+    private static final Pattern WHITESPACES = Pattern.compile("\\s+");
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -80,6 +86,15 @@ public class Post extends BaseTimeEntity {
 
     public boolean isVisible() {
         return status == ContentStatus.VISIBLE;
+    }
+
+    /** 목록 한 줄 요약: 줄바꿈 · 연속 공백을 공백 하나로 줄인 본문의 앞 100자. */
+    public String contentPreview() {
+        String flat = WHITESPACES.matcher(content).replaceAll(" ");
+        if (flat.codePointCount(0, flat.length()) <= PREVIEW_LENGTH) {
+            return flat;
+        }
+        return flat.substring(0, flat.offsetByCodePoints(0, PREVIEW_LENGTH));
     }
 
     public boolean isWrittenBy(Long memberId) {

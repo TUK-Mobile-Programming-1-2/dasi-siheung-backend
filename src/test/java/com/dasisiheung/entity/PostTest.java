@@ -58,4 +58,26 @@ class PostTest {
         comment.hide();
         assertThat(comment.isVisible()).isFalse();
     }
+
+    @Test
+    @DisplayName("미리보기: 줄바꿈 · 연속 공백은 공백 하나로, 짧으면 그대로")
+    void previewFlattensWhitespace() {
+        Post post = Post.write(user, PostCategory.QUESTION, "질문", "첫 줄\n\n둘째   줄\t끝");
+
+        assertThat(post.contentPreview()).isEqualTo("첫 줄 둘째 줄 끝");
+    }
+
+    @Test
+    @DisplayName("미리보기: 100자를 넘으면 앞 100자만, 이모지를 반으로 자르지 않는다")
+    void previewCutsAtHundredCodePoints() {
+        String content = "가".repeat(99) + "😀" + "나머지";
+        Post post = Post.write(user, PostCategory.QUESTION, "질문", content);
+
+        String preview = post.contentPreview();
+
+        assertThat(preview).isEqualTo("가".repeat(99) + "😀");
+        assertThat(preview.codePointCount(0, preview.length())).isEqualTo(Post.PREVIEW_LENGTH);
+        assertThat(Post.write(user, PostCategory.QUESTION, "질문", "가".repeat(100)).contentPreview())
+                .hasSize(Post.PREVIEW_LENGTH);
+    }
 }
