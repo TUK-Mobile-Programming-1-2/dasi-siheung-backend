@@ -37,7 +37,7 @@ public class RecommendationService {
     public List<RecommendationResponse> recommend(UsePurpose purpose, ActivityType activityType, LocalDate startDate,
                                                   LocalDate endDate, int limit) {
         SpaceSearchRequest filter = new SpaceSearchRequest(null, activityType, null, startDate, endDate, null, null,
-                null, null, null);
+                null, null, null, null, null);
         if (!filter.isPeriodValid()) {
             throw new BusinessException(ErrorCode.INVALID_INPUT, "시작일과 종료일은 함께 보내야 하고, 종료일은 시작일보다 빠를 수 없습니다.");
         }

@@ -115,8 +115,8 @@ class SpaceQueryServiceTest {
         Space space = SpaceFixtures.space(10L, SpaceFixtures.provider(2L), Set.of(), TODAY);
         given(spaceRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .willReturn(new PageImpl<>(List.of(space)));
-        SpaceSearchRequest request = new SpaceSearchRequest(null, null, null, null, null, null, null, null, null,
-                SpaceSort.PRICE_ASC);
+        SpaceSearchRequest request = new SpaceSearchRequest(null, null, null, null, null, null, null, null, null, null,
+                null, SpaceSort.PRICE_ASC);
 
         PageResponse<SpaceSummaryResponse> response = spaceQueryService.search(request, new PageQuery(0, 20));
 
@@ -139,7 +139,7 @@ class SpaceQueryServiceTest {
     @Test
     @DisplayName("검색 조건 기본값: 정렬 LATEST, 빈 시설, 공백 검색어는 없음")
     void defaults() {
-        SpaceSearchRequest request = new SpaceSearchRequest(null, null, null, null, null, null, null, null, "  ", null);
+        SpaceSearchRequest request = new SpaceSearchRequest(null, null, null, null, null, null, null, null, null, null, "  ", null);
 
         assertThat(request.sort()).isEqualTo(SpaceSort.LATEST);
         assertThat(request.facilities()).isEmpty();
@@ -150,7 +150,7 @@ class SpaceQueryServiceTest {
     }
 
     private static SpaceSearchRequest period(LocalDate startDate, LocalDate endDate) {
-        return new SpaceSearchRequest(null, null, null, startDate, endDate, null, null, null, null, null);
+        return new SpaceSearchRequest(null, null, null, startDate, endDate, null, null, null, null, null, null, null);
     }
 
     @Test
