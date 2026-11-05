@@ -38,6 +38,21 @@ public interface ReportRepository extends JpaRepository<Report, Long> {
     Page<Report> search(@Param("status") ReportStatus status, @Param("targetType") ReportTargetType targetType,
                         Pageable pageable);
 
+    /**
+     * 회원이 한 신고.
+     *
+     * @param status null 이면 전체
+     */
+    @Query(value = """
+            select r from Report r
+            where r.reporter.id = :reporterId and (:status is null or r.status = :status)
+            """, countQuery = """
+            select count(r) from Report r
+            where r.reporter.id = :reporterId and (:status is null or r.status = :status)
+            """)
+    Page<Report> findMine(@Param("reporterId") Long reporterId, @Param("status") ReportStatus status,
+                          Pageable pageable);
+
     List<Report> findByTargetTypeAndTargetIdAndStatus(ReportTargetType targetType, Long targetId, ReportStatus status);
 
     long countByStatus(ReportStatus status);
