@@ -31,7 +31,7 @@ ext {
     springdocVersion = '2.9.1'
     restdocsApiSpecVersion = '0.19.4'
     archunitVersion = '1.5.1'
-    jjwtVersion = '0.12.6'
+    jjwtVersion = '0.13.0'
 }
 
 dependencies {
