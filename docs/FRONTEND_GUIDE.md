@@ -248,6 +248,7 @@ flowchart LR
 | `REPORT_TARGET_NOT_FOUND` | 404 | 신고 대상이 없음 | 이미 지워진 대상 안내 |
 | `DUPLICATE_REPORT` | 409 | 처리 대기 중인 같은 신고가 있음 | 이미 신고했다고 안내 |
 | `CANNOT_REPORT_SELF` | 400 | 자기 자신 · 자기 글 신고 | 신고 버튼 숨기기 |
+| `REPORT_PHOTO_LIMIT_EXCEEDED` | 400 | 신고 사진 5장 초과 | 사진 선택을 5장으로 제한 |
 | `REPORT_ALREADY_RESOLVED` | 409 | 이미 처리된 신고를 다시 처리 | 목록 새로고침 |
 | `INVALID_REPORT_ACTION` | 400 | 회원 신고를 숨김 처리 | 정지 · 기각만 보여주기 |
 | `CANNOT_SUSPEND_MEMBER` | 409 | 관리자 · 탈퇴 회원 정지 | 버튼 숨기기 |
@@ -277,7 +278,7 @@ flowchart LR
 
 ### 3-3-3. 파일 업로드
 
-- 파일은 **`multipart/form-data`** 로 보냅니다. 파트 이름은 API 마다 다르니 Swagger 를 확인하세요. (보통 `files` 또는 `file`)
+- 파일은 **`multipart/form-data`** 로 보냅니다. 파트 이름은 API 마다 다르니 Swagger 를 확인하세요. (보통 `files` 또는 `file`, 신고 사진은 `photos`)
 - 서버가 **파일 내용으로 형식을 판별**합니다. 확장자만 바꾼 파일은 400 `UNSUPPORTED_FILE_TYPE` 입니다.
 
 | 종류 | 형식 | 파일당 최대 | 응답 주소 |
@@ -285,9 +286,31 @@ flowchart LR
 | 공간 사진 | JPG · PNG · WEBP | 10MB | 고정 주소 (그대로 `<img>` / Coil 에 사용) |
 | 권한 증빙 | PDF · JPG · PNG | 20MB | **10분짜리 임시 주소** — 만료되면 목록을 다시 조회 |
 | 활동 전후 사진 | JPG · PNG · WEBP | 10MB | 10분짜리 임시 주소 |
+| 신고 증거 사진 | JPG · PNG · WEBP | 10MB (최대 5장) | 10분짜리 임시 주소 — **관리자만** 열람 |
 
 - 사진은 앱에서 **긴 변 2000px 이하로 줄여서** 올리면 업로드가 빠르고 용량 초과를 피할 수 있습니다.
 - 임시 주소는 저장하지 말고 화면을 열 때마다 받은 값을 씁니다.
+
+**텍스트 + 파일을 함께 보내는 예 — 신고하기** (`POST /api/v1/reports`)
+
+텍스트 값도 각각 하나의 파트로 보냅니다. 사진이 없으면 `photos` 파트를 빼면 됩니다.
+
+```kotlin
+interface ReportApi {
+    @Multipart
+    @POST("api/v1/reports")
+    suspend fun report(
+        @Part("targetType") targetType: RequestBody,      // SPACE | POST | COMMENT | MEMBER
+        @Part("targetId") targetId: RequestBody,
+        @Part("reason") reason: RequestBody,              // 선택지 reportReasons
+        @Part("detail") detail: RequestBody?,             // 선택
+        @Part photos: List<MultipartBody.Part>,           // 선택, 최대 5장 (없으면 emptyList())
+    ): Response<ApiResult<ReportResponse>>
+}
+
+fun String.toPart() = toRequestBody("text/plain".toMediaType())
+fun File.toPhotoPart() = MultipartBody.Part.createFormData("photos", name, asRequestBody("image/jpeg".toMediaType()))
+```
 
 ### 3-3-4. 주소 · 좌표 · 지역
 
@@ -834,9 +857,9 @@ try {
 
 | 메서드 | 경로 | 인증 | 설명 |
 | --- | --- | --- | --- |
-| POST | `/api/v1/reports` | 로그인 | 신고하기 (공간 · 게시글 · 댓글 · 회원) |
-| GET | `/api/v1/admin/reports` | ADMIN | 신고 목록 (status · targetType) |
-| GET | `/api/v1/admin/reports/{reportId}` | ADMIN | 신고 상세 (대상 요약) |
+| POST | `/api/v1/reports` | 로그인 | 신고하기 (multipart: targetType · targetId · reason · detail + 증거 사진 photos 최대 5장) |
+| GET | `/api/v1/admin/reports` | ADMIN | 신고 목록 (status · targetType, 사진은 photoCount 만) |
+| GET | `/api/v1/admin/reports/{reportId}` | ADMIN | 신고 상세 (대상 요약, 증거 사진 임시 주소) |
 | POST | `/api/v1/admin/reports/{reportId}/resolve` | ADMIN | 신고 처리 (기각 · 숨김 · 정지) |
 | POST | `/api/v1/admin/members/{memberId}/suspend` | ADMIN | 회원 이용 정지 |
 | POST | `/api/v1/admin/members/{memberId}/unsuspend` | ADMIN | 이용 정지 해제 |
