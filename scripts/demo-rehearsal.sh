@@ -23,7 +23,7 @@ if [ ! -f http-client.private.env.json ]; then
   exit 1
 fi
 if [ "$RUNS" -gt 15 ]; then
-  echo "회차마다 신청 날짜가 이틀씩 밀려 시연 캘린더(60일)를 넘습니다. 15번 이하로 실행하세요."
+  echo "회차마다 신청 날짜가 이틀씩 밀려 시연 공간의 다른 신청 · 예약과 겹칠 수 있습니다. 15번 이하로 실행하세요."
   exit 1
 fi
 

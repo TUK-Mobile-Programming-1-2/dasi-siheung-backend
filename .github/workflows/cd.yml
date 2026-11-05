@@ -75,8 +75,10 @@ jobs:
               initialDelaySeconds: "180"
               strategy: recreate
               env:
+                # demo: 프론트 개발 · 테스트용 시연 데이터 (계정이 없을 때 한 번만 생성, docs/DEMO_GUIDE.md)
+                #       실제 서비스를 열기 전에 prod 로 되돌리고 시연 계정을 정리한다.
                 - name: SPRING_PROFILES_ACTIVE
-                  value: prod
+                  value: prod,demo
                 - name: TZ
                   value: Asia/Seoul
                 - name: DB_URL
