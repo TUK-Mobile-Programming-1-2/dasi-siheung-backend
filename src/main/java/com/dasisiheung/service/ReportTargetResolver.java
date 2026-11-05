@@ -51,6 +51,15 @@ public class ReportTargetResolver {
         };
     }
 
+    /** 대상 요약 한 줄. 대상이 지워졌으면 null. */
+    public String summaryOf(ReportTargetType type, Long id) {
+        try {
+            return find(type, id).summary();
+        } catch (BusinessException deleted) {
+            return null;
+        }
+    }
+
     /**
      * 대상을 숨긴다. 이미 숨겨졌으면 아무것도 하지 않는다.
      * 댓글 수 갱신은 영속성 컨텍스트를 비우므로 다른 변경을 마친 뒤 마지막에 부른다.

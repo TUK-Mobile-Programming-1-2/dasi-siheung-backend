@@ -6,6 +6,9 @@ import static com.dasisiheung.support.ApiDocumentation.error;
 import static com.dasisiheung.support.ApiDocumentation.page;
 import static com.dasisiheung.support.ApiDocumentation.resource;
 import static com.dasisiheung.support.ApiDocumentation.success;
+import static com.dasisiheung.support.MultipartDocumentation.filesPart;
+import static com.dasisiheung.support.MultipartDocumentation.requestParts;
+import static com.dasisiheung.support.MultipartDocumentation.textPart;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.is;
@@ -23,10 +26,8 @@ import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWit
 import static org.springframework.restdocs.payload.PayloadDocumentation.requestFields;
 import static org.springframework.restdocs.payload.PayloadDocumentation.responseFields;
 import static org.springframework.restdocs.request.RequestDocumentation.parameterWithName;
-import static org.springframework.restdocs.request.RequestDocumentation.partWithName;
 import static org.springframework.restdocs.request.RequestDocumentation.pathParameters;
 import static org.springframework.restdocs.request.RequestDocumentation.queryParameters;
-import static org.springframework.restdocs.request.RequestDocumentation.requestParts;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -34,6 +35,7 @@ import com.dasisiheung.dto.common.PageQuery;
 import com.dasisiheung.dto.common.PageResponse;
 import com.dasisiheung.dto.report.AdminReportResponse;
 import com.dasisiheung.dto.report.MemberSuspensionResponse;
+import com.dasisiheung.dto.report.MyReportResponse;
 import com.dasisiheung.dto.report.ReportPhotoResponse;
 import com.dasisiheung.dto.report.ReportRequest;
 import com.dasisiheung.dto.report.ReportResponse;
@@ -103,12 +105,11 @@ class ReportControllerTest extends ApiDocsTestSupport {
                         resource("Report", "신고하기", CREATE_DESCRIPTION),
                         requestHeaders(authorization()),
                         requestParts(
-                                partWithName("targetType").description("SPACE | POST | COMMENT | MEMBER"),
-                                partWithName("targetId").description("대상 ID"),
-                                partWithName("reason").description("사유 (선택지 reportReasons)"),
-                                partWithName("detail").optional().description("자세한 내용 (선택, 최대 1000자)"),
-                                partWithName("photos").optional()
-                                        .description("증거 사진 (선택, 같은 이름으로 여러 개, 최대 5장, JPG·PNG·WEBP 10MB)")),
+                                textPart("targetType", "SPACE | POST | COMMENT | MEMBER"),
+                                textPart("targetId", "대상 ID"),
+                                textPart("reason", "사유 (선택지 reportReasons)"),
+                                textPart("detail", "자세한 내용 (선택, 최대 1000자)").optional(),
+                                filesPart("photos", "증거 사진 (선택, 같은 이름으로 여러 개, 최대 5장, JPG·PNG·WEBP 10MB)").optional()),
                         responseFields(success(
                                 fieldWithPath("data.id").type(JsonFieldType.NUMBER).description("신고 ID"),
                                 fieldWithPath("data.targetType").type(JsonFieldType.STRING).description("대상 종류"),
@@ -214,6 +215,61 @@ class ReportControllerTest extends ApiDocsTestSupport {
                 .andExpect(status().isUnsupportedMediaType())
                 .andExpect(jsonPath("$.error.code").value("UNSUPPORTED_MEDIA_TYPE"));
         verifyNoInteractions(reportService);
+    }
+
+    @Test
+    @DisplayName("내 신고 내역")
+    void myReports() throws Exception {
+        given(reportService.getMyReports(eq(USER_ID), isNull(), any(PageQuery.class))).willReturn(new PageResponse<>(
+                List.of(new MyReportResponse(2L, ReportTargetType.SPACE, 10L, "정왕역 앞 코너 상가",
+                                ReportReason.FALSE_INFORMATION, "사진과 실제 공간이 전혀 다릅니다.", ReportStatus.RESOLVED, 2,
+                                FixedClockConfig.FIXED_LOCAL_NOW, FixedClockConfig.FIXED_LOCAL_NOW.plusHours(3)),
+                        new MyReportResponse(1L, ReportTargetType.COMMENT, 5L, null, ReportReason.SPAM, null,
+                                ReportStatus.PENDING, 0, FixedClockConfig.FIXED_LOCAL_NOW.minusDays(1), null)),
+                0, 20, 2, 1, false));
+
+        mockMvc.perform(get("/api/v1/members/me/reports").header(HttpHeaders.AUTHORIZATION, userToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].status").value("RESOLVED"))
+                .andExpect(jsonPath("$.data.content[1].targetSummary").isEmpty())
+                .andDo(document("report-my-list",
+                        resource("Report", "내 신고 내역", "내가 한 신고, 최근 순. 처리 결과는 상태(PENDING 처리 대기 · "
+                                + "RESOLVED 조치 완료 · DISMISSED 기각)만 알려주며, 관리자 메모 · 처리 내용 · 증거 사진 주소는 "
+                                + "주지 않습니다."),
+                        requestHeaders(authorization()),
+                        queryParameters(
+                                parameterWithName("status").optional().description("처리 상태 (선택지 reportStatuses, 없으면 전체)"),
+                                parameterWithName("page").optional().description("페이지 (0부터)"),
+                                parameterWithName("size").optional().description("페이지 크기 (최대 100)")),
+                        responseFields(page(
+                                fieldWithPath("data.content[].id").type(JsonFieldType.NUMBER).description("신고 ID"),
+                                fieldWithPath("data.content[].targetType").type(JsonFieldType.STRING)
+                                        .description("대상 종류: SPACE | POST | COMMENT | MEMBER"),
+                                fieldWithPath("data.content[].targetId").type(JsonFieldType.NUMBER).description("대상 ID"),
+                                fieldWithPath("data.content[].targetSummary").type(JsonFieldType.STRING).optional()
+                                        .description("대상 요약 (공간 이름 · 글 제목 · 댓글 앞부분 · 회원 이름, 지워졌으면 null)"),
+                                fieldWithPath("data.content[].reason").type(JsonFieldType.STRING).description("사유"),
+                                fieldWithPath("data.content[].detail").type(JsonFieldType.STRING).optional()
+                                        .description("자세한 내용"),
+                                fieldWithPath("data.content[].status").type(JsonFieldType.STRING)
+                                        .description("처리 상태: PENDING | RESOLVED | DISMISSED"),
+                                fieldWithPath("data.content[].photoCount").type(JsonFieldType.NUMBER)
+                                        .description("첨부한 증거 사진 장수"),
+                                fieldWithPath("data.content[].createdAt").type(JsonFieldType.STRING).description("접수 시각"),
+                                fieldWithPath("data.content[].resolvedAt").type(JsonFieldType.STRING).optional()
+                                        .description("처리 시각 (처리 전 null)")))));
+    }
+
+    @Test
+    @DisplayName("내 신고 내역: 공간 제공자도 볼 수 있고, 상태로 거른다")
+    void myReportsByStatus() throws Exception {
+        given(reportService.getMyReports(eq(PROVIDER_ID), eq(ReportStatus.PENDING), any(PageQuery.class)))
+                .willReturn(new PageResponse<>(List.of(), 0, 20, 0, 0, false));
+
+        mockMvc.perform(get("/api/v1/members/me/reports").param("status", "PENDING")
+                        .header(HttpHeaders.AUTHORIZATION, providerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(0));
     }
 
     @Test

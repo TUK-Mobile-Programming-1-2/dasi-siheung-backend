@@ -1,5 +1,8 @@
 package com.dasisiheung.service;
 
+import com.dasisiheung.dto.common.PageQuery;
+import com.dasisiheung.dto.common.PageResponse;
+import com.dasisiheung.dto.report.MyReportResponse;
 import com.dasisiheung.dto.report.ReportPhotoResponse;
 import com.dasisiheung.dto.report.ReportRequest;
 import com.dasisiheung.dto.report.ReportResponse;
@@ -16,7 +19,10 @@ import com.dasisiheung.repository.ReportRepository;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -61,6 +67,21 @@ public class ReportService {
 
         List<ReportPhoto> savedPhotos = savePhotos(saved, files);
         return ReportResponse.of(saved, toResponses(savedPhotos));
+    }
+
+    /**
+     * 내가 한 신고, 최근 순.
+     *
+     * @param status null 이면 전체
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<MyReportResponse> getMyReports(Long reporterId, ReportStatus status, PageQuery pageQuery) {
+        Page<Report> reports = reportRepository.findMine(reporterId, status,
+                pageQuery.toPageable(Sort.by(Sort.Direction.DESC, "createdAt", "id")));
+        Map<Long, Long> photoCounts = reportPhotoRepository.countByReportIds(reports.map(Report::getId).getContent());
+        return PageResponse.from(reports, report -> MyReportResponse.of(report,
+                targetResolver.summaryOf(report.getTargetType(), report.getTargetId()),
+                photoCounts.getOrDefault(report.getId(), 0L).intValue()));
     }
 
     private List<ReportPhoto> savePhotos(Report report, List<MultipartFile> files) {

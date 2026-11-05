@@ -43,6 +43,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 class MemberControllerTest extends ApiDocsTestSupport {
 
     private static final String TAG = "Member";
+    private static final String WITHDRAW_DESCRIPTION = "이메일·이름·연락처는 즉시 지워지고 다시 로그인할 수 없습니다. "
+            + "비밀번호가 틀리면 400 PASSWORD_MISMATCH. 진행 중인 신청 · 예약(검토 중이거나 이용이 끝나지 않은 확정 예약, "
+            + "공간 제공자는 받은 신청 포함)이 있으면 409 WITHDRAWAL_BLOCKED_BY_APPLICATION.";
     private static final MyProfileResponse PROFILE = new MyProfileResponse(USER_ID, "user@example.com", "김시흥",
             "01012345678", Role.USER, MemberStatus.ACTIVE, FixedClockConfig.FIXED_LOCAL_NOW);
 
@@ -135,9 +138,7 @@ class MemberControllerTest extends ApiDocsTestSupport {
                                 {"password": "password123"}
                                 """))
                 .andExpect(status().isOk())
-                .andDo(document("member-me-withdraw",
-                        resource(TAG, "회원 탈퇴", "이메일·이름·연락처는 즉시 지워지고 다시 로그인할 수 없습니다. "
-                                + "비밀번호가 틀리면 400 PASSWORD_MISMATCH 입니다."),
+                .andDo(document("member-me-withdraw", resource(TAG, "회원 탈퇴", WITHDRAW_DESCRIPTION),
                         requestHeaders(authorization()),
                         requestFields(fieldWithPath("password").type(JsonFieldType.STRING).description("본인 확인용 현재 비밀번호")),
                         responseFields(success())));
@@ -156,7 +157,27 @@ class MemberControllerTest extends ApiDocsTestSupport {
                                 {"password": "wrong1234"}
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.code").value("PASSWORD_MISMATCH"));
+                .andExpect(jsonPath("$.error.code").value("PASSWORD_MISMATCH"))
+                .andDo(document("member-me-withdraw-wrong-password", resource(TAG, "회원 탈퇴", WITHDRAW_DESCRIPTION),
+                        responseFields(error())));
+    }
+
+    @Test
+    @DisplayName("회원 탈퇴: 진행 중인 신청 · 예약이 있으면 409 WITHDRAWAL_BLOCKED_BY_APPLICATION")
+    void withdrawBlockedByApplication() throws Exception {
+        willThrow(new BusinessException(ErrorCode.WITHDRAWAL_BLOCKED_BY_APPLICATION))
+                .given(memberService).withdraw(USER_ID, "password123");
+
+        mockMvc.perform(post("/api/v1/members/me/withdraw")
+                        .header(HttpHeaders.AUTHORIZATION, userToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"password": "password123"}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("WITHDRAWAL_BLOCKED_BY_APPLICATION"))
+                .andDo(document("member-me-withdraw-blocked", resource(TAG, "회원 탈퇴", WITHDRAW_DESCRIPTION),
+                        responseFields(error())));
     }
 
     private static FieldDescriptor[] profileFields() {

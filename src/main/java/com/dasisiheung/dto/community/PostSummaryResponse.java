@@ -10,6 +10,8 @@ public record PostSummaryResponse(
         @Schema(description = "게시글 ID", example = "1") Long id,
         @Schema(description = "분류", example = "RECRUIT") PostCategory category,
         @Schema(description = "제목") String title,
+        @Schema(description = "본문 미리보기 — 줄바꿈 · 연속 공백을 공백 하나로 줄인 앞 100자",
+                example = "11월 둘째 주말, 핸드메이드 소품 팝업을 함께 열 팀을 찾습니다.") String contentPreview,
         @Schema(description = "글쓴이") AuthorInfo author,
         @Schema(description = "댓글 수", example = "3") int commentCount,
         @Schema(description = "조회 수", example = "42") int viewCount,
@@ -17,7 +19,7 @@ public record PostSummaryResponse(
 ) {
 
     public static PostSummaryResponse from(Post post) {
-        return new PostSummaryResponse(post.getId(), post.getCategory(), post.getTitle(),
+        return new PostSummaryResponse(post.getId(), post.getCategory(), post.getTitle(), post.contentPreview(),
                 AuthorInfo.from(post.getAuthor()), post.getCommentCount(), post.getViewCount(), post.getCreatedAt());
     }
 }

@@ -1,0 +1,123 @@
+// multipart 요청 본문을 명세에 채운다.
+//
+// epages openapi3 는 REST Docs 의 requestParts 를 requestBody 로 옮기지 않아, 사진 · 파일을 올리는 API 의
+// 요청 본문이 명세에서 비어 버린다. 테스트(MultipartDocumentation)가 남긴 request-parts.json 을 읽어
+// openapi3 가 만든 명세의 해당 operation 에 multipart/form-data requestBody 를 넣는다.
+
+import groovy.json.JsonSlurper
+
+class OpenApiMultipart {
+
+    static final String PARTS_FILE = 'request-parts.json'
+    static final String RESOURCE_FILE = 'resource.json'
+
+    /** @return requestBody 를 채운 operation 수 */
+    static int inject(File spec, File snippetsDir) {
+        List<String> lines = spec.readLines('UTF-8')
+        Set<String> done = [] as Set
+        def snippetDirs = (snippetsDir.listFiles() ?: [] as File[])
+                .findAll { new File(it, PARTS_FILE).isFile() }
+                .sort { it.name }
+        for (File dir : snippetDirs) {
+            def request = new JsonSlurper().parse(new File(dir, RESOURCE_FILE), 'UTF-8').request
+            String key = "${request.method} ${request.path}"
+            if (!done.add(key)) {
+                continue // 같은 API 의 다른 문서(오류 응답 등)는 처음 것만 쓴다.
+            }
+            def parts = new JsonSlurper().parse(new File(dir, PARTS_FILE), 'UTF-8').parts
+            int insertAt = responsesLineOf(lines, request.path as String, (request.method as String).toLowerCase(), dir.name)
+            lines.addAll(insertAt, requestBody(parts))
+        }
+        spec.withWriter('UTF-8') { writer -> lines.each { writer.write(it + '\n') } }
+        return done.size()
+    }
+
+    /** "  {path}:" → "    {method}:" 아래 "      responses:" 줄 위치. 이미 requestBody 가 있으면 실패한다. */
+    private static int responsesLineOf(List<String> lines, String path, String method, String snippet) {
+        int pathAt = lines.indexOf("  ${path}:".toString())
+        if (pathAt < 0) {
+            throw new IllegalStateException("명세에 경로가 없습니다: $path ($snippet)")
+        }
+        int methodAt = indexWithin(lines, pathAt + 1, "    ${method}:", ~/^ {2}\S/)
+        if (methodAt < 0) {
+            throw new IllegalStateException("명세에 ${method.toUpperCase()} $path 가 없습니다. ($snippet)")
+        }
+        if (indexWithin(lines, methodAt + 1, '      requestBody:', ~/^ {4}\S/) >= 0) {
+            throw new IllegalStateException("${method.toUpperCase()} $path 에 이미 requestBody 가 있습니다. ($snippet)")
+        }
+        int responsesAt = indexWithin(lines, methodAt + 1, '      responses:', ~/^ {4}\S/)
+        if (responsesAt < 0) {
+            throw new IllegalStateException("${method.toUpperCase()} $path 에 responses 가 없습니다. ($snippet)")
+        }
+        return responsesAt
+    }
+
+    /** start 부터 stop 패턴(다음 경로 · 다음 메서드) 전까지 target 줄을 찾는다. */
+    private static int indexWithin(List<String> lines, int start, String target, java.util.regex.Pattern stop) {
+        for (int i = start; i < lines.size(); i++) {
+            String line = lines[i]
+            if (line == target) {
+                return i
+            }
+            if (stop.matcher(line).find()) {
+                return -1
+            }
+        }
+        return -1
+    }
+
+    private static List<String> requestBody(parts) {
+        List<String> required = parts.findAll { !it.optional }*.name
+        List<String> out = [
+                '      requestBody:',
+                "        required: ${!required.isEmpty()}".toString(),
+                '        content:',
+                '          multipart/form-data:',
+                '            schema:',
+                '              type: object']
+        if (!required.isEmpty()) {
+            out << '              required:'
+            required.each { out << "              - ${quote(it)}".toString() }
+        }
+        out << '              properties:'
+        parts.each { part ->
+            out << "                ${quote(part.name)}:".toString()
+            switch (part.type) {
+                case 'TEXT':
+                    out << '                  type: string'
+                    out << "                  description: ${quote(part.description)}".toString()
+                    break
+                case 'FILE':
+                    out << '                  type: string'
+                    out << '                  format: binary'
+                    out << "                  description: ${quote(part.description)}".toString()
+                    break
+                case 'FILES':
+                    out << '                  type: array'
+                    out << "                  description: ${quote(part.description)}".toString()
+                    out << '                  items:'
+                    out << '                    type: string'
+                    out << '                    format: binary'
+                    break
+                default:
+                    throw new IllegalStateException("알 수 없는 파트 종류: ${part.type}")
+            }
+        }
+        return out
+    }
+
+    /** YAML 큰따옴표 문자열 (JSON 문자열과 같은 규칙). */
+    private static String quote(String value) {
+        '"' + value.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n') + '"'
+    }
+}
+
+def snippetsDir = layout.buildDirectory.dir('generated-snippets')
+def generatedSpec = layout.buildDirectory.file('api-spec/openapi3.yaml')
+
+tasks.matching { it.name == 'openapi3' }.configureEach {
+    doLast {
+        int count = OpenApiMultipart.inject(generatedSpec.get().asFile, snippetsDir.get().asFile)
+        logger.lifecycle("multipart 요청 본문을 명세에 채움: ${count}개 API")
+    }
+}

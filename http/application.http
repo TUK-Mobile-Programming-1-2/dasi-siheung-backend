@@ -771,3 +771,37 @@ Authorization: Bearer {{appUserAToken}}
 > {%
     client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
 %}
+
+### 탈퇴 — 확정 예약이 남은 이용자 A
+# 기대값: 409 Conflict, error.code = WITHDRAWAL_BLOCKED_BY_APPLICATION (이용이 끝난 다음 날부터 탈퇴 가능)
+POST {{baseUrl}}/api/v1/members/me/withdraw
+Authorization: Bearer {{appUserAToken}}
+Content-Type: application/json
+
+{
+  "password": "password123"
+}
+
+> {%
+    client.test("409 WITHDRAWAL_BLOCKED_BY_APPLICATION", () => {
+        client.assert(response.status === 409, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "WITHDRAWAL_BLOCKED_BY_APPLICATION", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 탈퇴 — 확정 예약을 받은 공간 제공자
+# 기대값: 409 Conflict, error.code = WITHDRAWAL_BLOCKED_BY_APPLICATION
+POST {{baseUrl}}/api/v1/members/me/withdraw
+Authorization: Bearer {{appProviderToken}}
+Content-Type: application/json
+
+{
+  "password": "password123"
+}
+
+> {%
+    client.test("409 WITHDRAWAL_BLOCKED_BY_APPLICATION", () => {
+        client.assert(response.status === 409, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "WITHDRAWAL_BLOCKED_BY_APPLICATION", `실제 ${response.body.error.code}`);
+    });
+%}

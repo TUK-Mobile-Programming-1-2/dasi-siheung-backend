@@ -5,6 +5,9 @@ import static com.dasisiheung.support.ApiDocumentation.document;
 import static com.dasisiheung.support.ApiDocumentation.error;
 import static com.dasisiheung.support.ApiDocumentation.resource;
 import static com.dasisiheung.support.ApiDocumentation.success;
+import static com.dasisiheung.support.MultipartDocumentation.filesPart;
+import static com.dasisiheung.support.MultipartDocumentation.requestParts;
+import static com.dasisiheung.support.MultipartDocumentation.textPart;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -15,9 +18,7 @@ import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuild
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.restdocs.payload.PayloadDocumentation.responseFields;
 import static org.springframework.restdocs.request.RequestDocumentation.parameterWithName;
-import static org.springframework.restdocs.request.RequestDocumentation.partWithName;
 import static org.springframework.restdocs.request.RequestDocumentation.pathParameters;
-import static org.springframework.restdocs.request.RequestDocumentation.requestParts;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -68,8 +69,8 @@ class ActivityPhotoControllerTest extends ApiDocsTestSupport {
                                 + "시점별 최대 10장 (400 ACTIVITY_PHOTO_LIMIT_EXCEEDED). 응답은 이 예약의 전체 사진입니다."),
                         requestHeaders(authorization()),
                         pathParameters(parameterWithName("applicationId").description("신청(예약) ID")),
-                        requestParts(partWithName("files").description("사진 파일 (여러 개, JPG·PNG·WEBP 10MB)"),
-                                partWithName("phase").description("시점 BEFORE 이용 전 | AFTER 이용 후")),
+                        requestParts(filesPart("files", "사진 파일 (같은 이름으로 여러 개, JPG·PNG·WEBP 10MB)"),
+                                textPart("phase", "시점 BEFORE 이용 전 | AFTER 이용 후")),
                         responseFields(success(fields()))));
     }
 

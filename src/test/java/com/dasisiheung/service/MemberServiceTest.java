@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 
 import com.dasisiheung.dto.member.ChangePasswordRequest;
@@ -12,6 +14,7 @@ import com.dasisiheung.entity.member.Member;
 import com.dasisiheung.entity.member.MemberStatus;
 import com.dasisiheung.entity.member.Role;
 import com.dasisiheung.exception.ErrorCode;
+import com.dasisiheung.repository.ApplicationRepository;
 import com.dasisiheung.repository.MemberRepository;
 import com.dasisiheung.repository.RefreshTokenRepository;
 import com.dasisiheung.support.FixedClockConfig;
@@ -38,6 +41,9 @@ class MemberServiceTest {
     @Mock
     private RefreshTokenRepository refreshTokenRepository;
 
+    @Mock
+    private ApplicationRepository applicationRepository;
+
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(4);
 
     private MemberService memberService;
@@ -45,8 +51,8 @@ class MemberServiceTest {
 
     @BeforeEach
     void setUp() {
-        memberService = new MemberService(memberRepository, refreshTokenRepository, passwordEncoder,
-                FixedClockConfig.fixedClock());
+        memberService = new MemberService(memberRepository, refreshTokenRepository, applicationRepository,
+                passwordEncoder, FixedClockConfig.fixedClock());
         member = Member.signUp("user@example.com", passwordEncoder.encode(PASSWORD), "김시흥", "01012345678", Role.USER);
         ReflectionTestUtils.setField(member, "id", MEMBER_ID);
     }
@@ -107,6 +113,31 @@ class MemberServiceTest {
         assertThat(member.getWithdrawnAt()).isEqualTo(FixedClockConfig.FIXED_LOCAL_NOW);
         assertThat(passwordEncoder.matches(PASSWORD, member.getPasswordHash())).isFalse();
         then(refreshTokenRepository).should().deleteAllByMemberId(MEMBER_ID);
+        then(applicationRepository).should().existsInProgressByParticipant(MEMBER_ID, FixedClockConfig.FIXED_TODAY);
+    }
+
+    @Test
+    @DisplayName("진행 중인 신청 · 예약이 있으면 탈퇴를 막고 개인정보 · 토큰을 그대로 둔다")
+    void withdrawBlockedByApplication() {
+        given(memberRepository.findById(MEMBER_ID)).willReturn(Optional.of(member));
+        given(applicationRepository.existsInProgressByParticipant(MEMBER_ID, FixedClockConfig.FIXED_TODAY))
+                .willReturn(true);
+
+        assertThatThrownBy(() -> memberService.withdraw(MEMBER_ID, PASSWORD))
+                .extracting("errorCode").isEqualTo(ErrorCode.WITHDRAWAL_BLOCKED_BY_APPLICATION);
+        assertThat(member.getStatus()).isEqualTo(MemberStatus.ACTIVE);
+        assertThat(member.getEmail()).isEqualTo("user@example.com");
+        then(refreshTokenRepository).should(never()).deleteAllByMemberId(MEMBER_ID);
+    }
+
+    @Test
+    @DisplayName("비밀번호가 틀리면 진행 중인 예약을 보기 전에 PASSWORD_MISMATCH")
+    void withdrawChecksPasswordFirst() {
+        given(memberRepository.findById(MEMBER_ID)).willReturn(Optional.of(member));
+
+        assertThatThrownBy(() -> memberService.withdraw(MEMBER_ID, "wrong1234"))
+                .extracting("errorCode").isEqualTo(ErrorCode.PASSWORD_MISMATCH);
+        then(applicationRepository).should(never()).existsInProgressByParticipant(anyLong(), any());
     }
 
     @Test

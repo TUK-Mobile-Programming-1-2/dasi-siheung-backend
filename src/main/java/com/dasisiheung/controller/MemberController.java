@@ -51,7 +51,9 @@ public class MemberController {
         return ApiResult.ok();
     }
 
-    @Operation(summary = "회원 탈퇴", description = "개인정보(이메일·이름·연락처)는 즉시 지워지고 같은 계정으로 다시 로그인할 수 없습니다.")
+    @Operation(summary = "회원 탈퇴", description = "개인정보(이메일·이름·연락처)는 즉시 지워지고 같은 계정으로 다시 로그인할 수 없습니다. "
+            + "비밀번호가 틀리면 400 PASSWORD_MISMATCH, 진행 중인 신청 · 예약(검토 중이거나 이용이 끝나지 않은 확정 예약, "
+            + "공간 제공자는 받은 신청 포함)이 있으면 409 WITHDRAWAL_BLOCKED_BY_APPLICATION.")
     @PostMapping("/withdraw")
     public ApiResult<Void> withdraw(@LoginMember AuthMember loginMember, @Valid @RequestBody WithdrawRequest request) {
         memberService.withdraw(loginMember.id(), request.password());

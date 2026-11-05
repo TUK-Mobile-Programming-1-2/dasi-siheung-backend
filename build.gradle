@@ -116,6 +116,9 @@ tasks.matching { it.name == 'openapi3' }.configureEach {
     dependsOn 'test'
 }
 
+// multipart 요청(사진 · 파일 업로드)의 파트를 명세 requestBody 로 채운다.
+apply from: 'gradle/openapi-multipart.gradle'
+
 // 생성된 명세를 커밋 대상인 정적 리소스로 옮긴다.
 // Copy 태스크로 src/main/resources 를 출력으로 선언하면 processResources 입력과 겹쳐
 // Gradle 의 암묵적 의존성 검사에 걸리므로, 출력 선언 없이 파일만 복사한다.
