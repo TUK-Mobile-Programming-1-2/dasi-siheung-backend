@@ -5,6 +5,7 @@ import com.dasisiheung.dto.common.PageResponse;
 import com.dasisiheung.dto.report.AdminReportResponse;
 import com.dasisiheung.dto.report.AdminReportResponse.TargetView;
 import com.dasisiheung.dto.report.MemberSuspensionResponse;
+import com.dasisiheung.dto.report.ReportPhotoResponse;
 import com.dasisiheung.dto.report.ResolveReportRequest;
 import com.dasisiheung.entity.member.Member;
 import com.dasisiheung.entity.report.Report;
@@ -15,11 +16,14 @@ import com.dasisiheung.exception.BusinessException;
 import com.dasisiheung.exception.ErrorCode;
 import com.dasisiheung.repository.MemberRepository;
 import com.dasisiheung.repository.RefreshTokenRepository;
+import com.dasisiheung.repository.ReportPhotoRepository;
 import com.dasisiheung.repository.ReportRepository;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,21 +38,33 @@ import org.springframework.transaction.annotation.Transactional;
 public class AdminReportService {
 
     private final ReportRepository reportRepository;
+    private final ReportPhotoRepository reportPhotoRepository;
     private final MemberRepository memberRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final ReportTargetResolver targetResolver;
+    private final FileUploadService fileUploadService;
     private final Clock clock;
 
     /** 처리 대기는 오래된 순, 그 밖은 최근 순. */
     public PageResponse<AdminReportResponse> getReports(ReportStatus status, ReportTargetType targetType,
                                                         PageQuery pageQuery) {
         Sort.Direction direction = status == ReportStatus.PENDING ? Sort.Direction.ASC : Sort.Direction.DESC;
-        return PageResponse.from(reportRepository.search(status, targetType,
-                pageQuery.toPageable(Sort.by(direction, "createdAt", "id"))), this::toResponse);
+        Page<Report> reports = reportRepository.search(status, targetType,
+                pageQuery.toPageable(Sort.by(direction, "createdAt", "id")));
+        Map<Long, Long> photoCounts = reportPhotoRepository.countByReportIds(
+                reports.map(Report::getId).getContent());
+        return PageResponse.from(reports, report -> AdminReportResponse.summary(report, targetOf(report),
+                photoCounts.getOrDefault(report.getId(), 0L).intValue()));
     }
 
+    /** 증거 사진 임시 주소(10분)를 함께 준다. */
     public AdminReportResponse getReport(Long reportId) {
-        return toResponse(reportRepository.getReport(reportId));
+        Report report = reportRepository.getReport(reportId);
+        List<ReportPhotoResponse> photos = reportPhotoRepository.findByReport_IdOrderByIdAsc(reportId).stream()
+                .map(photo -> ReportPhotoResponse.of(photo,
+                        fileUploadService.url(UploadPolicy.REPORT_PHOTO, photo.getStoragePath())))
+                .toList();
+        return AdminReportResponse.detail(report, targetOf(report), photos);
     }
 
     /**
@@ -108,15 +124,14 @@ public class AdminReportService {
         return note == null || note.isBlank() ? "신고 처리로 숨김 처리되었습니다." : note.strip();
     }
 
-    private AdminReportResponse toResponse(Report report) {
-        TargetView target;
+    /** @return 대상 요약, 대상이 지워졌으면 null */
+    private TargetView targetOf(Report report) {
         try {
             ReportTarget found = targetResolver.find(report.getTargetType(), report.getTargetId());
-            target = new TargetView(found.summary(), found.visible(), found.owner().getId(), found.owner().getName(),
+            return new TargetView(found.summary(), found.visible(), found.owner().getId(), found.owner().getName(),
                     found.owner().getStatus());
         } catch (BusinessException deleted) {
-            target = null;
+            return null;
         }
-        return AdminReportResponse.of(report, target);
     }
 }
