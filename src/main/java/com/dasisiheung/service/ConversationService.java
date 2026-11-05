@@ -5,6 +5,7 @@ import com.dasisiheung.dto.common.PageResponse;
 import com.dasisiheung.dto.message.ConversationResponse;
 import com.dasisiheung.dto.message.MessageResponse;
 import com.dasisiheung.dto.message.UnreadCountResponse;
+import com.dasisiheung.entity.application.Application;
 import com.dasisiheung.entity.member.Member;
 import com.dasisiheung.entity.message.Conversation;
 import com.dasisiheung.entity.message.Message;
@@ -12,6 +13,7 @@ import com.dasisiheung.entity.space.Space;
 import com.dasisiheung.entity.space.SpaceStatus;
 import com.dasisiheung.exception.BusinessException;
 import com.dasisiheung.exception.ErrorCode;
+import com.dasisiheung.repository.ApplicationRepository;
 import com.dasisiheung.repository.ConversationRepository;
 import com.dasisiheung.repository.MemberRepository;
 import com.dasisiheung.repository.MessageRepository;
@@ -47,6 +49,7 @@ public class ConversationService {
     private final MessageRepository messageRepository;
     private final SpaceRepository spaceRepository;
     private final MemberRepository memberRepository;
+    private final ApplicationRepository applicationRepository;
     private final SpaceResponseMapper spaceResponseMapper;
     private final Clock clock;
 
@@ -61,6 +64,24 @@ public class ConversationService {
                 .orElseGet(() -> conversationRepository.save(new Conversation(getPublishedSpace(spaceId),
                         memberRepository.getReferenceById(userId))));
         return toResponse(conversation, userId, 0);
+    }
+
+    /**
+     * 신청에서 1:1 대화를 연다. 신청자 · 공간 제공자 누구나 열 수 있고, 이미 있으면 그 대화를 돌려준다(멱등).
+     * 대화는 공간 · 이용자 한 쌍에 하나라, 같은 공간에 여러 번 신청해도 같은 대화로 이어진다.
+     * 신청이 있는 공간이면 공개 상태와 관계없이 열 수 있다. (일시 중단 중에도 예약 관련 연락은 필요)
+     *
+     * @throws BusinessException 신청이 없으면 APPLICATION_NOT_FOUND, 참여자가 아니면 NOT_APPLICATION_PARTICIPANT
+     */
+    @Transactional
+    public ConversationResponse openForApplication(Long memberId, Long applicationId) {
+        Application application = applicationRepository.getApplication(applicationId);
+        application.validateParticipant(memberId);
+        Conversation conversation = conversationRepository
+                .findBySpace_IdAndUser_Id(application.getSpace().getId(), application.getApplicant().getId())
+                .orElseGet(() -> conversationRepository.save(
+                        new Conversation(application.getSpace(), application.getApplicant())));
+        return toResponse(conversation, memberId, unreadCount(conversation, memberId));
     }
 
     public PageResponse<ConversationResponse> getMyConversations(Long memberId, PageQuery pageQuery) {
@@ -112,9 +133,7 @@ public class ConversationService {
         Conversation conversation = getParticipatingConversation(memberId, conversationId);
         conversation.markRead(memberId, lastMessageId);
         conversationRepository.flush();
-        long unread = messageRepository.countUnreadByConversation(List.of(conversationId), memberId).stream()
-                .mapToLong(IdCount::count).sum();
-        return toResponse(conversation, memberId, unread);
+        return toResponse(conversation, memberId, unreadCount(conversation, memberId));
     }
 
     public UnreadCountResponse getUnreadCount(Long memberId) {
@@ -125,6 +144,14 @@ public class ConversationService {
         Conversation conversation = conversationRepository.getConversation(conversationId);
         conversation.validateParticipant(memberId);
         return conversation;
+    }
+
+    private long unreadCount(Conversation conversation, Long memberId) {
+        if (conversation.getId() == null) {
+            return 0;
+        }
+        return messageRepository.countUnreadByConversation(List.of(conversation.getId()), memberId).stream()
+                .mapToLong(IdCount::count).sum();
     }
 
     private Space getPublishedSpace(Long spaceId) {

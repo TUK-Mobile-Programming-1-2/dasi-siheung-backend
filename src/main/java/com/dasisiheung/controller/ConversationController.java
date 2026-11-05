@@ -31,7 +31,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 1:1 소통 (폴링). 이용자가 공간별로 대화를 열고, 두 사람이 메시지를 주고받는다. */
+/**
+ * 1:1 소통 (폴링). 이용자가 공간에서, 또는 신청자 · 공간 제공자가 신청에서 대화를 열고 두 사람이 메시지를 주고받는다.
+ */
 @Tag(name = "Conversation", description = "1:1 소통 (폴링)")
 @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
 @RestController
@@ -45,6 +47,15 @@ public class ConversationController {
     @PreAuthorize("hasRole('USER')")
     public ApiResult<ConversationResponse> open(@LoginMember AuthMember loginMember, @PathVariable Long spaceId) {
         return ApiResult.ok(conversationService.open(loginMember.id(), spaceId));
+    }
+
+    @Operation(summary = "신청에서 대화 열기",
+            description = "신청자 · 공간 제공자 모두 호출할 수 있습니다. 받은 신청 화면의 '채팅' 버튼용. "
+                    + "이미 있으면 그 대화를 돌려줍니다. (공간 · 이용자 한 쌍에 대화 하나)")
+    @PostMapping("/api/v1/applications/{applicationId}/conversation")
+    public ApiResult<ConversationResponse> openForApplication(@LoginMember AuthMember loginMember,
+                                                              @PathVariable Long applicationId) {
+        return ApiResult.ok(conversationService.openForApplication(loginMember.id(), applicationId));
     }
 
     @Operation(summary = "내 대화 목록", description = "최근 메시지 순. 각 대화의 안 읽은 수가 함께 내려갑니다.")
