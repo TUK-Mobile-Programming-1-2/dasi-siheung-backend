@@ -30,7 +30,28 @@ public final class SpaceDocumentation {
                 fieldWithPath("facilities").type(JsonFieldType.ARRAY).optional().description("보유 시설 (선택지 facilities)"),
                 fieldWithPath("activityTypes").type(JsonFieldType.ARRAY).description("허용 활동 (선택지 activityTypes, 1개 이상)"),
                 fieldWithPath("availableDates").type(JsonFieldType.ARRAY).optional()
-                        .description("사용 가능 날짜 yyyy-MM-dd (오늘~1년). 수정 시 보내지 않으면 기존 캘린더 유지"));
+                        .description("사용 가능 날짜 yyyy-MM-dd (오늘~1년). 수정 시 보내지 않으면 기존 캘린더 유지"),
+                fieldWithPath("maxCapacity").type(JsonFieldType.NUMBER).optional()
+                        .description("최대 수용 인원 (1~500, 선택). 정하면 이보다 많은 운영 인원의 신청은 400 HEADCOUNT_EXCEEDS_CAPACITY"),
+                fieldWithPath("equipment").type(JsonFieldType.ARRAY).optional()
+                        .description("빌려주는 비품 (최대 20줄, 선택). 수정할 때는 보낸 목록으로 통째로 바뀝니다"),
+                fieldWithPath("equipment[].name").type(JsonFieldType.STRING).optional()
+                        .description("비품 이름 (최대 40자, 같은 이름은 한 줄로)"),
+                fieldWithPath("equipment[].quantity").type(JsonFieldType.NUMBER).optional().description("수량 (1~999)"),
+                fieldWithPath("priceNegotiable").type(JsonFieldType.BOOLEAN).optional()
+                        .description("가격 협의 가능 여부 (선택, 기본 true). false 면 가격 제안이 409 PRICE_NEGOTIATION_NOT_ALLOWED"));
+    }
+
+    /** 수용 인원 · 비품 · 가격 협의 응답 필드. */
+    private static List<FieldDescriptor> capacityFields(String prefix) {
+        return List.of(
+                fieldWithPath(prefix + "maxCapacity").type(JsonFieldType.NUMBER).optional()
+                        .description("최대 수용 인원 (정하지 않았으면 null)"),
+                fieldWithPath(prefix + "equipment").type(JsonFieldType.ARRAY).description("빌려주는 비품 (입력 순서대로)"),
+                fieldWithPath(prefix + "equipment[].name").type(JsonFieldType.STRING).optional().description("비품 이름"),
+                fieldWithPath(prefix + "equipment[].quantity").type(JsonFieldType.NUMBER).optional().description("수량"),
+                fieldWithPath(prefix + "priceNegotiable").type(JsonFieldType.BOOLEAN)
+                        .description("가격 협의 가능 여부 (false 면 정가로만 신청)"));
     }
 
     /** 공간 제공자의 내 공간 상세 필드. */
@@ -61,6 +82,7 @@ public final class SpaceDocumentation {
                 fieldWithPath(prefix + "proofs").type(JsonFieldType.ARRAY).description("권한 증빙 (임시 주소 포함)"),
                 fieldWithPath(prefix + "createdAt").type(JsonFieldType.STRING).description("등록 시각"),
                 fieldWithPath(prefix + "updatedAt").type(JsonFieldType.STRING).description("마지막 수정 시각")));
+        fields.addAll(capacityFields(prefix));
         return fields;
     }
 
@@ -91,6 +113,7 @@ public final class SpaceDocumentation {
                 fieldWithPath(prefix + "reviewCount").type(JsonFieldType.NUMBER).description("후기 수"),
                 fieldWithPath(prefix + "ratingAverage").type(JsonFieldType.NUMBER).optional().description("평균 평점 (후기 없으면 null)"),
                 fieldWithPath(prefix + "favorited").type(JsonFieldType.BOOLEAN).description("내가 찜했는지 (비로그인이면 false)")));
+        fields.addAll(capacityFields(prefix));
         fields.addAll(photoFields(prefix + "photos[]."));
         return fields;
     }

@@ -32,6 +32,9 @@ public record SpaceDetailResponse(
         @Schema(description = "1일 이용료(원)", example = "50000") int dailyPrice,
         @Schema(description = "보유 시설") List<Facility> facilities,
         @Schema(description = "허용 활동") List<ActivityType> activityTypes,
+        @Schema(description = "최대 수용 인원 (정하지 않았으면 null)", example = "10") Integer maxCapacity,
+        @Schema(description = "빌려주는 비품 (입력 순서대로)") List<EquipmentItem> equipment,
+        @Schema(description = "가격 협의 가능 여부 (false 면 정가로만 신청)", example = "true") boolean priceNegotiable,
         @Schema(description = "오늘 이후 사용 가능 날짜 (오름차순)") List<LocalDate> availableDates,
         @Schema(description = "사진 (순서대로, 첫 번째가 대표)") List<SpacePhotoResponse> photos,
         @Schema(description = "공간 제공자") ProviderProfile provider,
@@ -51,7 +54,8 @@ public record SpaceDetailResponse(
                 space.getRules(), space.getAddress(), space.getBuildingName(), space.getUnitNumber(),
                 space.latitude(), space.longitude(), space.getAreaSqm(), space.getBuildingUse(),
                 space.getCommercialTheme(), space.getDailyPrice(), SpaceResponses.sorted(space.getFacilities()),
-                SpaceResponses.sorted(space.getActivityTypes()), availableDates, photos,
+                SpaceResponses.sorted(space.getActivityTypes()), space.getMaxCapacity(),
+                SpaceResponses.equipment(space), space.isPriceNegotiable(), availableDates, photos,
                 ProviderProfile.from(space.getProvider()), space.getFavoriteCount(), space.getReviewCount(),
                 space.getRatingAverage(), favorited);
     }

@@ -1,5 +1,6 @@
 package com.dasisiheung.dto.space;
 
+import com.dasisiheung.entity.space.Space;
 import java.util.Collection;
 import java.util.List;
 
@@ -11,5 +12,10 @@ final class SpaceResponses {
 
     static <T extends Comparable<? super T>> List<T> sorted(Collection<T> values) {
         return values.stream().sorted().toList();
+    }
+
+    /** 비품은 제공자가 적은 순서 그대로 내려준다. */
+    static List<EquipmentItem> equipment(Space space) {
+        return space.getEquipment().stream().map(EquipmentItem::from).toList();
     }
 }

@@ -4,13 +4,18 @@ import com.dasisiheung.entity.space.ActivityType;
 import com.dasisiheung.entity.space.BuildingUse;
 import com.dasisiheung.entity.space.CommercialTheme;
 import com.dasisiheung.entity.space.Facility;
+import com.dasisiheung.entity.space.Space;
 import com.dasisiheung.entity.space.SpaceDetails;
 import com.dasisiheung.util.GeoPoints;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -18,6 +23,9 @@ import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 /**
@@ -69,12 +77,36 @@ public record SpaceRequest(
 
         @Schema(description = "사용 가능 날짜 (오늘~1년 이내). 수정할 때 보내지 않으면(null) 기존 캘린더를 유지한다",
                 example = "[\"2026-11-01\", \"2026-11-02\"]")
-        @Size(max = 366) Set<LocalDate> availableDates
+        @Size(max = 366) Set<LocalDate> availableDates,
+
+        @Schema(description = "최대 수용 인원 (1~500, 선택). 정하면 이보다 많은 운영 인원의 신청은 받지 않는다", example = "10")
+        @Min(1) @Max(Space.MAX_CAPACITY) Integer maxCapacity,
+
+        @Schema(description = "빌려주는 비품 (이름 · 수량, 최대 20줄, 선택). 수정할 때는 보낸 목록으로 통째로 바꾼다")
+        @Size(max = Space.MAX_EQUIPMENT) List<@Valid EquipmentItem> equipment,
+
+        @Schema(description = "가격 협의 가능 여부 (선택, 기본 true). false 면 이용자는 정가로만 신청한다", example = "true")
+        Boolean priceNegotiable
 ) {
 
     public SpaceDetails toDetails() {
+        List<EquipmentItem> items = equipment == null ? List.of() : equipment;
         return new SpaceDetails(title, description, rules, address, buildingName, unitNumber,
                 GeoPoints.of(latitude, longitude), areaSqm, buildingUse, commercialTheme, dailyPrice,
-                facilities, activityTypes);
+                facilities, activityTypes, maxCapacity, items.stream().map(EquipmentItem::toEntity).toList(),
+                priceNegotiable == null || priceNegotiable);
+    }
+
+    @JsonIgnore
+    @Schema(hidden = true)
+    @AssertTrue(message = "비품 이름이 겹칩니다. 같은 비품은 수량으로 합쳐 주세요.")
+    public boolean isEquipmentNamesUnique() {
+        if (equipment == null) {
+            return true;
+        }
+        Set<String> names = new HashSet<>();
+        return equipment.stream()
+                .filter(item -> item != null && item.name() != null)
+                .allMatch(item -> names.add(item.name().strip().toLowerCase(Locale.ROOT)));
     }
 }
