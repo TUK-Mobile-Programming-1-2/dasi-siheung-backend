@@ -1,6 +1,7 @@
 package com.dasisiheung.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.dasisiheung.entity.member.Member;
@@ -43,6 +44,15 @@ class ReportTest {
         Report dismissed = new Report(reporter, ReportTargetType.POST, 5L, 2L, ReportReason.SPAM, null);
         dismissed.resolve(admin, ReportAction.DISMISS, null, FixedClockConfig.FIXED_LOCAL_NOW);
         assertThat(dismissed.getStatus()).isEqualTo(ReportStatus.DISMISSED);
+    }
+
+    @Test
+    @DisplayName("증거 사진은 5장까지")
+    void photoCount() {
+        assertThatCode(() -> Report.validatePhotoCount(0)).doesNotThrowAnyException();
+        assertThatCode(() -> Report.validatePhotoCount(Report.MAX_PHOTOS)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> Report.validatePhotoCount(Report.MAX_PHOTOS + 1))
+                .extracting("errorCode").isEqualTo(ErrorCode.REPORT_PHOTO_LIMIT_EXCEEDED);
     }
 
     @Test

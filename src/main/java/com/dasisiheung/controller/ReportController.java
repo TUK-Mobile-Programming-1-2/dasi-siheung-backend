@@ -13,8 +13,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -26,11 +27,14 @@ public class ReportController {
 
     private final ReportService reportService;
 
-    @Operation(summary = "신고하기", description = "공간 · 게시글 · 댓글 · 회원을 신고합니다. 관리자가 확인 후 숨김 · 이용 정지 · 기각합니다.")
-    @PostMapping("/api/v1/reports")
+    @Operation(summary = "신고하기",
+            description = "공간 · 게시글 · 댓글 · 회원을 신고합니다. 관리자가 확인 후 숨김 · 이용 정지 · 기각합니다. "
+                    + "multipart 파트: targetType · targetId · reason · detail(선택) 텍스트, "
+                    + "photos(증거 사진, 선택, 최대 5장, JPG·PNG·WEBP 10MB). 사진은 관리자만 볼 수 있습니다.")
+    @PostMapping(path = "/api/v1/reports", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResult<ReportResponse> report(@LoginMember AuthMember loginMember,
-                                            @Valid @RequestBody ReportRequest request) {
+                                            @Valid @ModelAttribute ReportRequest request) {
         return ApiResult.ok(reportService.report(loginMember.id(), request));
     }
 }

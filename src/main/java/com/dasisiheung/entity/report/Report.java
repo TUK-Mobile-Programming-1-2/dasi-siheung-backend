@@ -27,6 +27,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Report extends BaseTimeEntity {
 
+    /** 신고 한 건에 붙일 수 있는 증거 사진 최대 장수. */
+    public static final int MAX_PHOTOS = 5;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -82,6 +85,17 @@ public class Report extends BaseTimeEntity {
         this.reason = reason;
         this.detail = detail == null || detail.isBlank() ? null : detail.strip();
         this.status = ReportStatus.PENDING;
+    }
+
+    /**
+     * 사진을 올리기 전에 장수를 검사한다. (파일 업로드 전에 불러 실패 시 파일이 남지 않게 한다)
+     *
+     * @throws BusinessException 최대 장수를 넘으면 REPORT_PHOTO_LIMIT_EXCEEDED
+     */
+    public static void validatePhotoCount(int count) {
+        if (count > MAX_PHOTOS) {
+            throw new BusinessException(ErrorCode.REPORT_PHOTO_LIMIT_EXCEEDED);
+        }
     }
 
     /**

@@ -1,6 +1,11 @@
 package com.dasisiheung.integration;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -8,17 +13,29 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.dasisiheung.entity.member.Role;
 import com.dasisiheung.support.IntegrationTest;
 import com.dasisiheung.support.SpaceScenario;
+import com.dasisiheung.storage.FileStorage;
+import com.dasisiheung.storage.LocalFileStorage;
 import com.dasisiheung.support.TestAccounts;
+import com.dasisiheung.support.TestFiles;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.mock.web.MockPart;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
 
 @IntegrationTest
@@ -36,6 +53,9 @@ class ReportIntegrationTest {
 
     @Autowired
     private SpaceScenario spaceScenario;
+
+    @Autowired
+    private FileStorage fileStorage;
 
     @Test
     @DisplayName("공간 신고 2건 → 중복 409 · 자기 신고 400 → 숨김 + 정지 → 둘 다 닫힘, 공간 404, 제공자 로그인 403 → 해제")
@@ -108,11 +128,82 @@ class ReportIntegrationTest {
                 .andExpect(jsonPath("$.data.commentCount").value(0));
     }
 
-    private ResultActions report(TestAccounts.Account reporter, String targetType, long targetId) throws Exception {
-        return mockMvc.perform(post("/api/v1/reports").header(HttpHeaders.AUTHORIZATION, reporter.bearer())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"targetType\": \"%s\", \"targetId\": %d, \"reason\": \"FALSE_INFORMATION\"}"
-                        .formatted(targetType, targetId)));
+    @Test
+    @DisplayName("증거 사진 2장: 비공개 저장소에 저장 → 관리자 목록은 장수만, 상세 · 처리 응답은 임시 주소")
+    void reportWithPhotos() throws Exception {
+        TestAccounts.Account provider = testAccounts.create(Role.PROVIDER);
+        TestAccounts.Account admin = testAccounts.create(Role.ADMIN);
+        TestAccounts.Account reporter = testAccounts.create(Role.USER);
+        long spaceId = spaceScenario.publishedSpace(provider, admin, Set.of());
+
+        String body = report(reporter, "SPACE", spaceId, TestFiles.jpeg("photos"),
+                new MockMultipartFile("photos", "photo.png", "image/png", TestFiles.pngBytes()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.photos.length()").value(2))
+                .andExpect(jsonPath("$.data.photos[0].url").value(containsString("/local-storage/private/reports/")))
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        long reportId = idOf(body);
+        assertThat(storedReportPhotos(reportId)).hasSize(2);
+
+        mockMvc.perform(get("/api/v1/admin/reports").param("status", "PENDING").param("size", "100")
+                        .header(HttpHeaders.AUTHORIZATION, admin.bearer()))
+                .andExpect(jsonPath("$.data.content[?(@.id == %d)].photoCount".formatted(reportId)).value(contains(2)))
+                .andExpect(jsonPath("$.data.content[?(@.id == %d)].photos".formatted(reportId)).value(contains(nullValue())));
+        mockMvc.perform(get("/api/v1/admin/reports/{id}", reportId).header(HttpHeaders.AUTHORIZATION, admin.bearer()))
+                .andExpect(jsonPath("$.data.photoCount").value(2))
+                .andExpect(jsonPath("$.data.photos.length()").value(2))
+                .andExpect(jsonPath("$.data.photos[1].url").value(containsString("/reports/" + reportId + "/photos/")));
+        mockMvc.perform(post("/api/v1/admin/reports/{id}/resolve", reportId).header(HttpHeaders.AUTHORIZATION, admin.bearer())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"action\": \"DISMISS\"}"))
+                .andExpect(jsonPath("$.data.status").value("DISMISSED"))
+                .andExpect(jsonPath("$.data.photos.length()").value(2));
+    }
+
+    @Test
+    @DisplayName("사진 6장이면 400 REPORT_PHOTO_LIMIT_EXCEEDED, 파일을 올리기 전에 막는다")
+    void photoLimit() throws Exception {
+        TestAccounts.Account writer = testAccounts.create(Role.USER);
+        TestAccounts.Account reporter = testAccounts.create(Role.USER);
+        Set<Path> before = storedReportPhotos();
+
+        MockMultipartFile[] photos = new MockMultipartFile[6];
+        Arrays.setAll(photos, i -> TestFiles.jpeg("photos"));
+        report(reporter, "MEMBER", writer.id(), photos)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("REPORT_PHOTO_LIMIT_EXCEEDED"));
+
+        assertThat(storedReportPhotos()).isEqualTo(before);
+    }
+
+    private ResultActions report(TestAccounts.Account reporter, String targetType, long targetId,
+                                 MockMultipartFile... photos) throws Exception {
+        MockMultipartHttpServletRequestBuilder request = multipart("/api/v1/reports");
+        for (MockMultipartFile photo : photos) {
+            request.file(photo);
+        }
+        return mockMvc.perform(request.part(text("targetType", targetType), text("targetId", String.valueOf(targetId)),
+                        text("reason", "FALSE_INFORMATION"))
+                .header(HttpHeaders.AUTHORIZATION, reporter.bearer()));
+    }
+
+    private static MockPart text(String name, String value) {
+        return new MockPart(name, value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private Set<Path> storedReportPhotos(long reportId) throws IOException {
+        return storedReportPhotos().stream().filter(path -> path.toString().contains("/reports/" + reportId + "/"))
+                .collect(Collectors.toSet());
+    }
+
+    /** 로컬 저장소(build/test-storage)의 신고 사진 전체. */
+    private Set<Path> storedReportPhotos() throws IOException {
+        Path reports = ((LocalFileStorage) fileStorage).root().resolve("private/reports");
+        if (Files.notExists(reports)) {
+            return Set.of();
+        }
+        try (Stream<Path> files = Files.walk(reports)) {
+            return files.filter(Files::isRegularFile).collect(Collectors.toSet());
+        }
     }
 
     private ResultActions login(TestAccounts.Account account) throws Exception {
