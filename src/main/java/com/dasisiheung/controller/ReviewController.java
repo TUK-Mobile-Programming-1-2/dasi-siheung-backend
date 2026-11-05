@@ -24,10 +24,11 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 이용 후기. 공간별 후기 조회는 로그인 없이, 작성 · 수정 · 삭제는 신청자, 답글은 공간 제공자. */
+/** 이용 후기. 공간별 후기 조회는 로그인 없이, 작성 · 수정 · 삭제는 신청자, 받은 후기 · 답글은 공간 제공자. */
 @Tag(name = "Review", description = "이용 후기 · 평점")
 @RestController
 @RequiredArgsConstructor
@@ -77,6 +78,19 @@ public class ReviewController {
     public ApiResult<ReviewResponse> reply(@LoginMember AuthMember loginMember, @PathVariable Long reviewId,
                                            @Valid @RequestBody ReviewReplyRequest request) {
         return ApiResult.ok(reviewService.reply(loginMember.id(), reviewId, request));
+    }
+
+    @Operation(summary = "받은 후기 (공간 제공자)",
+            description = "내 모든 공간의 후기 (최근 순). replied=false 로 답글을 기다리는 후기만 볼 수 있습니다.")
+    @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
+    @GetMapping("/api/v1/provider/reviews")
+    @PreAuthorize("hasRole('PROVIDER')")
+    public ApiResult<PageResponse<ReviewResponse>> getReceivedReviews(
+            @LoginMember AuthMember loginMember,
+            @RequestParam(required = false) Long spaceId,
+            @RequestParam(required = false) Boolean replied,
+            @Valid @ParameterObject PageQuery pageQuery) {
+        return ApiResult.ok(reviewService.getReceivedReviews(loginMember.id(), spaceId, replied, pageQuery));
     }
 
     @Operation(summary = "내가 쓴 후기")

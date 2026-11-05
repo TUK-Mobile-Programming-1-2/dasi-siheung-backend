@@ -848,8 +848,12 @@ try {
 | POST | `/api/v1/applications/{applicationId}/review` | USER | 후기 작성 (이용이 끝난 확정 예약) |
 | PUT | `/api/v1/reviews/{reviewId}` | USER | 후기 수정 |
 | DELETE | `/api/v1/reviews/{reviewId}` | USER | 후기 삭제 |
-| POST | `/api/v1/reviews/{reviewId}/reply` | PROVIDER | 후기 답글 |
+| POST | `/api/v1/reviews/{reviewId}/reply` | PROVIDER | 후기 답글 (다시 보내면 수정) |
+| GET | `/api/v1/provider/reviews` | PROVIDER | 받은 후기 (내 모든 공간, `spaceId` · `replied` 필터) |
 | GET | `/api/v1/members/me/reviews` | USER | 내가 쓴 후기 |
+
+- 공간 제공자의 '후기 관리' 화면은 `GET /provider/reviews?replied=false` 로 답글을 기다리는 후기만 모아 보여 주세요.
+- 답글 대기 개수(배지)는 `GET /provider/reviews?replied=false&size=1` 의 `totalElements` 를 쓰면 됩니다.
 
 ### 활동 전후 사진 (`http/application.http`)
 
