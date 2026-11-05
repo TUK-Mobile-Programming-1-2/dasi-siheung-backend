@@ -48,6 +48,7 @@ public class ApplicationService {
      * 제안 금액을 함께 보내면 첫 가격 제안으로 남는다.
      *
      * @throws BusinessException 확정 예약과 겹치면 PERIOD_ALREADY_BOOKED, 중복이면 DUPLICATE_APPLICATION,
+     *                           협의를 받지 않는 공간에 제안 금액을 보내면 PRICE_NEGOTIATION_NOT_ALLOWED,
      *                           그 밖은 {@link Application#submit} 참고
      */
     @Transactional
@@ -57,6 +58,9 @@ public class ApplicationService {
         ApplicationPeriod period = request.toPeriod();
 
         Application application = Application.submit(space, applicant, request.toActivityDetails(), period, today());
+        if (request.hasOffer()) {
+            space.validatePriceNegotiable();
+        }
         validateNotBooked(space, period);
         validateNoDuplicate(space, applicantId, period);
         applicationRepository.save(application);

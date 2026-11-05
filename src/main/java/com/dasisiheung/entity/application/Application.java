@@ -127,6 +127,7 @@ public class Application extends BaseTimeEntity {
      * 신청서를 만든다. 겹치는 신청 · 확정 예약 검사는 저장소 조회가 필요해 서비스가 맡는다.
      *
      * @throws BusinessException 공개 중이 아니면 SPACE_NOT_FOUND, 허용하지 않는 활동이면 ACTIVITY_NOT_ALLOWED,
+     *                           운영 인원이 수용 인원을 넘으면 HEADCOUNT_EXCEEDS_CAPACITY,
      *                           기간이 잘못되면 INVALID_APPLICATION_PERIOD, 비어 있지 않은 날짜가 있으면 PERIOD_NOT_AVAILABLE
      */
     public static Application submit(Space space, Member applicant, ActivityDetails details,
@@ -136,6 +137,10 @@ public class Application extends BaseTimeEntity {
         }
         if (!space.getActivityTypes().contains(details.activityType())) {
             throw new BusinessException(ErrorCode.ACTIVITY_NOT_ALLOWED);
+        }
+        if (!space.canAccommodate(details.headcount())) {
+            throw new BusinessException(ErrorCode.HEADCOUNT_EXCEEDS_CAPACITY,
+                    "운영 인원이 공간의 최대 수용 인원(%d명)을 넘습니다.".formatted(space.getMaxCapacity()));
         }
         period.validateApplicable(today);
         if (!period.isCoveredBy(space.getAvailableDates())) {
@@ -182,12 +187,15 @@ public class Application extends BaseTimeEntity {
      * 가격을 제안한다. 처음 제안 · 받은 제안에 대한 역제안 · 합의 뒤 재협의 모두 이 메서드로 한다.
      *
      * @return 이력으로 저장할 제안
-     * @throws BusinessException 검토 중이 아니면 INVALID_APPLICATION_STATUS, 금액이 1원~정가 합계 밖이면 INVALID_OFFER_PRICE,
+     * @throws BusinessException 검토 중이 아니면 INVALID_APPLICATION_STATUS,
+     *                           가격 협의를 받지 않는 공간이면 PRICE_NEGOTIATION_NOT_ALLOWED,
+     *                           금액이 1원~정가 합계 밖이면 INVALID_OFFER_PRICE,
      *                           내 제안에 대한 답을 기다리는 중이면 OFFER_NOT_ALLOWED
      */
     public PriceOffer offer(Member proposer, int amount, String message, LocalDateTime now) {
         OfferSide side = sideOf(proposer.getId());
         validatePending();
+        space.validatePriceNegotiable();
         if (amount < 1 || amount > listTotalPrice) {
             throw new BusinessException(ErrorCode.INVALID_OFFER_PRICE);
         }
