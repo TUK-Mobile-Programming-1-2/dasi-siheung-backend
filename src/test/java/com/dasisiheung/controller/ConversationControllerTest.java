@@ -130,6 +130,27 @@ class ConversationControllerTest extends ApiDocsTestSupport {
     }
 
     @Test
+    @DisplayName("신청에서 대화 열기 — 공간 제공자도 받은 신청에서 신청자에게 대화를 연다")
+    void openForApplication() throws Exception {
+        given(conversationService.openForApplication(PROVIDER_ID, 7L)).willReturn(new ConversationResponse(1L, 10L,
+                "정왕역 앞 1층 상가", ProviderSpaceControllerTest.photos().get(0).url(),
+                new ConversationResponse.Counterpart(USER_ID, "이이용", Role.USER),
+                "안녕하세요! 11월 첫 주말에 팝업 가능할까요?", FixedClockConfig.FIXED_LOCAL_NOW, 1, 0L));
+
+        mockMvc.perform(post("/api/v1/applications/{applicationId}/conversation", 7L)
+                        .header(HttpHeaders.AUTHORIZATION, providerToken()))
+                .andExpect(status().isOk())
+                .andDo(document("conversation-open-for-application",
+                        resource(TAG, "신청에서 대화 열기", "신청자 · 해당 공간 제공자 모두 호출할 수 있습니다. "
+                                + "받은 신청 · 보낸 신청 화면의 '채팅' 버튼용으로, 이미 있으면 그 대화를 돌려줍니다(멱등). "
+                                + "대화는 공간 · 이용자 한 쌍에 하나라 같은 공간에 여러 번 신청해도 같은 대화입니다. "
+                                + "참여자가 아니면 403 NOT_APPLICATION_PARTICIPANT, 신청이 없으면 404 APPLICATION_NOT_FOUND."),
+                        requestHeaders(authorization()),
+                        pathParameters(parameterWithName("applicationId").description("신청 ID")),
+                        responseFields(success(conversationFields("data.")))));
+    }
+
+    @Test
     @DisplayName("공간 제공자는 대화를 열 수 없다 (403)")
     void providerCannotOpen() throws Exception {
         mockMvc.perform(post("/api/v1/spaces/{spaceId}/conversations", 10L).header(HttpHeaders.AUTHORIZATION, providerToken()))
