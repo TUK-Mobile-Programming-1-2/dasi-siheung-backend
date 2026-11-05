@@ -89,6 +89,18 @@ public class ReviewService {
                 ReviewResponse::from);
     }
 
+    /**
+     * 공간 제공자가 받은 후기 (최근 순). 답글을 달 후기를 한 번에 모아 보는 화면용.
+     *
+     * @param spaceId null 이면 내 모든 공간 (남의 공간 ID 면 빈 목록)
+     * @param replied null 이면 전체, false 면 답글을 기다리는 후기만
+     */
+    public PageResponse<ReviewResponse> getReceivedReviews(Long providerId, Long spaceId, Boolean replied,
+                                                           PageQuery pageQuery) {
+        return PageResponse.from(reviewRepository.findReceived(providerId, spaceId, replied,
+                pageQuery.toPageable(LATEST_FIRST)), ReviewResponse::from);
+    }
+
     public PageResponse<ReviewResponse> getMyReviews(Long reviewerId, PageQuery pageQuery) {
         return PageResponse.from(reviewRepository.findByReviewer_Id(reviewerId, pageQuery.toPageable(LATEST_FIRST)),
                 ReviewResponse::from);
