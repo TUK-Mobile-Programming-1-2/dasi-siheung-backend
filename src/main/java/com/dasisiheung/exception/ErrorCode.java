@@ -33,6 +33,8 @@ public enum ErrorCode {
     MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "회원을 찾을 수 없습니다."),
     PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, "현재 비밀번호가 일치하지 않습니다."),
     SAME_AS_CURRENT_PASSWORD(HttpStatus.BAD_REQUEST, "새 비밀번호가 현재 비밀번호와 같습니다."),
+    WITHDRAWAL_BLOCKED_BY_APPLICATION(HttpStatus.CONFLICT,
+            "진행 중인 신청 · 예약이 있어 탈퇴할 수 없습니다. 신청을 취소 · 거절하거나 이용이 끝난 뒤 다시 시도해 주세요."),
 
     // 파일
     FILE_REQUIRED(HttpStatus.BAD_REQUEST, "파일을 선택해 주세요."),

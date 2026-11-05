@@ -92,6 +92,18 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
             """)
     List<Application> findApprovedEndingFrom(@Param("spaceId") Long spaceId, @Param("from") LocalDate from);
 
+    /**
+     * 회원이 신청자이거나 공간 제공자인 신청 중 아직 진행 중인 것이 있는지.
+     * 진행 중: 검토 중(PENDING), 또는 이용이 끝나지 않은(종료일이 오늘 이후인) 확정 예약(APPROVED).
+     */
+    @Query("""
+            select count(a) > 0 from Application a
+            where (a.applicant.id = :memberId or a.space.provider.id = :memberId)
+              and (a.status = com.dasisiheung.entity.application.ApplicationStatus.PENDING
+                   or (a.status = com.dasisiheung.entity.application.ApplicationStatus.APPROVED and a.endDate >= :today))
+            """)
+    boolean existsInProgressByParticipant(@Param("memberId") Long memberId, @Param("today") LocalDate today);
+
     @Query("select new com.dasisiheung.repository.projection.EnumCount(a.status, count(a)) from Application a group by a.status")
     List<EnumCount<ApplicationStatus>> countByStatus();
 }
