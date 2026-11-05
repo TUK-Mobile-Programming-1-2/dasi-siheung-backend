@@ -19,6 +19,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
+import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.math.BigDecimal;
@@ -46,6 +47,8 @@ public class Space extends BaseTimeEntity {
     public static final int AVAILABLE_DATE_WINDOW_DAYS = 365;
     public static final int MAX_PHOTOS = 10;
     public static final int MAX_PROOFS = 5;
+    public static final int MAX_CAPACITY = 500;
+    public static final int MAX_EQUIPMENT = 20;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -141,6 +144,19 @@ public class Space extends BaseTimeEntity {
     @Column(name = "activity_type", nullable = false, length = 30)
     private Set<ActivityType> activityTypes = new HashSet<>();
 
+    /** 최대 수용 인원. null 이면 정하지 않음 (신청 인원을 제한하지 않는다). */
+    @Column(name = "max_capacity")
+    private Integer maxCapacity;
+
+    /** 이용자 · 제공자가 가격을 제안할 수 있는지. false 면 정가로만 신청한다. */
+    @Column(name = "price_negotiable", nullable = false)
+    private boolean priceNegotiable = true;
+
+    @ElementCollection
+    @CollectionTable(name = "space_equipment", joinColumns = @JoinColumn(name = "space_id"))
+    @OrderColumn(name = "sort_order")
+    private List<Equipment> equipment = new ArrayList<>();
+
     @ElementCollection
     @CollectionTable(name = "space_available_date", joinColumns = @JoinColumn(name = "space_id"))
     @Column(name = "available_date", nullable = false)
@@ -170,6 +186,18 @@ public class Space extends BaseTimeEntity {
 
     public boolean isOwnedBy(Long memberId) {
         return provider.getId().equals(memberId);
+    }
+
+    /** 이 인원이 수용 인원 안인지. 수용 인원을 정하지 않았으면 제한하지 않는다. */
+    public boolean canAccommodate(int headcount) {
+        return maxCapacity == null || headcount <= maxCapacity;
+    }
+
+    /** @throws BusinessException 가격 협의를 받지 않는 공간이면 PRICE_NEGOTIATION_NOT_ALLOWED */
+    public void validatePriceNegotiable() {
+        if (!priceNegotiable) {
+            throw new BusinessException(ErrorCode.PRICE_NEGOTIATION_NOT_ALLOWED);
+        }
     }
 
     /**
@@ -393,11 +421,18 @@ public class Space extends BaseTimeEntity {
         this.dailyPrice = details.dailyPrice();
         replace(facilities, details.facilities());
         replace(activityTypes, details.activityTypes());
+        this.maxCapacity = details.maxCapacity();
+        this.priceNegotiable = details.priceNegotiable();
+        if (!equipment.equals(details.equipment())) {
+            equipment.clear();
+            equipment.addAll(details.equipment());
+        }
     }
 
     protected SpaceDetails currentDetails() {
         return new SpaceDetails(title, description, rules, address, buildingName, unitNumber, location, areaSqm,
-                buildingUse, commercialTheme, dailyPrice, facilities, activityTypes);
+                buildingUse, commercialTheme, dailyPrice, facilities, activityTypes, maxCapacity, equipment,
+                priceNegotiable);
     }
 
     private static <T> void replace(Set<T> target, Set<T> values) {

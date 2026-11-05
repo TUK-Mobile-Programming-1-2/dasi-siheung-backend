@@ -65,6 +65,7 @@ public enum ErrorCode {
     APPLICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "신청을 찾을 수 없습니다."),
     NOT_APPLICATION_PARTICIPANT(HttpStatus.FORBIDDEN, "본인이 보내거나 받은 신청만 다룰 수 있습니다."),
     ACTIVITY_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "이 공간에서 허용하지 않는 활동입니다."),
+    HEADCOUNT_EXCEEDS_CAPACITY(HttpStatus.BAD_REQUEST, "운영 인원이 공간의 최대 수용 인원을 넘습니다."),
     INVALID_APPLICATION_PERIOD(HttpStatus.BAD_REQUEST, "이용 기간은 오늘부터 시작해 최대 30일까지 신청할 수 있습니다."),
     PERIOD_NOT_AVAILABLE(HttpStatus.CONFLICT, "선택한 기간에 공간을 사용할 수 없는 날짜가 있습니다."),
     DUPLICATE_APPLICATION(HttpStatus.CONFLICT, "같은 공간 · 같은 기간에 이미 검토 중인 신청이 있습니다."),
@@ -81,6 +82,7 @@ public enum ErrorCode {
     INVALID_OFFER_PRICE(HttpStatus.BAD_REQUEST, "제안 금액은 1원 이상, 정가 합계 이하로 입력해 주세요."),
     OFFER_NOT_ALLOWED(HttpStatus.CONFLICT, "보낸 제안에 대한 상대방의 답변을 기다리는 중입니다."),
     NO_PENDING_OFFER(HttpStatus.CONFLICT, "수락할 가격 제안이 없습니다."),
+    PRICE_NEGOTIATION_NOT_ALLOWED(HttpStatus.CONFLICT, "가격 협의를 받지 않는 공간입니다. 정가로 신청해 주세요."),
 
     // 이용 후기
     REVIEW_NOT_ALLOWED(HttpStatus.CONFLICT, "이용이 끝난 확정 예약에만 후기를 남길 수 있습니다."),
