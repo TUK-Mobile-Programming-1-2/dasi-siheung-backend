@@ -49,10 +49,17 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResult<Void>> handleInvalidRequestBody(MethodArgumentNotValidException e) {
         List<FieldErrorDetail> fieldErrors = e.getBindingResult().getFieldErrors().stream()
-                .map(error -> new FieldErrorDetail(error.getField(), error.getDefaultMessage()))
+                .map(error -> new FieldErrorDetail(error.getField(),
+                        error.isBindingFailure() ? BINDING_FAILURE_REASON : error.getDefaultMessage()))
                 .toList();
         return toInvalidInputResponse(fieldErrors);
     }
+
+    /**
+     * form · multipart 값의 형 변환 실패 (예: 없는 enum 이름, 숫자 자리에 글자).
+     * 기본 메시지는 내부 클래스 이름이 드러나므로 바꿔 준다.
+     */
+    private static final String BINDING_FAILURE_REASON = "값의 형식이 올바르지 않습니다.";
 
     @ExceptionHandler(HandlerMethodValidationException.class)
     public ResponseEntity<ApiResult<Void>> handleInvalidParameter(HandlerMethodValidationException e) {
