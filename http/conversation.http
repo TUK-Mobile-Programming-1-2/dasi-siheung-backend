@@ -265,3 +265,78 @@ Authorization: Bearer {{chatUserToken}}
         client.assert(response.body.data[0].content.startsWith("네 가능합니다"), response.body.data[0].content);
     });
 %}
+
+### 신청서 보내기 (이용자) — 신청 ↔ 대화 연결 확인용
+POST {{baseUrl}}/api/v1/applications
+Authorization: Bearer {{chatUserToken}}
+Content-Type: application/json
+
+{
+  "spaceId": {{chatSpaceId}},
+  "activityType": "EXHIBITION",
+  "activityTitle": "대화 후 신청한 전시",
+  "plan": "1:1 대화로 문의한 뒤 신청합니다.",
+  "headcount": 2,
+  "startDate": "{{chatDay1}}",
+  "endDate": "{{chatDay1}}"
+}
+
+> {%
+    client.test("201 Created + 이미 있는 대화가 연결됨", () => {
+        client.assert(response.status === 201, `실제 ${response.status}`);
+        client.assert(String(response.body.data.conversationId) === String(client.global.get("chatConversationId")),
+            `실제 ${response.body.data.conversationId}`);
+    });
+    client.global.set("chatApplicationId", response.body.data.id);
+%}
+
+### 받은 신청 목록에 대화 ID (제공자)
+# 기대값: 200 OK, 이 신청의 conversationId = 위 대화
+GET {{baseUrl}}/api/v1/provider/applications?spaceId={{chatSpaceId}}
+Authorization: Bearer {{chatProviderToken}}
+
+> {%
+    client.test("conversationId", () => {
+        const a = response.body.data.content.find(a => String(a.id) === String(client.global.get("chatApplicationId")));
+        client.assert(a && String(a.conversationId) === String(client.global.get("chatConversationId")), JSON.stringify(a));
+    });
+%}
+
+### 받은 신청에서 대화 열기 (제공자, '채팅' 버튼)
+# 인증: 신청자 · 해당 공간 제공자
+# 기대값: 200 OK, 같은 대화, 상대방 = 이용자
+POST {{baseUrl}}/api/v1/applications/{{chatApplicationId}}/conversation
+Authorization: Bearer {{chatProviderToken}}
+
+> {%
+    client.test("200 OK + 같은 대화", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(String(response.body.data.id) === String(client.global.get("chatConversationId")), "대화 ID");
+        client.assert(response.body.data.counterpart.role === "USER", `실제 ${response.body.data.counterpart.role}`);
+    });
+%}
+
+### 보낸 신청에서 대화 열기 (이용자)
+# 기대값: 200 OK, 같은 대화, 상대방 = 공간 제공자
+POST {{baseUrl}}/api/v1/applications/{{chatApplicationId}}/conversation
+Authorization: Bearer {{chatUserToken}}
+
+> {%
+    client.test("200 OK + 같은 대화", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(String(response.body.data.id) === String(client.global.get("chatConversationId")), "대화 ID");
+        client.assert(response.body.data.counterpart.role === "PROVIDER", `실제 ${response.body.data.counterpart.role}`);
+    });
+%}
+
+### 신청 참여자가 아니면 열 수 없다 (관리자도 마찬가지)
+# 기대값: 403 NOT_APPLICATION_PARTICIPANT
+POST {{baseUrl}}/api/v1/applications/{{chatApplicationId}}/conversation
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("403", () => {
+        client.assert(response.status === 403, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "NOT_APPLICATION_PARTICIPANT", `실제 ${response.body.error.code}`);
+    });
+%}

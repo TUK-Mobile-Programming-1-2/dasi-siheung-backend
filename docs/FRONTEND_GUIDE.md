@@ -382,6 +382,16 @@ HIDDEN(숨김): 신고 처리로 관리자가 내린 공간 — 수정 불가
 - 메시지 ID 는 클수록 최근입니다. 응답은 항상 **오래된 순**입니다.
 - 읽음 위치는 뒤로 돌아가지 않으므로 같은 ID 를 여러 번 보내도 됩니다.
 
+**대화 여는 곳**
+
+| 화면 | 호출 | 누가 |
+| --- | --- | --- |
+| 공간 상세의 '문의하기' | `POST /spaces/{spaceId}/conversations` | 이용자 |
+| 보낸 신청 · 받은 신청의 '채팅' | `POST /applications/{applicationId}/conversation` | 신청자 · 공간 제공자 |
+
+- 대화는 **공간 · 이용자 한 쌍에 하나**입니다. 어디서 열어도, 같은 공간에 여러 번 신청해도 같은 대화로 이어집니다.
+- 신청 상세 · 목록의 `conversationId` 가 있으면 그 대화방으로 바로 이동하고, `null` 이면 위 '채팅' API 로 연 뒤 이동하세요.
+
 ### 3-4. 인증 (JWT)
 
 | 토큰 | 유효 시간 | 쓰는 곳 |
@@ -809,7 +819,7 @@ try {
 | --- | --- | --- | --- |
 | POST | `/api/v1/applications` | USER | 신청서 제출 |
 | GET | `/api/v1/applications` | USER | 내가 보낸 신청 (status 필터) |
-| GET | `/api/v1/applications/{applicationId}` | 신청자 · 공간 제공자 | 신청 상세 |
+| GET | `/api/v1/applications/{applicationId}` | 신청자 · 공간 제공자 | 신청 상세 (연결된 대화 `conversationId` 포함) |
 | POST | `/api/v1/applications/{applicationId}/cancel` | USER | 신청 취소 |
 | POST | `/api/v1/applications/{applicationId}/offers` | 신청자 · 공간 제공자 | 가격 제안 · 역제안 (기간 합계 금액) |
 | POST | `/api/v1/applications/{applicationId}/offers/accept` | 신청자 · 공간 제공자 | 받은 가격 제안 수락 |
@@ -867,6 +877,7 @@ try {
 | 메서드 | 경로 | 인증 | 설명 |
 | --- | --- | --- | --- |
 | POST | `/api/v1/spaces/{spaceId}/conversations` | USER | 대화 열기 (멱등) |
+| POST | `/api/v1/applications/{applicationId}/conversation` | 신청자 · 공간 제공자 | 신청에서 대화 열기 (멱등, '채팅' 버튼) |
 | GET | `/api/v1/conversations` | 로그인 | 내 대화 목록 (안 읽은 수 포함) |
 | GET | `/api/v1/conversations/{conversationId}/messages` | 참여자 | 메시지 조회 (after · before 폴링) |
 | POST | `/api/v1/conversations/{conversationId}/messages` | 참여자 | 메시지 보내기 |
