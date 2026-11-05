@@ -22,14 +22,15 @@ public record ApplicationSummaryResponse(
         @Schema(description = "이용 종료일") LocalDate endDate,
         @Schema(description = "현재 합의 금액(원)", example = "100000") int totalPrice,
         @Schema(description = "가격 협의 상태", example = "WAITING_PROVIDER") PriceNegotiationStatus negotiationStatus,
+        @Schema(description = "신청자 ↔ 공간 제공자 1:1 대화 ID (아직 없으면 null)", example = "3") Long conversationId,
         @Schema(description = "신청 시각") LocalDateTime createdAt
 ) {
 
-    public static ApplicationSummaryResponse of(Application application, String thumbnailUrl) {
+    public static ApplicationSummaryResponse of(Application application, String thumbnailUrl, Long conversationId) {
         return new ApplicationSummaryResponse(application.getId(), application.getStatus(),
                 application.getSpace().getId(), application.getSpace().getTitle(), thumbnailUrl,
                 application.getApplicant().getName(), application.getActivityType(), application.getActivityTitle(),
                 application.getStartDate(), application.getEndDate(), application.getTotalPrice(),
-                application.getNegotiationStatus(), application.getCreatedAt());
+                application.getNegotiationStatus(), conversationId, application.getCreatedAt());
     }
 }

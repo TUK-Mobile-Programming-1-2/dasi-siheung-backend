@@ -74,7 +74,7 @@ public class ApplicationService {
         Page<Application> applications = status == null
                 ? applicationRepository.findByApplicant_Id(applicantId, pageable)
                 : applicationRepository.findByApplicant_IdAndStatus(applicantId, status, pageable);
-        return PageResponse.from(applications, responseMapper::summary);
+        return responseMapper.summaries(applications);
     }
 
     /** 신청 상세. 신청자와 해당 공간 제공자만 볼 수 있다. */

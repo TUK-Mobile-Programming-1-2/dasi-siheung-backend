@@ -247,11 +247,11 @@ class ApplicationControllerTest extends ApiDocsTestSupport {
     static ApplicationResponse detail() {
         return ApplicationResponse.of(application(), ProviderSpaceControllerTest.photos().get(0).url(), List.of(
                 new PriceOfferResponse(1L, OfferSide.APPLICANT, "이이용", 90_000, "조금만 조정 부탁드립니다.", null,
-                        FixedClockConfig.FIXED_LOCAL_NOW)));
+                        FixedClockConfig.FIXED_LOCAL_NOW)), 3L);
     }
 
     static ApplicationSummaryResponse summary() {
-        return ApplicationSummaryResponse.of(application(), ProviderSpaceControllerTest.photos().get(0).url());
+        return ApplicationSummaryResponse.of(application(), ProviderSpaceControllerTest.photos().get(0).url(), 3L);
     }
 
     static FieldDescriptor[] fields(List<FieldDescriptor> fields) {

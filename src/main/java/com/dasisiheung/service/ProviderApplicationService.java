@@ -40,8 +40,8 @@ public class ProviderApplicationService {
      */
     public PageResponse<ApplicationSummaryResponse> getReceivedApplications(Long providerId, ApplicationStatus status,
                                                                             Long spaceId, PageQuery pageQuery) {
-        return PageResponse.from(applicationRepository.findReceived(providerId, status, spaceId,
-                pageQuery.toPageable(LATEST_FIRST)), responseMapper::summary);
+        return responseMapper.summaries(applicationRepository.findReceived(providerId, status, spaceId,
+                pageQuery.toPageable(LATEST_FIRST)));
     }
 
     /**
