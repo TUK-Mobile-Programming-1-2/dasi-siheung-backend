@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.dasisiheung.entity.member.Member;
 import com.dasisiheung.entity.space.BuildingUse;
+import com.dasisiheung.entity.space.Equipment;
 import com.dasisiheung.entity.space.ProofType;
 import com.dasisiheung.entity.space.ReviewChecklist;
 import com.dasisiheung.entity.space.ReviewDecision;
@@ -191,6 +192,43 @@ class SpaceTest {
         Space space = SpaceFixtures.space(1L, SpaceFixtures.provider(2L), Set.of(), TODAY);
         ReflectionTestUtils.setField(space, "status", SpaceStatus.PUBLISHED);
         return space;
+    }
+
+    @Test
+    @DisplayName("수용 인원 · 비품 · 가격 협의는 바꿔도 다시 검수받지 않고, 비품은 보낸 목록으로 통째로 바뀐다")
+    void capacityEquipmentNegotiation() {
+        Space space = published();
+        assertThat(space.getMaxCapacity()).isEqualTo(10);
+        assertThat(space.getEquipment()).extracting(Equipment::getName).containsExactly("접이식 테이블", "의자");
+        assertThat(space.isPriceNegotiable()).isTrue();
+
+        SpaceDetails base = SpaceFixtures.request(Set.of()).toDetails();
+        space.update(space.getRegion(), new SpaceDetails(base.title(), base.description(), base.rules(),
+                base.address(), base.buildingName(), base.unitNumber(), base.location(), base.areaSqm(),
+                base.buildingUse(), base.commercialTheme(), base.dailyPrice(), base.facilities(), base.activityTypes(),
+                30, List.of(new Equipment(" 빔프로젝터 ", 1)), false), null, TODAY);
+
+        assertThat(space.getStatus()).isEqualTo(SpaceStatus.PUBLISHED);
+        assertThat(space.getMaxCapacity()).isEqualTo(30);
+        assertThat(space.isPriceNegotiable()).isFalse();
+        assertThat(space.getEquipment()).containsExactly(new Equipment("빔프로젝터", 1));
+        assertThat(space.canAccommodate(30)).isTrue();
+        assertThat(space.canAccommodate(31)).isFalse();
+    }
+
+    @Test
+    @DisplayName("수용 인원을 정하지 않은 공간은 인원을 제한하지 않는다 (기존 등록 항목만 있는 공간)")
+    void noCapacity() {
+        SpaceDetails base = SpaceFixtures.request(Set.of()).toDetails();
+        Space space = Space.register(SpaceFixtures.provider(2L), published().getRegion(),
+                new SpaceDetails(base.title(), base.description(), base.rules(), base.address(), base.buildingName(),
+                        base.unitNumber(), base.location(), base.areaSqm(), base.buildingUse(), base.commercialTheme(),
+                        base.dailyPrice(), base.facilities(), base.activityTypes()), Set.of(), TODAY);
+
+        assertThat(space.getMaxCapacity()).isNull();
+        assertThat(space.canAccommodate(500)).isTrue();
+        assertThat(space.getEquipment()).isEmpty();
+        assertThat(space.isPriceNegotiable()).isTrue();
     }
 
     @Test

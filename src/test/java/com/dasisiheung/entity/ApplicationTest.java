@@ -76,6 +76,23 @@ class ApplicationTest {
         }
 
         @Test
+        @DisplayName("운영 인원이 수용 인원을 넘으면 HEADCOUNT_EXCEEDS_CAPACITY, 수용 인원을 정하지 않은 공간은 제한하지 않는다")
+        void capacity() {
+            assertThatThrownBy(() -> submitWithHeadcount(11))
+                    .extracting("errorCode").isEqualTo(ErrorCode.HEADCOUNT_EXCEEDS_CAPACITY);
+            assertThat(submitWithHeadcount(10).getHeadcount()).isEqualTo(10);
+
+            ReflectionTestUtils.setField(space, "maxCapacity", null);
+            assertThat(submitWithHeadcount(200).getHeadcount()).isEqualTo(200);
+        }
+
+        private Application submitWithHeadcount(int headcount) {
+            return Application.submit(space, applicant,
+                    new Application.ActivityDetails(ActivityType.POPUP_STORE, "캔들 팝업", "계획", headcount),
+                    new ApplicationPeriod(TODAY.plusDays(1), TODAY.plusDays(1)), TODAY);
+        }
+
+        @Test
         @DisplayName("지난 날짜에 시작하거나 30일을 넘으면 INVALID_APPLICATION_PERIOD")
         void invalidPeriod() {
             assertThatThrownBy(() -> submit(TODAY.minusDays(1), TODAY.plusDays(1)))
@@ -305,6 +322,20 @@ class ApplicationTest {
             application.cancel(APPLICANT_ID, null, TODAY, NOW);
             assertThatThrownBy(() -> application.offer(applicant, 90_000, null, NOW))
                     .extracting("errorCode").isEqualTo(ErrorCode.INVALID_APPLICATION_STATUS);
+        }
+
+        @Test
+        @DisplayName("가격 협의를 받지 않는 공간이면 신청자 · 제공자 모두 제안할 수 없다 (PRICE_NEGOTIATION_NOT_ALLOWED)")
+        void notNegotiable() {
+            ReflectionTestUtils.setField(space, "priceNegotiable", false);
+            Application application = submit(TODAY.plusDays(1), TODAY.plusDays(2));
+
+            assertThatThrownBy(() -> application.offer(applicant, 80_000, null, NOW))
+                    .extracting("errorCode").isEqualTo(ErrorCode.PRICE_NEGOTIATION_NOT_ALLOWED);
+            assertThatThrownBy(() -> application.offer(provider, 80_000, null, NOW))
+                    .extracting("errorCode").isEqualTo(ErrorCode.PRICE_NEGOTIATION_NOT_ALLOWED);
+            assertThat(application.getNegotiationStatus()).isEqualTo(PriceNegotiationStatus.NONE);
+            assertThat(application.getTotalPrice()).isEqualTo(100_000);
         }
 
         @Test

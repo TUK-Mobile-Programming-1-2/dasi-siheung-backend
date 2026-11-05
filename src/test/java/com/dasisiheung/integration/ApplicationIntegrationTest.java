@@ -6,13 +6,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.dasisiheung.config.ClockConfig;
+import com.dasisiheung.dto.application.ApplicationRequest;
 import com.dasisiheung.entity.member.Role;
+import com.dasisiheung.entity.space.ActivityType;
 import com.dasisiheung.support.ApplicationFixtures;
 import com.dasisiheung.support.ApplicationScenario;
 import com.dasisiheung.support.IntegrationTest;
+import com.dasisiheung.support.SpaceFixtures;
 import com.dasisiheung.support.SpaceScenario;
 import com.dasisiheung.support.TestAccounts;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,6 +26,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Transactional;
 
 @IntegrationTest
@@ -97,6 +102,40 @@ class ApplicationIntegrationTest {
 
         // 취소한 뒤에는 같은 기간으로 다시 신청할 수 있다
         applicationScenario.submit(user, spaceId, DAY2, DAY2);
+    }
+
+    @Test
+    @DisplayName("수용 인원 초과는 400 HEADCOUNT_EXCEEDS_CAPACITY, 가격 협의를 받지 않는 공간은 제안 409 · 정가 신청은 201")
+    void capacityAndNegotiation() throws Exception {
+        long fixedPriceSpace = spaceScenario.publishedSpace(provider, testAccounts.create(Role.ADMIN),
+                SpaceFixtures.withExtras(SpaceFixtures.request(Set.of(DAY1, DAY2)), "정가 고정 공간", 2, null, false));
+
+        submit(fixedPriceSpace, 3, null)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("HEADCOUNT_EXCEEDS_CAPACITY"));
+        submit(fixedPriceSpace, 2, 40_000)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("PRICE_NEGOTIATION_NOT_ALLOWED"));
+        String body = submit(fixedPriceSpace, 2, null)
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.totalPrice").value(50_000))
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        long applicationId = objectMapper.readTree(body).at("/data/id").asLong();
+
+        mockMvc.perform(post("/api/v1/applications/{id}/offers", applicationId)
+                        .header(HttpHeaders.AUTHORIZATION, provider.bearer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"amount\": 45000}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("PRICE_NEGOTIATION_NOT_ALLOWED"));
+    }
+
+    private ResultActions submit(long targetSpaceId, int headcount, Integer offerAmount) throws Exception {
+        return mockMvc.perform(post("/api/v1/applications")
+                .header(HttpHeaders.AUTHORIZATION, user.bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(new ApplicationRequest(targetSpaceId, ActivityType.POPUP_STORE,
+                        "수제 캔들 팝업", "주말 하루 판매합니다.", headcount, DAY1, DAY1, offerAmount, null))));
     }
 
     @Test
