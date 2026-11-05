@@ -62,6 +62,8 @@ public final class ApplicationDocumentation {
                 fieldWithPath(prefix + "offers[].message").type(JsonFieldType.STRING).optional().description("한마디"),
                 fieldWithPath(prefix + "offers[].acceptedAt").type(JsonFieldType.STRING).optional().description("상대가 수락한 시각 (수락 전이면 null)"),
                 fieldWithPath(prefix + "offers[].createdAt").type(JsonFieldType.STRING).optional().description("제안 시각"),
+                fieldWithPath(prefix + "conversationId").type(JsonFieldType.NUMBER).optional()
+                        .description("신청자 ↔ 공간 제공자 1:1 대화 ID (아직 없으면 null — POST /api/v1/applications/{id}/conversation 으로 열기)"),
                 fieldWithPath(prefix + "createdAt").type(JsonFieldType.STRING).description("신청 시각"),
                 fieldWithPath(prefix + "decidedAt").type(JsonFieldType.STRING).optional().description("확정 · 거절 · 취소 · 마감 시각")));
     }
@@ -81,6 +83,8 @@ public final class ApplicationDocumentation {
                 fieldWithPath(prefix + "endDate").type(JsonFieldType.STRING).description("이용 종료일"),
                 fieldWithPath(prefix + "totalPrice").type(JsonFieldType.NUMBER).description("현재 합의 금액(원)"),
                 fieldWithPath(prefix + "negotiationStatus").type(JsonFieldType.STRING).description("가격 협의 상태 (선택지 negotiationStatuses)"),
+                fieldWithPath(prefix + "conversationId").type(JsonFieldType.NUMBER).optional()
+                        .description("신청자 ↔ 공간 제공자 1:1 대화 ID (아직 없으면 null)"),
                 fieldWithPath(prefix + "createdAt").type(JsonFieldType.STRING).description("신청 시각")};
     }
 }

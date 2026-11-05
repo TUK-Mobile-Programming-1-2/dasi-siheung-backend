@@ -16,6 +16,7 @@ import com.dasisiheung.entity.application.PriceOffer;
 import com.dasisiheung.entity.space.Space;
 import com.dasisiheung.exception.ErrorCode;
 import com.dasisiheung.repository.ApplicationRepository;
+import com.dasisiheung.repository.ConversationRepository;
 import com.dasisiheung.repository.MemberRepository;
 import com.dasisiheung.repository.PriceOfferRepository;
 import com.dasisiheung.repository.SpaceRepository;
@@ -52,6 +53,9 @@ class ApplicationServiceTest {
     @Mock
     private PriceOfferRepository priceOfferRepository;
 
+    @Mock
+    private ConversationRepository conversationRepository;
+
     private ApplicationService applicationService;
     private Space space;
 
@@ -59,7 +63,8 @@ class ApplicationServiceTest {
     void setUp() {
         applicationService = new ApplicationService(applicationRepository, spaceRepository, memberRepository,
                 priceOfferRepository, new ApplicationResponseMapper(
-                        new SpaceResponseMapper(mock(FileUploadService.class)), priceOfferRepository),
+                        new SpaceResponseMapper(mock(FileUploadService.class)), priceOfferRepository,
+                        conversationRepository),
                 FixedClockConfig.fixedClock());
         space = ApplicationFixtures.publishedSpace(
                 SpaceFixtures.space(10L, SpaceFixtures.provider(PROVIDER_ID), Set.of(START, START.plusDays(1)), TODAY));

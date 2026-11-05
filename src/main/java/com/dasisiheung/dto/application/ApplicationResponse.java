@@ -32,18 +32,21 @@ public record ApplicationResponse(
         @Schema(description = "가격 협의 상태", example = "NONE") PriceNegotiationStatus negotiationStatus,
         @Schema(description = "답변을 기다리는 제안 금액 (없으면 null)", example = "90000") Integer pendingOfferAmount,
         @Schema(description = "가격 협의 이력 (오래된 순)") List<PriceOfferResponse> offers,
+        @Schema(description = "신청자 ↔ 공간 제공자 1:1 대화 ID (아직 없으면 null — "
+                + "POST /api/v1/applications/{id}/conversation 으로 열기)", example = "3") Long conversationId,
         @Schema(description = "신청 시각") LocalDateTime createdAt,
         @Schema(description = "확정 · 거절 · 취소 · 마감 시각") LocalDateTime decidedAt
 ) {
 
-    public static ApplicationResponse of(Application application, String thumbnailUrl, List<PriceOfferResponse> offers) {
+    public static ApplicationResponse of(Application application, String thumbnailUrl, List<PriceOfferResponse> offers,
+                                         Long conversationId) {
         return new ApplicationResponse(application.getId(), application.getStatus(), application.getStatusReason(),
                 SpaceInfo.of(application.getSpace(), thumbnailUrl), ApplicantInfo.from(application.getApplicant()),
                 application.getActivityType(), application.getActivityTitle(), application.getPlan(),
                 application.getHeadcount(), application.getStartDate(), application.getEndDate(), application.days(),
                 application.getListDailyPrice(), application.getListTotalPrice(), application.getTotalPrice(),
-                application.getNegotiationStatus(), application.getPendingOfferAmount(), offers, application.getCreatedAt(),
-                application.getDecidedAt());
+                application.getNegotiationStatus(), application.getPendingOfferAmount(), offers, conversationId,
+                application.getCreatedAt(), application.getDecidedAt());
     }
 
     public record SpaceInfo(
