@@ -29,10 +29,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 /**
- * 시연 데이터. demo 프로필에서만, 시연 계정이 없을 때 한 번 만든다. (다시 실행해도 중복 생성하지 않음)
+ * 시연 · 테스트 데이터. demo 프로필에서만, 시연 계정이 없을 때 한 번 만든다. (다시 실행해도 중복 생성하지 않음)
  * <p>
  * 실제 서비스 흐름(가입 → 등록 → 신청 → 협의 → 승인 → 후기)을 서비스 메서드로 그대로 밟는다.
  * 관리자 검수와 "지난 이용 기간"만 SQL 로 건너뛴다. 관리자 계정은 만들지 않는다 (ADMIN_GUIDE 의 DB 승격으로 만든다).
+ * <p>
+ * 배포 서버(prod,demo)에서도 켜 두므로, 만들다 실패해도 서버 기동은 막지 않고 오류만 남긴다.
  */
 @Slf4j
 @Component
@@ -42,7 +44,8 @@ public class DemoDataInitializer implements ApplicationRunner {
 
     public static final String PASSWORD = "demo1234!";
     static final String MARKER_EMAIL = "provider1@demo.dasisiheung.com";
-    private static final int CALENDAR_DAYS = 60;
+    /** 사용 가능 날짜: 내일부터 이 기간. 프론트 테스트 기간 동안 날짜가 바닥나지 않게 넉넉히 둔다. */
+    static final int CALENDAR_DAYS = 180;
 
     private final MemberRepository memberRepository;
     private final AuthService authService;
@@ -64,6 +67,15 @@ public class DemoDataInitializer implements ApplicationRunner {
             log.info("시연 데이터가 이미 있어 건너뜁니다.");
             return;
         }
+        try {
+            createDemoData();
+        } catch (RuntimeException e) {
+            log.error("시연 데이터를 만들지 못했습니다. 서버는 그대로 실행합니다. "
+                    + "*@demo.dasisiheung.com 계정을 지우고 다시 시작하면 처음부터 만듭니다.", e);
+        }
+    }
+
+    private void createDemoData() {
         LocalDate today = LocalDate.now(clock);
         Set<LocalDate> calendar = today.plusDays(1).datesUntil(today.plusDays(CALENDAR_DAYS + 1)).collect(Collectors.toSet());
 
@@ -104,17 +116,17 @@ public class DemoDataInitializer implements ApplicationRunner {
                 Set.of(ActivityType.POPUP_STORE, ActivityType.MEETING), calendar));
 
         LocalDate soon = today.plusDays(10);
-        // 이용이 끝난 예약 + 후기 (평점 · 통계 시연)
+        // 이용이 끝난 예약 + 후기 (평점 · 통계 시연). 2개는 답글을 비워 제공자 답글 작성을 시험할 수 있게 한다.
         pastBookingWithReview(popup, station, jeongwangOwner, ActivityType.POPUP_STORE, soon, -30, 5,
-                "역 앞이라 퇴근 시간에 줄이 생겼어요. 첫날 완판!");
+                "역 앞이라 퇴근 시간에 줄이 생겼어요. 첫날 완판!", true);
         pastBookingWithReview(maker, station, jeongwangOwner, ActivityType.EXPERIENCE, soon, -15, 4,
-                "전기 · 수도가 있어 체험 준비가 편했어요.");
+                "전기 · 수도가 있어 체험 준비가 편했어요.", false);
         pastBookingWithReview(artist, cafe, baegotOwner, ActivityType.EXHIBITION, soon, -20, 5,
-                "채광이 좋아 작품 사진이 잘 나왔습니다.");
+                "채광이 좋아 작품 사진이 잘 나왔습니다.", true);
         pastBookingWithReview(teacher, park, baegotOwner, ActivityType.CLASS, soon, -12, 4,
-                "가족 단위 참가자가 많았어요. 주차만 조금 아쉬움.");
+                "가족 단위 참가자가 많았어요. 주차만 조금 아쉬움.", false);
         pastBookingWithReview(popup, marina, geobukOwner, ActivityType.POPUP_STORE, soon, -8, 5,
-                "주말 관광객이 정말 많아요. 다음 달에도 신청할게요.");
+                "주말 관광객이 정말 많아요. 다음 달에도 신청할게요.", true);
 
         // 앞으로의 확정 예약 · 협의 중 신청 · 검토 중 신청 (신청 흐름 시연)
         long confirmed = apply(artist, campus, ActivityType.EXHIBITION, "졸업 작품 전시", today.plusDays(14), today.plusDays(16));
@@ -167,16 +179,19 @@ public class DemoDataInitializer implements ApplicationRunner {
                 title + " — 시연용 신청입니다.", 2, start, end, null, null)).id();
     }
 
-    /** 앞날짜로 신청 · 승인한 뒤 이용 기간을 과거로 옮기고 후기 · 답글을 남긴다. */
+    /** 앞날짜로 신청 · 승인한 뒤 이용 기간을 과거로 옮기고 후기(와 답글)를 남긴다. */
     private void pastBookingWithReview(long applicantId, long spaceId, long providerId, ActivityType activityType,
-                                       LocalDate start, int startOffsetDays, int rating, String content) {
+                                       LocalDate start, int startOffsetDays, int rating, String content,
+                                       boolean replied) {
         long applicationId = apply(applicantId, spaceId, activityType, "시흥 로컬 " + activityType.getLabel(), start,
                 start.plusDays(1));
         providerApplicationService.approve(providerId, applicationId);
         jdbcTemplate.update("UPDATE space_application SET start_date = current_date + ?, end_date = current_date + ? "
                 + "WHERE id = ?", startOffsetDays, startOffsetDays + 1, applicationId);
         long reviewId = reviewService.write(applicantId, applicationId, new ReviewRequest(rating, content)).id();
-        reviewService.reply(providerId, reviewId, new ReviewReplyRequest("이용해 주셔서 감사합니다. 또 찾아 주세요!"));
+        if (replied) {
+            reviewService.reply(providerId, reviewId, new ReviewReplyRequest("이용해 주셔서 감사합니다. 또 찾아 주세요!"));
+        }
     }
 
     private static SpaceRequest space(String title, String description, String address, double latitude,
