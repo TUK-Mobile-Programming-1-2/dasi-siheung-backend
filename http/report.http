@@ -1,4 +1,4 @@
-# 신고 · 제재 — 신고 접수 · 관리자 처리(숨김 · 이용 정지) · 정지 해제
+# 신고 · 제재 — 신고 접수(증거 사진 첨부) · 관리자 처리(숨김 · 이용 정지) · 정지 해제
 # 관리자 계정: http-client.private.env.json
 
 ### 준비: 공간 제공자 가입
@@ -144,39 +144,71 @@ Content-Type: application/json
 %}
 
 
-### 신고하기 (공간)
+### 신고하기 (공간) — 증거 사진 2장
 # 인증: 로그인 회원
-# 기대값: 201 Created, PENDING
+# 요청: multipart/form-data — targetType · targetId · reason · detail(선택) 텍스트 + photos(선택, 최대 5장)
+# 기대값: 201 Created, PENDING, 사진 2장 · 임시 주소
 POST {{baseUrl}}/api/v1/reports
 Authorization: Bearer {{rptUserToken}}
-Content-Type: application/json
+Content-Type: multipart/form-data; boundary=dasi-boundary
 
-{
-  "targetType": "SPACE",
-  "targetId": {{rptSpaceId}},
-  "reason": "FALSE_INFORMATION",
-  "detail": "사진과 실제 공간이 전혀 다릅니다."
-}
+--dasi-boundary
+Content-Disposition: form-data; name="targetType"
+
+SPACE
+--dasi-boundary
+Content-Disposition: form-data; name="targetId"
+
+{{rptSpaceId}}
+--dasi-boundary
+Content-Disposition: form-data; name="reason"
+
+FALSE_INFORMATION
+--dasi-boundary
+Content-Disposition: form-data; name="detail"
+
+사진과 실제 공간이 전혀 다릅니다.
+--dasi-boundary
+Content-Disposition: form-data; name="photos"; filename="space-photo.jpg"
+Content-Type: image/jpeg
+
+< ./fixtures/space-photo.jpg
+--dasi-boundary
+Content-Disposition: form-data; name="photos"; filename="space-photo.png"
+Content-Type: image/png
+
+< ./fixtures/space-photo.png
+--dasi-boundary--
 
 > {%
-    client.test("201 Created + PENDING", () => {
+    client.test("201 Created + PENDING + 사진 2장", () => {
         client.assert(response.status === 201, `실제 ${response.status}`);
         client.assert(response.body.data.status === "PENDING", `실제 ${response.body.data.status}`);
+        client.assert(response.body.data.photos.length === 2, `실제 ${response.body.data.photos.length}`);
+        client.assert(response.body.data.photos.every(p => p.url.length > 0), "임시 주소");
     });
     client.global.set("rptReportId", response.body.data.id);
 %}
 
-### 같은 대상 다시 신고
+### 같은 대상 다시 신고 (사진 없이)
 # 기대값: 409 DUPLICATE_REPORT
 POST {{baseUrl}}/api/v1/reports
 Authorization: Bearer {{rptUserToken}}
-Content-Type: application/json
+Content-Type: multipart/form-data; boundary=dasi-boundary
 
-{
-  "targetType": "SPACE",
-  "targetId": {{rptSpaceId}},
-  "reason": "SPAM"
-}
+--dasi-boundary
+Content-Disposition: form-data; name="targetType"
+
+SPACE
+--dasi-boundary
+Content-Disposition: form-data; name="targetId"
+
+{{rptSpaceId}}
+--dasi-boundary
+Content-Disposition: form-data; name="reason"
+
+SPAM
+--dasi-boundary--
 
 > {%
     client.test("409 DUPLICATE_REPORT", () => {
@@ -189,18 +221,102 @@ Content-Type: application/json
 # 기대값: 400 CANNOT_REPORT_SELF
 POST {{baseUrl}}/api/v1/reports
 Authorization: Bearer {{rptProviderToken}}
-Content-Type: application/json
+Content-Type: multipart/form-data; boundary=dasi-boundary
 
-{
-  "targetType": "SPACE",
-  "targetId": {{rptSpaceId}},
-  "reason": "OTHER"
-}
+--dasi-boundary
+Content-Disposition: form-data; name="targetType"
+
+SPACE
+--dasi-boundary
+Content-Disposition: form-data; name="targetId"
+
+{{rptSpaceId}}
+--dasi-boundary
+Content-Disposition: form-data; name="reason"
+
+OTHER
+--dasi-boundary--
 
 > {%
     client.test("400 CANNOT_REPORT_SELF", () => {
         client.assert(response.status === 400, `실제 ${response.status}`);
         client.assert(response.body.error.code === "CANNOT_REPORT_SELF", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 사진 6장
+# 기대값: 400 REPORT_PHOTO_LIMIT_EXCEEDED (파일을 올리기 전에 막힘)
+POST {{baseUrl}}/api/v1/reports
+Authorization: Bearer {{rptUserToken}}
+Content-Type: multipart/form-data; boundary=dasi-boundary
+
+--dasi-boundary
+Content-Disposition: form-data; name="targetType"
+
+SPACE
+--dasi-boundary
+Content-Disposition: form-data; name="targetId"
+
+{{rptSpaceId}}
+--dasi-boundary
+Content-Disposition: form-data; name="reason"
+
+FRAUD
+--dasi-boundary
+Content-Disposition: form-data; name="photos"; filename="space-photo.jpg"
+Content-Type: image/jpeg
+
+< ./fixtures/space-photo.jpg
+--dasi-boundary
+Content-Disposition: form-data; name="photos"; filename="space-photo.jpg"
+Content-Type: image/jpeg
+
+< ./fixtures/space-photo.jpg
+--dasi-boundary
+Content-Disposition: form-data; name="photos"; filename="space-photo.jpg"
+Content-Type: image/jpeg
+
+< ./fixtures/space-photo.jpg
+--dasi-boundary
+Content-Disposition: form-data; name="photos"; filename="space-photo.jpg"
+Content-Type: image/jpeg
+
+< ./fixtures/space-photo.jpg
+--dasi-boundary
+Content-Disposition: form-data; name="photos"; filename="space-photo.jpg"
+Content-Type: image/jpeg
+
+< ./fixtures/space-photo.jpg
+--dasi-boundary
+Content-Disposition: form-data; name="photos"; filename="space-photo.jpg"
+Content-Type: image/jpeg
+
+< ./fixtures/space-photo.jpg
+--dasi-boundary--
+
+> {%
+    client.test("400 REPORT_PHOTO_LIMIT_EXCEEDED", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "REPORT_PHOTO_LIMIT_EXCEEDED", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 예전 JSON 요청
+# 기대값: 415 UNSUPPORTED_MEDIA_TYPE (multipart 로만 받음)
+POST {{baseUrl}}/api/v1/reports
+Authorization: Bearer {{rptUserToken}}
+Content-Type: application/json
+
+{
+  "targetType": "SPACE",
+  "targetId": {{rptSpaceId}},
+  "reason": "SPAM"
+}
+
+> {%
+    client.test("415 UNSUPPORTED_MEDIA_TYPE", () => {
+        client.assert(response.status === 415, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "UNSUPPORTED_MEDIA_TYPE", `실제 ${response.body.error.code}`);
     });
 %}
 
@@ -211,9 +327,25 @@ GET {{baseUrl}}/api/v1/admin/reports?status=PENDING&size=100
 Authorization: Bearer {{adminToken}}
 
 > {%
-    client.test("200 OK + PENDING 만", () => {
+    client.test("200 OK + PENDING 만 + 사진은 장수만", () => {
         client.assert(response.status === 200, `실제 ${response.status}`);
         client.assert(response.body.data.content.every(r => r.status === "PENDING"), "처리된 신고가 섞였습니다");
+        client.assert(response.body.data.content.every(r => typeof r.photoCount === "number" && r.photos === null),
+            "목록에는 photoCount 만, photos 는 null");
+    });
+%}
+
+### 관리자: 신고 상세 — 증거 사진
+# 기대값: 200 OK, photoCount 2, 사진 2장 임시 주소 (10분 뒤 만료)
+GET {{baseUrl}}/api/v1/admin/reports/{{rptReportId}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("사진 2장 + 임시 주소", () => {
+        const d = response.body.data;
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(d.photoCount === 2 && d.photos.length === 2, JSON.stringify(d.photos));
+        client.assert(d.photos.every(p => p.url.length > 0), "임시 주소");
     });
 %}
 
