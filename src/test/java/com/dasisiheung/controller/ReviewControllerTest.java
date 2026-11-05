@@ -149,6 +149,35 @@ class ReviewControllerTest extends ApiDocsTestSupport {
     }
 
     @Test
+    @DisplayName("받은 후기 (공간 제공자) — 답글 대기만")
+    void getReceivedReviews() throws Exception {
+        given(reviewService.getReceivedReviews(eq(PROVIDER_ID), eq(10L), eq(false), any(PageQuery.class)))
+                .willReturn(new PageResponse<>(List.of(waitingReview()), 0, 20, 1, 1, false));
+
+        mockMvc.perform(get("/api/v1/provider/reviews").param("spaceId", "10").param("replied", "false")
+                        .header(HttpHeaders.AUTHORIZATION, providerToken()))
+                .andExpect(status().isOk())
+                .andDo(document("review-received-list",
+                        resource(TAG, "받은 후기 (공간 제공자)", "내 모든 공간의 후기 (최근 순). 답글을 달 후기를 모아 보는 화면용. "
+                                + "답글 대기 개수는 replied=false&size=1 의 totalElements 로 알 수 있습니다. 이용자는 403."),
+                        requestHeaders(authorization()),
+                        queryParameters(
+                                parameterWithName("spaceId").optional().description("특정 공간만 (없으면 내 모든 공간)"),
+                                parameterWithName("replied").optional()
+                                        .description("true 답글 단 후기만 | false 답글을 기다리는 후기만 | 없으면 전체"),
+                                parameterWithName("page").optional().description("페이지 (0부터)"),
+                                parameterWithName("size").optional().description("페이지 크기 (최대 100)")),
+                        responseFields(page(fields("data.content[].")))));
+    }
+
+    @Test
+    @DisplayName("받은 후기: 이용자는 볼 수 없다 (403)")
+    void userCannotSeeReceivedReviews() throws Exception {
+        mockMvc.perform(get("/api/v1/provider/reviews").header(HttpHeaders.AUTHORIZATION, userToken()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     @DisplayName("내가 쓴 후기")
     void getMyReviews() throws Exception {
         given(reviewService.getMyReviews(eq(USER_ID), any(PageQuery.class)))
@@ -165,6 +194,13 @@ class ReviewControllerTest extends ApiDocsTestSupport {
         return new ReviewResponse(3L, 10L, "정왕역 앞 1층 상가", 7L, "이이용", ActivityType.POPUP_STORE,
                 FixedClockConfig.FIXED_TODAY.minusDays(3), FixedClockConfig.FIXED_TODAY.minusDays(2), 5,
                 "역 앞이라 유동 인구가 많아 첫날부터 매출이 좋았어요.", "감사합니다!", FixedClockConfig.FIXED_LOCAL_NOW,
+                FixedClockConfig.FIXED_LOCAL_NOW, FixedClockConfig.FIXED_LOCAL_NOW);
+    }
+
+    private static ReviewResponse waitingReview() {
+        return new ReviewResponse(4L, 10L, "정왕역 앞 1층 상가", 8L, "박전시", ActivityType.EXHIBITION,
+                FixedClockConfig.FIXED_TODAY.minusDays(5), FixedClockConfig.FIXED_TODAY.minusDays(4), 4,
+                "채광이 좋아 작품이 잘 보였어요. 주차만 조금 아쉬웠습니다.", null, null,
                 FixedClockConfig.FIXED_LOCAL_NOW, FixedClockConfig.FIXED_LOCAL_NOW);
     }
 

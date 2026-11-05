@@ -100,6 +100,58 @@ class ReviewIntegrationTest {
                 .andExpect(jsonPath("$.data.ratingAverage").doesNotExist());
     }
 
+    @Test
+    @DisplayName("받은 후기: 내 모든 공간 → 답글 대기만(replied=false) → 공간별 → 다른 제공자는 0건 → 이용자는 403")
+    void receivedReviews() throws Exception {
+        TestAccounts.Account provider = testAccounts.create(Role.PROVIDER);
+        TestAccounts.Account admin = testAccounts.create(Role.ADMIN);
+        TestAccounts.Account user = testAccounts.create(Role.USER);
+        long repliedReviewId = pastReview(provider, admin, user, 5);
+        long waitingReviewId = pastReview(provider, admin, user, 4);
+        mockMvc.perform(post("/api/v1/reviews/{id}/reply", repliedReviewId)
+                        .header(HttpHeaders.AUTHORIZATION, provider.bearer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\": \"감사합니다\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/provider/reviews").header(HttpHeaders.AUTHORIZATION, provider.bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(2))
+                .andExpect(jsonPath("$.data.content[0].id").value(waitingReviewId));
+        String body = mockMvc.perform(get("/api/v1/provider/reviews").param("replied", "false")
+                        .header(HttpHeaders.AUTHORIZATION, provider.bearer()))
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.content[0].id").value(waitingReviewId))
+                .andExpect(jsonPath("$.data.content[0].reply").doesNotExist())
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        long waitingSpaceId = objectMapper.readTree(body).at("/data/content/0/spaceId").asLong();
+        mockMvc.perform(get("/api/v1/provider/reviews").param("replied", "true")
+                        .header(HttpHeaders.AUTHORIZATION, provider.bearer()))
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.content[0].id").value(repliedReviewId));
+        mockMvc.perform(get("/api/v1/provider/reviews").param("spaceId", String.valueOf(waitingSpaceId))
+                        .header(HttpHeaders.AUTHORIZATION, provider.bearer()))
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.content[0].spaceId").value(waitingSpaceId));
+
+        mockMvc.perform(get("/api/v1/provider/reviews")
+                        .header(HttpHeaders.AUTHORIZATION, testAccounts.create(Role.PROVIDER).bearer()))
+                .andExpect(jsonPath("$.data.totalElements").value(0));
+        mockMvc.perform(get("/api/v1/provider/reviews").header(HttpHeaders.AUTHORIZATION, user.bearer()))
+                .andExpect(status().isForbidden());
+    }
+
+    /** 새 공간에 확정 예약 → 이용 기간을 지난날로 → 후기 작성. @return 후기 ID */
+    private long pastReview(TestAccounts.Account provider, TestAccounts.Account admin, TestAccounts.Account user,
+                            int rating) throws Exception {
+        long applicationId = bookingScenario.approvedBooking(provider, admin, user, DAY1, DAY1);
+        bookingScenario.movePeriod(applicationId, -2, -2);
+        String body = write(user, applicationId, rating)
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        return objectMapper.readTree(body).at("/data/id").asLong();
+    }
+
     private ResultActions write(TestAccounts.Account user, long applicationId, int rating) throws Exception {
         return mockMvc.perform(post("/api/v1/applications/{id}/review", applicationId)
                 .header(HttpHeaders.AUTHORIZATION, user.bearer())
