@@ -255,3 +255,36 @@ GET {{baseUrl}}/api/v1/spaces?sort=RATING&size=50
         }
     });
 %}
+
+### 받은 후기 (공간 제공자) — 답글을 기다리는 후기만
+# 인증: PROVIDER
+# 기대값: 200 OK, 목록 형식. (.http 에서는 이용 기간을 지난날로 옮길 수 없어 이 제공자의 후기는 0건)
+# 시연 데이터 계정(provider1@demo.dasisiheung.com)으로 호출하면 답글 대기 후기 1건이 보인다.
+GET {{baseUrl}}/api/v1/provider/reviews?replied=false
+Authorization: Bearer {{revProviderToken}}
+
+> {%
+    client.test("200 OK + 목록", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(Array.isArray(response.body.data.content), "content");
+        client.assert(response.body.data.totalElements === 0, `실제 ${response.body.data.totalElements}`);
+    });
+%}
+
+### 받은 후기 — 특정 공간만
+# 기대값: 200 OK
+GET {{baseUrl}}/api/v1/provider/reviews?spaceId={{revSpaceId}}
+Authorization: Bearer {{revProviderToken}}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+%}
+
+### 받은 후기 — 이용자는 볼 수 없다
+# 기대값: 403
+GET {{baseUrl}}/api/v1/provider/reviews
+Authorization: Bearer {{revUserToken}}
+
+> {%
+    client.test("403", () => client.assert(response.status === 403, `실제 ${response.status}`));
+%}
