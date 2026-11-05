@@ -6,6 +6,10 @@ import static com.dasisiheung.support.ApiDocumentation.error;
 import static com.dasisiheung.support.ApiDocumentation.page;
 import static com.dasisiheung.support.ApiDocumentation.resource;
 import static com.dasisiheung.support.ApiDocumentation.success;
+import static com.dasisiheung.support.MultipartDocumentation.filePart;
+import static com.dasisiheung.support.MultipartDocumentation.filesPart;
+import static com.dasisiheung.support.MultipartDocumentation.requestParts;
+import static com.dasisiheung.support.MultipartDocumentation.textPart;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
@@ -20,10 +24,8 @@ import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuild
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.put;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.restdocs.request.RequestDocumentation.parameterWithName;
-import static org.springframework.restdocs.request.RequestDocumentation.partWithName;
 import static org.springframework.restdocs.request.RequestDocumentation.pathParameters;
 import static org.springframework.restdocs.request.RequestDocumentation.queryParameters;
-import static org.springframework.restdocs.request.RequestDocumentation.requestParts;
 import static org.springframework.restdocs.payload.PayloadDocumentation.requestFields;
 import static org.springframework.restdocs.payload.PayloadDocumentation.responseFields;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -155,7 +157,7 @@ class ProviderSpaceControllerTest extends ApiDocsTestSupport {
                                 + "JPG·PNG·WEBP 10MB. 초과하면 400 SPACE_PHOTO_LIMIT_EXCEEDED, 형식이 다르면 400 UNSUPPORTED_FILE_TYPE."),
                         requestHeaders(authorization()),
                         pathParameters(parameterWithName("spaceId").description("공간 ID")),
-                        requestParts(partWithName("files").description("사진 파일 (여러 개)")),
+                        requestParts(filesPart("files", "사진 파일 (같은 이름으로 여러 개)")),
                         responseFields(success(photoListFields()))));
     }
 
@@ -224,8 +226,8 @@ class ProviderSpaceControllerTest extends ApiDocsTestSupport {
                                 + "공개·일시 중단 중인 공간에 추가하면 다시 검수 대기(PENDING_REVIEW)가 됩니다."),
                         requestHeaders(authorization()),
                         pathParameters(parameterWithName("spaceId").description("공간 ID")),
-                        requestParts(partWithName("file").description("증빙 파일"),
-                                partWithName("proofType").description("증빙 종류 (선택지 proofTypes)")),
+                        requestParts(filePart("file", "증빙 파일"),
+                                textPart("proofType", "증빙 종류 (선택지 proofTypes)")),
                         responseFields(success(proofFields("data.")))));
     }
 
