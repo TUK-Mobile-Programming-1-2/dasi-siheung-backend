@@ -132,6 +132,12 @@ public class SpaceQueryService {
         if (!request.facilities().isEmpty()) {
             conditions.add(SpaceSpecifications.hasAllFacilities(request.facilities()));
         }
+        if (request.headcount() != null) {
+            conditions.add(SpaceSpecifications.accommodates(request.headcount()));
+        }
+        if (Boolean.TRUE.equals(request.negotiableOnly())) {
+            conditions.add(SpaceSpecifications.priceNegotiable());
+        }
         if (request.keyword() != null) {
             conditions.add(SpaceSpecifications.containsKeyword(request.keyword()));
         }

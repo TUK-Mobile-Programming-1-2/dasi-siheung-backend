@@ -115,6 +115,42 @@ class PublicSpaceIntegrationTest {
     }
 
     @Test
+    @DisplayName("검색: 운영 인원(수용 인원을 정한 공간 중) · 가격 협의 가능 조건, 상세에 수용 인원 · 비품 · 협의 여부")
+    void searchByCapacityAndNegotiation() throws Exception {
+        TestAccounts.Account provider = testAccounts.create(Role.PROVIDER);
+        TestAccounts.Account admin = testAccounts.create(Role.ADMIN);
+        String token = "인원" + UUID.randomUUID().toString().substring(0, 8);
+        var base = SpaceFixtures.request(Set.of(TODAY.plusDays(1)));
+        long small = spaceScenario.publishedSpace(provider, admin,
+                SpaceFixtures.withExtras(base, token + " 소규모", 5, null, true));
+        long large = spaceScenario.publishedSpace(provider, admin,
+                SpaceFixtures.withExtras(base, token + " 대형", 30, SpaceFixtures.equipment(), false));
+        long unknown = spaceScenario.publishedSpace(provider, admin,
+                SpaceFixtures.withExtras(base, token + " 미정", null, null, null));
+
+        expectOnly(search(token, "headcount", "10"), large);
+        search(token, "headcount", "3")
+                .andExpect(jsonPath("$.data.totalElements").value(2));
+        search(token, "negotiableOnly", "true")
+                .andExpect(jsonPath("$.data.totalElements").value(2))
+                .andExpect(jsonPath("$.data.content[?(@.id == %d)]".formatted(large)).isEmpty());
+        expectOnly(search(token, "headcount", "3", "negotiableOnly", "true"), small);
+        search(token, "negotiableOnly", "false")
+                .andExpect(jsonPath("$.data.totalElements").value(3));
+
+        mockMvc.perform(get("/api/v1/spaces/{id}", large))
+                .andExpect(jsonPath("$.data.maxCapacity").value(30))
+                .andExpect(jsonPath("$.data.priceNegotiable").value(false))
+                .andExpect(jsonPath("$.data.equipment[0].name").value("접이식 테이블"));
+        mockMvc.perform(get("/api/v1/spaces/{id}", unknown))
+                .andExpect(jsonPath("$.data.maxCapacity").doesNotExist())
+                .andExpect(jsonPath("$.data.equipment.length()").value(0))
+                .andExpect(jsonPath("$.data.priceNegotiable").value(true));
+        mockMvc.perform(get("/api/v1/spaces").param("headcount", "501"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     @DisplayName("검색: 지난 기간은 400 INVALID_SEARCH_PERIOD, 종료일 없는 기간은 400 INVALID_INPUT")
     void invalidPeriod() throws Exception {
         mockMvc.perform(get("/api/v1/spaces")

@@ -63,6 +63,27 @@ class DemoDataIntegrationTest {
         assertThat(demoCount("SELECT count(*) FROM member WHERE email LIKE '%@demo.dasisiheung.com'")).isEqualTo(members);
     }
 
+    @Test
+    @DisplayName("수용 인원 · 비품이 없던 예전 시연 공간은 다시 시작할 때 채워진다 (한 번만)")
+    void fillsSpaceExtrasForOldDemoData() {
+        Long stationId = jdbcTemplate.queryForObject("""
+                SELECT s.id FROM space s JOIN member m ON m.id = s.provider_id
+                WHERE m.email = 'provider1@demo.dasisiheung.com' AND s.title = '정왕역 앞 코너 상가'""", Long.class);
+        jdbcTemplate.update("UPDATE space SET max_capacity = NULL, price_negotiable = TRUE WHERE id = ?", stationId);
+        jdbcTemplate.update("DELETE FROM space_equipment WHERE space_id = ?", stationId);
+
+        demoDataInitializer.run(new DefaultApplicationArguments());
+        demoDataInitializer.run(new DefaultApplicationArguments());
+
+        assertThat(jdbcTemplate.queryForObject("SELECT max_capacity FROM space WHERE id = ?", Integer.class, stationId))
+                .isEqualTo(8);
+        assertThat(jdbcTemplate.queryForObject("SELECT price_negotiable FROM space WHERE id = ?", Boolean.class,
+                stationId)).isFalse();
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT name FROM space_equipment WHERE space_id = ? ORDER BY sort_order", String.class, stationId))
+                .containsExactly("접이식 테이블", "의자", "옷걸이 행거");
+    }
+
     /** 이번 테스트 실행에서 시연 데이터를 새로 만들었는지 (기준 계정의 가입 시각). */
     private boolean createdJustNow() {
         return Boolean.TRUE.equals(jdbcTemplate.queryForObject("""

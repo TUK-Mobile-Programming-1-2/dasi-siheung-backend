@@ -57,6 +57,15 @@ public final class SpaceSpecifications {
         return (root, query, cb) -> cb.lessThanOrEqualTo(root.get("dailyPrice"), maxPrice);
     }
 
+    /** 이 인원을 수용할 수 있다. 수용 인원을 정하지 않은 공간은 확인할 수 없어 뺀다. */
+    public static Specification<Space> accommodates(int headcount) {
+        return (root, query, cb) -> cb.greaterThanOrEqualTo(root.get("maxCapacity"), headcount);
+    }
+
+    public static Specification<Space> priceNegotiable() {
+        return (root, query, cb) -> cb.isTrue(root.get("priceNegotiable"));
+    }
+
     /** 공간 이름 또는 주소에 검색어가 들어 있다. (대소문자 무시, % _ 는 글자 그대로) */
     public static Specification<Space> containsKeyword(String keyword) {
         String pattern = LikePatterns.containsIgnoreCase(keyword);

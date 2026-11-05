@@ -19,6 +19,8 @@ public record SpaceSummaryResponse(
         @Schema(description = "전용 면적(㎡)", example = "33.06") BigDecimal areaSqm,
         @Schema(description = "상권 테마") CommercialTheme commercialTheme,
         @Schema(description = "허용 활동") List<ActivityType> activityTypes,
+        @Schema(description = "최대 수용 인원 (정하지 않았으면 null)", example = "10") Integer maxCapacity,
+        @Schema(description = "가격 협의 가능 여부", example = "true") boolean priceNegotiable,
         @Schema(description = "위도", example = "37.3517") double latitude,
         @Schema(description = "경도", example = "126.7428") double longitude,
         @Schema(description = "찜 수", example = "12") int favoriteCount,
@@ -29,7 +31,8 @@ public record SpaceSummaryResponse(
     public static SpaceSummaryResponse of(Space space, String thumbnailUrl) {
         return new SpaceSummaryResponse(space.getId(), space.getTitle(), space.getRegion(), space.getAddress(),
                 thumbnailUrl, space.getDailyPrice(), space.getAreaSqm(), space.getCommercialTheme(),
-                SpaceResponses.sorted(space.getActivityTypes()), space.latitude(), space.longitude(),
+                SpaceResponses.sorted(space.getActivityTypes()), space.getMaxCapacity(), space.isPriceNegotiable(),
+                space.latitude(), space.longitude(),
                 space.getFavoriteCount(), space.getReviewCount(), space.getRatingAverage());
     }
 }

@@ -6,7 +6,9 @@ import com.dasisiheung.entity.space.Region;
 import com.dasisiheung.entity.space.UsePurpose;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Schema;
+import com.dasisiheung.entity.space.Space;
 import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
@@ -43,6 +45,12 @@ public record SpaceSearchRequest(
         @Schema(description = "꼭 있어야 하는 시설 (모두 갖춘 공간만)")
         Set<Facility> facilities,
 
+        @Schema(description = "운영 인원 — 이 인원을 수용할 수 있는 공간만 (수용 인원을 정한 공간 중에서)", example = "8")
+        @Min(1) @Max(Space.MAX_CAPACITY) Integer headcount,
+
+        @Schema(description = "true 면 가격 협의가 가능한 공간만", example = "true")
+        Boolean negotiableOnly,
+
         @Schema(description = "공간 이름 · 주소 검색어", example = "정왕역")
         @Size(max = 50) String keyword,
 
@@ -57,7 +65,7 @@ public record SpaceSearchRequest(
     }
 
     public static SpaceSearchRequest empty() {
-        return new SpaceSearchRequest(null, null, null, null, null, null, null, null, null, null);
+        return new SpaceSearchRequest(null, null, null, null, null, null, null, null, null, null, null, null);
     }
 
     public boolean hasPeriod() {

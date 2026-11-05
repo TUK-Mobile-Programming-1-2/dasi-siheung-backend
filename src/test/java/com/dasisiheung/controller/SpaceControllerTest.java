@@ -67,7 +67,8 @@ class SpaceControllerTest extends ApiDocsTestSupport {
     @DisplayName("공간 검색: 조건을 쿼리 파라미터로 받아 공개 공간 카드를 페이지로 준다")
     void search() throws Exception {
         given(spaceQueryService.search(argThat(request -> request.region() == Region.JEONGWANG
-                        && request.facilities().contains(Facility.WIFI) && request.sort() == SpaceSort.PRICE_ASC),
+                        && request.facilities().contains(Facility.WIFI) && request.sort() == SpaceSort.PRICE_ASC
+                        && Integer.valueOf(8).equals(request.headcount()) && Boolean.TRUE.equals(request.negotiableOnly())),
                 any(PageQuery.class)))
                 .willReturn(new PageResponse<>(List.of(spaceSummary()), 0, 20, 1, 1, false));
 
@@ -75,7 +76,8 @@ class SpaceControllerTest extends ApiDocsTestSupport {
                         .param("region", "JEONGWANG").param("activityType", "POPUP_STORE").param("purpose", "SALES")
                         .param("startDate", "2026-10-24").param("endDate", "2026-10-25")
                         .param("minPrice", "30000").param("maxPrice", "80000")
-                        .param("facilities", "WIFI", "ELECTRICITY").param("keyword", "정왕역")
+                        .param("facilities", "WIFI", "ELECTRICITY").param("headcount", "8")
+                        .param("negotiableOnly", "true").param("keyword", "정왕역")
                         .param("sort", "PRICE_ASC").param("page", "0").param("size", "20"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].thumbnailUrl").exists())
@@ -91,6 +93,8 @@ class SpaceControllerTest extends ApiDocsTestSupport {
                                 parameterWithName("minPrice").optional().description("1일 이용료 하한(원)"),
                                 parameterWithName("maxPrice").optional().description("1일 이용료 상한(원) — 예산"),
                                 parameterWithName("facilities").optional().description("꼭 있어야 하는 시설, 여러 번 보낼 수 있음 (모두 갖춘 공간만)"),
+                                parameterWithName("headcount").optional().description("운영 인원 — 이 인원을 수용할 수 있는 공간만 (수용 인원을 정한 공간 중에서, 1~500)"),
+                                parameterWithName("negotiableOnly").optional().description("true 면 가격 협의가 가능한 공간만"),
                                 parameterWithName("keyword").optional().description("공간 이름 · 주소 검색어 (최대 50자)"),
                                 parameterWithName("sort").optional().description("정렬 (선택지 spaceSorts, 기본 LATEST)"),
                                 parameterWithName("page").optional().description("페이지 (0부터)"),
@@ -214,7 +218,7 @@ class SpaceControllerTest extends ApiDocsTestSupport {
     static SpaceSummaryResponse spaceSummary() {
         return new SpaceSummaryResponse(10L, "정왕역 앞 1층 상가", Region.JEONGWANG, "경기도 시흥시 마유로 418",
                 ProviderSpaceControllerTest.photos().get(0).url(), 50_000, new BigDecimal("33.06"),
-                CommercialTheme.FOOD_ALLEY, List.of(ActivityType.POPUP_STORE, ActivityType.EXHIBITION),
+                CommercialTheme.FOOD_ALLEY, List.of(ActivityType.POPUP_STORE, ActivityType.EXHIBITION), 10, true,
                 37.3517, 126.7428, 12, 4, new BigDecimal("4.50"));
     }
 
@@ -229,6 +233,8 @@ class SpaceControllerTest extends ApiDocsTestSupport {
                 fieldWithPath(prefix + "areaSqm").type(JsonFieldType.NUMBER).description("전용 면적(㎡)"),
                 fieldWithPath(prefix + "commercialTheme").type(JsonFieldType.STRING).optional().description("상권 테마"),
                 fieldWithPath(prefix + "activityTypes").type(JsonFieldType.ARRAY).description("허용 활동"),
+                fieldWithPath(prefix + "maxCapacity").type(JsonFieldType.NUMBER).optional().description("최대 수용 인원 (정하지 않았으면 null)"),
+                fieldWithPath(prefix + "priceNegotiable").type(JsonFieldType.BOOLEAN).description("가격 협의 가능 여부"),
                 fieldWithPath(prefix + "latitude").type(JsonFieldType.NUMBER).description("위도"),
                 fieldWithPath(prefix + "longitude").type(JsonFieldType.NUMBER).description("경도"),
                 fieldWithPath(prefix + "favoriteCount").type(JsonFieldType.NUMBER).description("찜 수"),

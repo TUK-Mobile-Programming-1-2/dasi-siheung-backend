@@ -7,6 +7,7 @@ import com.dasisiheung.dto.community.CommentRequest;
 import com.dasisiheung.dto.community.PostRequest;
 import com.dasisiheung.dto.review.ReviewReplyRequest;
 import com.dasisiheung.dto.review.ReviewRequest;
+import com.dasisiheung.dto.space.EquipmentItem;
 import com.dasisiheung.dto.space.SpaceRequest;
 import com.dasisiheung.entity.community.PostCategory;
 import com.dasisiheung.entity.member.Role;
@@ -18,6 +19,8 @@ import com.dasisiheung.repository.MemberRepository;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +50,20 @@ public class DemoDataInitializer implements ApplicationRunner {
     /** 사용 가능 날짜: 내일부터 이 기간. 프론트 테스트 기간 동안 날짜가 바닥나지 않게 넉넉히 둔다. */
     static final int CALENDAR_DAYS = 180;
 
+    /** 시연 공간별 수용 인원 · 비품 · 가격 협의 여부 (공간 이름 기준). 정왕역 상가는 정가 고정 공간 예시. */
+    static final Map<String, SpaceExtras> SPACE_EXTRAS = Map.of(
+            "정왕역 앞 코너 상가", new SpaceExtras(8, List.of(new EquipmentItem("접이식 테이블", 2),
+                    new EquipmentItem("의자", 6), new EquipmentItem("옷걸이 행거", 2)), false),
+            "한국공학대 앞 쇼룸", new SpaceExtras(15, List.of(new EquipmentItem("진열 선반", 4),
+                    new EquipmentItem("스탠드 조명", 3)), true),
+            "배곧 카페거리 2층 갤러리", new SpaceExtras(20, List.of(new EquipmentItem("작품 거치대", 6),
+                    new EquipmentItem("빔프로젝터", 1), new EquipmentItem("의자", 20)), true),
+            "배곧 생명공원 앞 상가", new SpaceExtras(12, List.of(new EquipmentItem("작업 테이블", 3),
+                    new EquipmentItem("어린이 의자", 12)), true),
+            "거북섬 마리나 전망 공간", new SpaceExtras(25, List.of(new EquipmentItem("접이식 테이블", 4),
+                    new EquipmentItem("블루투스 스피커", 1)), true),
+            "거북섬 웨이브파크 옆 창고형 공간", new SpaceExtras(40, List.of(new EquipmentItem("팔레트", 10)), true));
+
     private final MemberRepository memberRepository;
     private final AuthService authService;
     private final SpaceService spaceService;
@@ -64,6 +81,7 @@ public class DemoDataInitializer implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         if (memberRepository.existsByEmail(MARKER_EMAIL)) {
+            fillSpaceExtras();
             log.info("시연 데이터가 이미 있어 건너뜁니다.");
             return;
         }
@@ -161,6 +179,34 @@ public class DemoDataInitializer implements ApplicationRunner {
                 + "관리자는 docs/ADMIN_GUIDE.md 대로 승격하세요.", PASSWORD, statistics);
     }
 
+    /**
+     * 수용 인원 · 비품 · 가격 협의가 생기기 전에 만든 시연 공간을 보강한다. (수용 인원이 비어 있는 시연 공간만, 한 번)
+     * 이미 만든 데이터라 서비스 흐름 대신 SQL 로 채운다.
+     */
+    private void fillSpaceExtras() {
+        try {
+            SPACE_EXTRAS.forEach((title, extras) -> jdbcTemplate.query("""
+                            SELECT s.id FROM space s JOIN member m ON m.id = s.provider_id
+                            WHERE m.email LIKE '%@demo.dasisiheung.com' AND s.title = ? AND s.max_capacity IS NULL""",
+                    (rs, rowNum) -> rs.getLong(1), title)
+                    .forEach(spaceId -> fillSpaceExtras(spaceId, extras)));
+        } catch (RuntimeException e) {
+            log.error("시연 공간의 수용 인원 · 비품을 채우지 못했습니다. 서버는 그대로 실행합니다.", e);
+        }
+    }
+
+    private void fillSpaceExtras(long spaceId, SpaceExtras extras) {
+        jdbcTemplate.update("UPDATE space SET max_capacity = ?, price_negotiable = ? WHERE id = ?",
+                extras.maxCapacity(), extras.priceNegotiable(), spaceId);
+        jdbcTemplate.update("DELETE FROM space_equipment WHERE space_id = ?", spaceId);
+        for (int i = 0; i < extras.equipment().size(); i++) {
+            EquipmentItem item = extras.equipment().get(i);
+            jdbcTemplate.update("INSERT INTO space_equipment (space_id, sort_order, name, quantity) VALUES (?, ?, ?, ?)",
+                    spaceId, i, item.name(), item.quantity());
+        }
+        log.info("시연 공간 {} 에 수용 인원 · 비품 · 가격 협의 여부를 채웠습니다.", spaceId);
+    }
+
     private long signup(String localPart, String name, Role role) {
         return authService.signup(new SignupRequest(localPart + "@demo.dasisiheung.com", PASSWORD, name,
                 "010-0000-0000", role)).id();
@@ -198,8 +244,13 @@ public class DemoDataInitializer implements ApplicationRunner {
                                       double longitude, String areaSqm, BuildingUse buildingUse,
                                       CommercialTheme theme, int dailyPrice, Set<Facility> facilities,
                                       Set<ActivityType> activityTypes, Set<LocalDate> availableDates) {
+        SpaceExtras extras = SPACE_EXTRAS.get(title);
         return new SpaceRequest(title, description, "퇴실 시 원상 복구, 21시 이후 소음 금지", address, null, null, latitude,
                 longitude, new BigDecimal(areaSqm), buildingUse, theme, dailyPrice, facilities, activityTypes,
-                availableDates);
+                availableDates, extras.maxCapacity(), extras.equipment(), extras.priceNegotiable());
+    }
+
+    /** 시연 공간의 수용 인원 · 비품 · 가격 협의 여부. */
+    record SpaceExtras(int maxCapacity, List<EquipmentItem> equipment, boolean priceNegotiable) {
     }
 }
