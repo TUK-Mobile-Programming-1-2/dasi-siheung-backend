@@ -6,6 +6,7 @@ import com.dasisiheung.entity.report.ReportStatus;
 import com.dasisiheung.entity.report.ReportTargetType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /** 신고 접수 결과 (신고한 사람에게). */
 public record ReportResponse(
@@ -15,11 +16,12 @@ public record ReportResponse(
         @Schema(description = "사유", example = "FALSE_INFORMATION") ReportReason reason,
         @Schema(description = "자세한 내용") String detail,
         @Schema(description = "처리 상태", example = "PENDING") ReportStatus status,
+        @Schema(description = "첨부한 증거 사진 (올린 순, 없으면 빈 배열)") List<ReportPhotoResponse> photos,
         @Schema(description = "접수 시각") LocalDateTime createdAt
 ) {
 
-    public static ReportResponse from(Report report) {
+    public static ReportResponse of(Report report, List<ReportPhotoResponse> photos) {
         return new ReportResponse(report.getId(), report.getTargetType(), report.getTargetId(), report.getReason(),
-                report.getDetail(), report.getStatus(), report.getCreatedAt());
+                report.getDetail(), report.getStatus(), List.copyOf(photos), report.getCreatedAt());
     }
 }
