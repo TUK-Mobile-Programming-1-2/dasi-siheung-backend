@@ -60,6 +60,22 @@ class PostTest {
     }
 
     @Test
+    @DisplayName("사진은 작성자만 더하고 지울 수 있고, 합쳐서 5장까지")
+    void photos() {
+        Post post = Post.write(user, PostCategory.RECRUIT, "팀원 모집", "내용");
+
+        assertThatCode(() -> post.validateCanAddPhotos(1L, 3, 2)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> post.validateCanAddPhotos(1L, 4, 2))
+                .hasMessageContaining("현재 4장")
+                .extracting("errorCode").isEqualTo(ErrorCode.POST_PHOTO_LIMIT_EXCEEDED);
+        assertThatThrownBy(() -> post.validateCanAddPhotos(2L, 0, 1))
+                .extracting("errorCode").isEqualTo(ErrorCode.NOT_POST_AUTHOR);
+        assertThatThrownBy(() -> post.validateCanDeletePhoto(2L))
+                .extracting("errorCode").isEqualTo(ErrorCode.NOT_POST_AUTHOR);
+        assertThatCode(() -> post.validateCanDeletePhoto(1L)).doesNotThrowAnyException();
+    }
+
+    @Test
     @DisplayName("미리보기: 줄바꿈 · 연속 공백은 공백 하나로, 짧으면 그대로")
     void previewFlattensWhitespace() {
         Post post = Post.write(user, PostCategory.QUESTION, "질문", "첫 줄\n\n둘째   줄\t끝");
