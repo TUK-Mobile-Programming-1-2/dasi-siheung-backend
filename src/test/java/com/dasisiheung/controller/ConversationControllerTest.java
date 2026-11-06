@@ -134,7 +134,7 @@ class ConversationControllerTest extends ApiDocsTestSupport {
     void openForApplication() throws Exception {
         given(conversationService.openForApplication(PROVIDER_ID, 7L)).willReturn(new ConversationResponse(1L, 10L,
                 "정왕역 앞 1층 상가", ProviderSpaceControllerTest.photos().get(0).url(),
-                new ConversationResponse.Counterpart(USER_ID, "이이용", Role.USER),
+                new ConversationResponse.Counterpart(USER_ID, "이이용", Role.USER, null),
                 "안녕하세요! 11월 첫 주말에 팝업 가능할까요?", FixedClockConfig.FIXED_LOCAL_NOW, 1, 0L));
 
         mockMvc.perform(post("/api/v1/applications/{applicationId}/conversation", 7L)
@@ -159,7 +159,8 @@ class ConversationControllerTest extends ApiDocsTestSupport {
 
     private static ConversationResponse conversation(long unread) {
         return new ConversationResponse(1L, 10L, "정왕역 앞 1층 상가", ProviderSpaceControllerTest.photos().get(0).url(),
-                new ConversationResponse.Counterpart(PROVIDER_ID, "김제공", Role.PROVIDER),
+                new ConversationResponse.Counterpart(PROVIDER_ID, "김제공", Role.PROVIDER,
+                        "https://abc.supabase.co/storage/v1/object/public/space-photos/members/2/profile/a.jpg"),
                 "네 가능합니다. 신청서 보내 주세요.", FixedClockConfig.FIXED_LOCAL_NOW, unread, 40L);
     }
 
@@ -172,6 +173,8 @@ class ConversationControllerTest extends ApiDocsTestSupport {
                 fieldWithPath(prefix + "counterpart.id").type(JsonFieldType.NUMBER).description("상대방 회원 ID"),
                 fieldWithPath(prefix + "counterpart.name").type(JsonFieldType.STRING).description("상대방 이름"),
                 fieldWithPath(prefix + "counterpart.role").type(JsonFieldType.STRING).description("상대방 역할"),
+                fieldWithPath(prefix + "counterpart.profileImageUrl").type(JsonFieldType.STRING).optional()
+                        .description("상대방 프로필 사진 주소 (없거나 탈퇴했으면 null)"),
                 fieldWithPath(prefix + "lastMessagePreview").type(JsonFieldType.STRING).optional().description("마지막 메시지 미리보기"),
                 fieldWithPath(prefix + "lastMessageAt").type(JsonFieldType.STRING).optional().description("마지막 메시지 시각"),
                 fieldWithPath(prefix + "unreadCount").type(JsonFieldType.NUMBER).description("안 읽은 메시지 수"),

@@ -6,6 +6,8 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 
 import com.dasisiheung.dto.member.ChangePasswordRequest;
@@ -18,6 +20,8 @@ import com.dasisiheung.repository.ApplicationRepository;
 import com.dasisiheung.repository.MemberRepository;
 import com.dasisiheung.repository.RefreshTokenRepository;
 import com.dasisiheung.support.FixedClockConfig;
+import com.dasisiheung.support.TestFiles;
+import com.dasisiheung.util.FileType;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -44,6 +48,12 @@ class MemberServiceTest {
     @Mock
     private ApplicationRepository applicationRepository;
 
+    @Mock
+    private FileUploadService fileUploadService;
+
+    @Mock
+    private ProfileImageResolver profileImageResolver;
+
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(4);
 
     private MemberService memberService;
@@ -52,7 +62,7 @@ class MemberServiceTest {
     @BeforeEach
     void setUp() {
         memberService = new MemberService(memberRepository, refreshTokenRepository, applicationRepository,
-                passwordEncoder, FixedClockConfig.fixedClock());
+                passwordEncoder, fileUploadService, profileImageResolver, FixedClockConfig.fixedClock());
         member = Member.signUp("user@example.com", passwordEncoder.encode(PASSWORD), "김시흥", "01012345678", Role.USER);
         ReflectionTestUtils.setField(member, "id", MEMBER_ID);
     }
@@ -138,6 +148,76 @@ class MemberServiceTest {
         assertThatThrownBy(() -> memberService.withdraw(MEMBER_ID, "wrong1234"))
                 .extracting("errorCode").isEqualTo(ErrorCode.PASSWORD_MISMATCH);
         then(applicationRepository).should(never()).existsInProgressByParticipant(anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("프로필 사진을 바꾸면 새 경로를 저장하고 이전 사진은 커밋 뒤 지운다")
+    void changeProfileImage() {
+        member.changeProfileImage("members/7/profile/old.jpg");
+        var image = TestFiles.jpeg("image");
+        given(memberRepository.findById(MEMBER_ID)).willReturn(Optional.of(member));
+        given(fileUploadService.upload(UploadPolicy.PROFILE_IMAGE, "members/7/profile", image))
+                .willReturn(new StoredFile("members/7/profile/new.jpg", FileType.JPEG, "photo.jpg", 10));
+        given(profileImageResolver.urlOf(member)).willReturn("https://cdn/members/7/profile/new.jpg");
+
+        var response = memberService.changeProfileImage(MEMBER_ID, image);
+
+        assertThat(member.getProfileImagePath()).isEqualTo("members/7/profile/new.jpg");
+        assertThat(response.profileImageUrl()).isEqualTo("https://cdn/members/7/profile/new.jpg");
+        then(fileUploadService).should().deleteAfterCommit(UploadPolicy.PROFILE_IMAGE, "members/7/profile/old.jpg");
+    }
+
+    @Test
+    @DisplayName("처음 올리는 프로필 사진이면 지울 파일이 없다")
+    void changeProfileImageFirstTime() {
+        var image = TestFiles.jpeg("image");
+        given(memberRepository.findById(MEMBER_ID)).willReturn(Optional.of(member));
+        given(fileUploadService.upload(eq(UploadPolicy.PROFILE_IMAGE), anyString(), eq(image)))
+                .willReturn(new StoredFile("members/7/profile/new.jpg", FileType.JPEG, "photo.jpg", 10));
+
+        memberService.changeProfileImage(MEMBER_ID, image);
+
+        then(fileUploadService).should(never()).deleteAfterCommit(any(), anyString());
+    }
+
+    @Test
+    @DisplayName("프로필 사진을 지우면 경로를 비우고 파일은 커밋 뒤 지운다. 사진이 없으면 아무것도 지우지 않는다")
+    void deleteProfileImage() {
+        member.changeProfileImage("members/7/profile/old.jpg");
+        given(memberRepository.findById(MEMBER_ID)).willReturn(Optional.of(member));
+
+        var response = memberService.deleteProfileImage(MEMBER_ID);
+        memberService.deleteProfileImage(MEMBER_ID);
+
+        assertThat(member.getProfileImagePath()).isNull();
+        assertThat(response.profileImageUrl()).isNull();
+        then(fileUploadService).should().deleteAfterCommit(UploadPolicy.PROFILE_IMAGE, "members/7/profile/old.jpg");
+    }
+
+    @Test
+    @DisplayName("탈퇴하면 프로필 사진 파일도 커밋 뒤 지운다")
+    void withdrawDeletesProfileImage() {
+        member.changeProfileImage("members/7/profile/old.jpg");
+        given(memberRepository.findById(MEMBER_ID)).willReturn(Optional.of(member));
+
+        memberService.withdraw(MEMBER_ID, PASSWORD);
+
+        assertThat(member.getProfileImagePath()).isNull();
+        then(fileUploadService).should().deleteAfterCommit(UploadPolicy.PROFILE_IMAGE, "members/7/profile/old.jpg");
+    }
+
+    @Test
+    @DisplayName("진행 중인 예약으로 탈퇴가 막히면 프로필 사진은 그대로 둔다")
+    void withdrawBlockedKeepsProfileImage() {
+        member.changeProfileImage("members/7/profile/old.jpg");
+        given(memberRepository.findById(MEMBER_ID)).willReturn(Optional.of(member));
+        given(applicationRepository.existsInProgressByParticipant(MEMBER_ID, FixedClockConfig.FIXED_TODAY))
+                .willReturn(true);
+
+        assertThatThrownBy(() -> memberService.withdraw(MEMBER_ID, PASSWORD))
+                .extracting("errorCode").isEqualTo(ErrorCode.WITHDRAWAL_BLOCKED_BY_APPLICATION);
+        assertThat(member.getProfileImagePath()).isEqualTo("members/7/profile/old.jpg");
+        then(fileUploadService).should(never()).deleteAfterCommit(any(), anyString());
     }
 
     @Test
