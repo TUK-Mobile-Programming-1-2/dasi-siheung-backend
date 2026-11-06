@@ -97,6 +97,8 @@ public enum ErrorCode {
     COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "댓글을 찾을 수 없습니다."),
     NOT_POST_AUTHOR(HttpStatus.FORBIDDEN, "본인이 쓴 글만 고치거나 지울 수 있습니다."),
     NOT_COMMENT_AUTHOR(HttpStatus.FORBIDDEN, "본인이 쓴 댓글만 지울 수 있습니다."),
+    POST_PHOTO_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "게시글 사진은 최대 5장까지 올릴 수 있습니다."),
+    POST_PHOTO_NOT_FOUND(HttpStatus.NOT_FOUND, "게시글 사진을 찾을 수 없습니다."),
     NOTICE_ADMIN_ONLY(HttpStatus.FORBIDDEN, "공지는 관리자만 쓸 수 있습니다."),
 
     // 1:1 소통

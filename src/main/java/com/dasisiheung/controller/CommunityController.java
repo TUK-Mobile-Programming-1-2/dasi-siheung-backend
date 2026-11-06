@@ -7,20 +7,24 @@ import com.dasisiheung.dto.common.PageResponse;
 import com.dasisiheung.dto.community.CommentRequest;
 import com.dasisiheung.dto.community.CommentResponse;
 import com.dasisiheung.dto.community.PostDetailResponse;
+import com.dasisiheung.dto.community.PostPhotoResponse;
 import com.dasisiheung.dto.community.PostRequest;
 import com.dasisiheung.dto.community.PostSummaryResponse;
 import com.dasisiheung.entity.community.PostCategory;
 import com.dasisiheung.security.AuthMember;
 import com.dasisiheung.security.LoginMember;
 import com.dasisiheung.service.CommunityService;
+import com.dasisiheung.service.PostPhotoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Size;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,8 +33,10 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 /** 커뮤니티. 조회(GET)는 로그인 없이, 쓰기는 로그인 회원. */
 @Tag(name = "Community", description = "커뮤니티 게시글 · 댓글")
@@ -40,6 +46,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class CommunityController {
 
     private final CommunityService communityService;
+    private final PostPhotoService postPhotoService;
 
     @Operation(summary = "게시글 목록", description = "최근 순. category · keyword(제목 · 본문) 로 거를 수 있습니다.")
     @GetMapping("/posts")
@@ -56,7 +63,8 @@ public class CommunityController {
         return ApiResult.ok(communityService.getPost(postId, loginMember == null ? null : loginMember.id()));
     }
 
-    @Operation(summary = "게시글 쓰기", description = "공지(NOTICE)는 관리자만 쓸 수 있습니다.")
+    @Operation(summary = "게시글 쓰기",
+            description = "공지(NOTICE)는 관리자만 쓸 수 있습니다. 사진은 응답의 id 로 '게시글 사진 추가'에 이어서 올립니다.")
     @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
     @PostMapping("/posts")
     @ResponseStatus(HttpStatus.CREATED)
@@ -73,7 +81,27 @@ public class CommunityController {
         return ApiResult.ok(communityService.edit(loginMember.id(), postId, request));
     }
 
-    @Operation(summary = "게시글 삭제", description = "작성자 또는 관리자. 댓글도 함께 지워집니다.")
+    @Operation(summary = "게시글 사진 추가",
+            description = "글을 쓴 뒤 받은 게시글 ID 로 올립니다. multipart 파트 files 에 여러 장. "
+                    + "글당 최대 5장, JPG·PNG·WEBP 10MB. 작성자만. 응답은 전체 사진 목록(올린 순)입니다.")
+    @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
+    @PostMapping(path = "/posts/{postId}/photos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResult<List<PostPhotoResponse>> addPhotos(@LoginMember AuthMember loginMember, @PathVariable Long postId,
+                                                        @RequestPart("files") List<MultipartFile> files) {
+        return ApiResult.ok(postPhotoService.addPhotos(loginMember.id(), postId, files));
+    }
+
+    @Operation(summary = "게시글 사진 삭제", description = "작성자만.")
+    @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
+    @DeleteMapping("/posts/{postId}/photos/{photoId}")
+    public ApiResult<Void> deletePhoto(@LoginMember AuthMember loginMember, @PathVariable Long postId,
+                                       @PathVariable Long photoId) {
+        postPhotoService.deletePhoto(loginMember.id(), postId, photoId);
+        return ApiResult.ok();
+    }
+
+    @Operation(summary = "게시글 삭제", description = "작성자 또는 관리자. 댓글 · 사진도 함께 지워집니다.")
     @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
     @DeleteMapping("/posts/{postId}")
     public ApiResult<Void> delete(@LoginMember AuthMember loginMember, @PathVariable Long postId) {

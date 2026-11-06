@@ -256,6 +256,8 @@ flowchart LR
 | `COMMENT_NOT_FOUND` | 404 | 없는 댓글 | 댓글 새로고침 |
 | `NOT_POST_AUTHOR` | 403 | 남의 글을 고치거나 지움 | 수정 · 삭제 버튼은 mine 일 때만 |
 | `NOT_COMMENT_AUTHOR` | 403 | 남의 댓글을 지움 | 삭제 버튼 숨기기 |
+| `POST_PHOTO_LIMIT_EXCEEDED` | 400 | 게시글 사진 5장 초과 (이미 올린 사진 포함) | 사진 선택을 남은 장수로 제한 |
+| `POST_PHOTO_NOT_FOUND` | 404 | 이미 지웠거나 이 글의 사진이 아님 | 상세를 다시 조회 |
 | `NOTICE_ADMIN_ONLY` | 403 | 관리자가 아닌데 공지 작성 | 분류 선택지에서 공지 빼기 |
 
 **1:1 소통**
@@ -303,7 +305,7 @@ flowchart LR
 
 ### 3-3-3. 파일 업로드
 
-- 파일은 **`multipart/form-data`** 로 보냅니다. 파트 이름은 API 마다 다르니 Swagger 를 확인하세요. (보통 `files` 또는 `file`, 신고 사진은 `photos`)
+- 파일은 **`multipart/form-data`** 로 보냅니다. 파트 이름은 API 마다 다르니 Swagger 를 확인하세요. (보통 `files` 또는 `file`, 신고 사진은 `photos`, 프로필 사진은 `image`)
 - 서버가 **파일 내용으로 형식을 판별**합니다. 확장자만 바꾼 파일은 400 `UNSUPPORTED_FILE_TYPE` 입니다.
 
 | 종류 | 형식 | 파일당 최대 | 응답 주소 |
@@ -312,6 +314,8 @@ flowchart LR
 | 권한 증빙 | PDF · JPG · PNG | 20MB | **10분짜리 임시 주소** — 만료되면 목록을 다시 조회 |
 | 활동 전후 사진 | JPG · PNG · WEBP | 10MB | 10분짜리 임시 주소 |
 | 신고 증거 사진 | JPG · PNG · WEBP | 10MB (최대 5장) | 10분짜리 임시 주소 — **관리자만** 열람 |
+| 프로필 사진 | JPG · PNG · WEBP | 5MB (1장) | 고정 주소 — 내 정보 · 글쓴이 · 대화 상대에 같은 주소 |
+| 게시글 사진 | JPG · PNG · WEBP | 10MB (글당 최대 5장) | 고정 주소 — 첫 사진이 목록 썸네일 |
 
 - 사진은 앱에서 **긴 변 2000px 이하로 줄여서** 올리면 업로드가 빠르고 용량 초과를 피할 수 있습니다.
 - 임시 주소는 저장하지 말고 화면을 열 때마다 받은 값을 씁니다.
@@ -336,6 +340,42 @@ interface ReportApi {
 fun String.toPart() = toRequestBody("text/plain".toMediaType())
 fun File.toPhotoPart() = MultipartBody.Part.createFormData("photos", name, asRequestBody("image/jpeg".toMediaType()))
 ```
+
+**글 + 사진 — 게시글 쓰기** (`POST /api/v1/community/posts` → `POST /api/v1/community/posts/{postId}/photos`)
+
+글은 지금처럼 JSON 으로 먼저 쓰고, 응답의 `id` 로 사진을 이어서 올립니다. 사진 업로드가 실패해도 글은 남으니,
+실패하면 "사진을 다시 올려 주세요" 안내 후 상세 화면에서 다시 올리게 하면 됩니다. 수정 화면에서는 사진을 한 장씩 더하거나(`POST .../photos`) 지웁니다(`DELETE .../photos/{photoId}`).
+
+```kotlin
+interface CommunityApi {
+    @POST("api/v1/community/posts")
+    suspend fun write(@Body request: PostRequest): Response<ApiResult<PostDetailResponse>>
+
+    @Multipart
+    @POST("api/v1/community/posts/{postId}/photos")
+    suspend fun addPhotos(
+        @Path("postId") postId: Long,
+        @Part files: List<MultipartBody.Part>,            // 파트 이름 files, 글당 최대 5장
+    ): Response<ApiResult<List<PostPhotoResponse>>>
+}
+
+fun File.toFilesPart() = MultipartBody.Part.createFormData("files", name, asRequestBody("image/jpeg".toMediaType()))
+```
+
+**프로필 사진** (`POST /api/v1/members/me/profile-image`, 파트 이름 `image`)
+
+```kotlin
+@Multipart
+@POST("api/v1/members/me/profile-image")
+suspend fun changeProfileImage(@Part image: MultipartBody.Part): Response<ApiResult<MyProfileResponse>>
+
+@DELETE("api/v1/members/me/profile-image")
+suspend fun deleteProfileImage(): Response<ApiResult<MyProfileResponse>>
+
+// MultipartBody.Part.createFormData("image", name, asRequestBody("image/jpeg".toMediaType()))
+```
+
+`profileImageUrl` 이 null 이면 기본 이미지를 보여줍니다. 사진을 바꾸면 주소 자체가 바뀌므로 Coil 캐시를 따로 지울 필요가 없습니다.
 
 ### 3-3-4. 주소 · 좌표 · 지역
 
@@ -774,7 +814,9 @@ try {
 | GET | `/api/v1/members/me` | 로그인 | 내 정보 조회 |
 | PATCH | `/api/v1/members/me` | 로그인 | 이름·휴대폰 번호 수정 (보낸 값만) |
 | PATCH | `/api/v1/members/me/password` | 로그인 | 비밀번호 변경 (다른 기기 로그아웃) |
-| POST | `/api/v1/members/me/withdraw` | 로그인 | 회원 탈퇴 (개인정보 즉시 삭제, 진행 중인 신청 · 예약이 있으면 409) |
+| POST | `/api/v1/members/me/profile-image` | 로그인 | 프로필 사진 변경 (multipart `image`, 이전 사진은 삭제) |
+| DELETE | `/api/v1/members/me/profile-image` | 로그인 | 프로필 사진 삭제 (기본 이미지로) |
+| POST | `/api/v1/members/me/withdraw` | 로그인 | 회원 탈퇴 (개인정보 · 프로필 사진 즉시 삭제, 진행 중인 신청 · 예약이 있으면 409) |
 
 ### 선택지 (`http/option.http`)
 
@@ -894,11 +936,13 @@ try {
 
 | 메서드 | 경로 | 인증 | 설명 |
 | --- | --- | --- | --- |
-| GET | `/api/v1/community/posts` | 공개 | 게시글 목록 (category · keyword, 본문 미리보기 `contentPreview` 앞 100자) |
-| GET | `/api/v1/community/posts/{postId}` | 공개 | 게시글 상세 (조회 수 +1, 토큰 있으면 mine) |
+| GET | `/api/v1/community/posts` | 공개 | 게시글 목록 (category · keyword, 본문 미리보기 `contentPreview` 앞 100자, 썸네일 `thumbnailUrl`) |
+| GET | `/api/v1/community/posts/{postId}` | 공개 | 게시글 상세 (조회 수 +1, 토큰 있으면 mine, 사진 `photos`) |
 | POST | `/api/v1/community/posts` | 로그인 | 게시글 쓰기 (공지는 ADMIN) |
 | PUT | `/api/v1/community/posts/{postId}` | 작성자 | 게시글 수정 |
-| DELETE | `/api/v1/community/posts/{postId}` | 작성자 · ADMIN | 게시글 삭제 |
+| DELETE | `/api/v1/community/posts/{postId}` | 작성자 · ADMIN | 게시글 삭제 (댓글 · 사진도 함께) |
+| POST | `/api/v1/community/posts/{postId}/photos` | 작성자 | 게시글 사진 추가 (multipart `files`, 글당 최대 5장) |
+| DELETE | `/api/v1/community/posts/{postId}/photos/{photoId}` | 작성자 | 게시글 사진 삭제 |
 | GET | `/api/v1/community/posts/{postId}/comments` | 공개 | 댓글 목록 (오래된 순) |
 | POST | `/api/v1/community/posts/{postId}/comments` | 로그인 | 댓글 쓰기 |
 | DELETE | `/api/v1/community/comments/{commentId}` | 작성자 · ADMIN | 댓글 삭제 |

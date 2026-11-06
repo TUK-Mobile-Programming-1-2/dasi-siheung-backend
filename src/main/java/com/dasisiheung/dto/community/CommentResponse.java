@@ -12,8 +12,8 @@ public record CommentResponse(
         @Schema(description = "작성 시각") LocalDateTime createdAt
 ) {
 
-    public static CommentResponse from(Comment comment) {
-        return new CommentResponse(comment.getId(), comment.getPost().getId(), AuthorInfo.from(comment.getAuthor()),
+    public static CommentResponse of(Comment comment, AuthorInfo author) {
+        return new CommentResponse(comment.getId(), comment.getPost().getId(), author,
                 comment.getContent(), comment.getCreatedAt());
     }
 }

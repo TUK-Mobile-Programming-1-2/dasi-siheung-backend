@@ -20,6 +20,15 @@ public interface PostRepository extends JpaRepository<Post, Long> {
         return findById(postId).orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
     }
 
+    /** @throws BusinessException 없거나 숨김(신고 처리)이면 POST_NOT_FOUND */
+    default Post getVisiblePost(Long postId) {
+        Post post = getPost(postId);
+        if (!post.isVisible()) {
+            throw new BusinessException(ErrorCode.POST_NOT_FOUND);
+        }
+        return post;
+    }
+
     /**
      * 보이는 게시글 목록.
      *

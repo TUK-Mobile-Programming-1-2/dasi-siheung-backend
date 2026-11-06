@@ -14,12 +14,16 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @Tag(name = "Member", description = "내 정보")
 @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
@@ -41,6 +45,21 @@ public class MemberController {
     public ApiResult<MyProfileResponse> updateMyProfile(@LoginMember AuthMember loginMember,
                                                         @Valid @RequestBody UpdateProfileRequest request) {
         return ApiResult.ok(memberService.updateMyProfile(loginMember.id(), request));
+    }
+
+    @Operation(summary = "프로필 사진 변경",
+            description = "multipart 파트 image 에 사진 한 장. JPG·PNG·WEBP 5MB. 이전 사진은 지워집니다. "
+                    + "글쓴이 · 대화 상대 정보에도 같은 주소가 내려갑니다.")
+    @PostMapping(path = "/profile-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResult<MyProfileResponse> changeProfileImage(@LoginMember AuthMember loginMember,
+                                                           @RequestPart("image") MultipartFile image) {
+        return ApiResult.ok(memberService.changeProfileImage(loginMember.id(), image));
+    }
+
+    @Operation(summary = "프로필 사진 삭제", description = "기본 이미지로 돌아갑니다. 사진이 없어도 200 입니다.")
+    @DeleteMapping("/profile-image")
+    public ApiResult<MyProfileResponse> deleteProfileImage(@LoginMember AuthMember loginMember) {
+        return ApiResult.ok(memberService.deleteProfileImage(loginMember.id()));
     }
 
     @Operation(summary = "비밀번호 변경", description = "변경하면 모든 기기의 리프레시 토큰이 폐기됩니다.")

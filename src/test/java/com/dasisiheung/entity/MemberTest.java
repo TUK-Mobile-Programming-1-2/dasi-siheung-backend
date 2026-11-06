@@ -72,6 +72,29 @@ class MemberTest {
                 .extracting("errorCode").isEqualTo(ErrorCode.INVALID_CREDENTIALS);
     }
 
+    @Test
+    @DisplayName("프로필 사진을 바꾸거나 지우면 이전 경로를 돌려준다 (저장소에서 지울 대상)")
+    void changeAndRemoveProfileImage() {
+        Member member = Member.signUp("user@example.com", "hash", "김시흥", "01012345678", Role.USER);
+
+        assertThat(member.changeProfileImage("members/1/profile/a.jpg")).isNull();
+        assertThat(member.changeProfileImage("members/1/profile/b.jpg")).isEqualTo("members/1/profile/a.jpg");
+        assertThat(member.removeProfileImage()).isEqualTo("members/1/profile/b.jpg");
+        assertThat(member.getProfileImagePath()).isNull();
+        assertThat(member.removeProfileImage()).isNull();
+    }
+
+    @Test
+    @DisplayName("탈퇴하면 프로필 사진 경로도 지운다")
+    void withdrawClearsProfileImage() {
+        Member member = Member.signUp("user@example.com", "hash", "김시흥", "01012345678", Role.USER);
+        member.changeProfileImage("members/1/profile/a.jpg");
+
+        member.withdraw(NOW);
+
+        assertThat(member.getProfileImagePath()).isNull();
+    }
+
     private static Member suspended(LocalDateTime until) {
         Member member = Member.signUp("user@example.com", "hash", "김시흥", "01012345678", Role.USER);
         ReflectionTestUtils.setField(member, "status", MemberStatus.SUSPENDED);

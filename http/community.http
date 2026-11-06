@@ -34,7 +34,7 @@ Content-Type: application/json
 
 ### 게시글 쓰기
 # 인증: 로그인 회원
-# 기대값: 201 Created, mine = true, 조회 · 댓글 0
+# 기대값: 201 Created, mine = true, 조회 · 댓글 0, photos = [] (사진은 다음 요청에서 이 id 로 올린다)
 POST {{baseUrl}}/api/v1/community/posts
 Authorization: Bearer {{communityToken}}
 Content-Type: application/json
@@ -49,6 +49,7 @@ Content-Type: application/json
     client.test("201 Created", () => {
         client.assert(response.status === 201, `실제 ${response.status}`);
         client.assert(response.body.data.mine === true && response.body.data.viewCount === 0, JSON.stringify(response.body.data));
+        client.assert(response.body.data.photos.length === 0, `실제 ${response.body.data.photos.length}`);
     });
     client.global.set("communityPostId", response.body.data.id);
 %}
@@ -72,8 +73,74 @@ Content-Type: application/json
     });
 %}
 
+### 게시글 사진 2장 추가 (multipart, 파트 이름 files)
+# 인증: 작성자
+# 기대값: 201 Created, data = 전체 사진 목록 [{ id, url }] (올린 순, 첫 사진이 목록 썸네일)
+POST {{baseUrl}}/api/v1/community/posts/{{communityPostId}}/photos
+Authorization: Bearer {{communityToken}}
+Content-Type: multipart/form-data; boundary=dasi-boundary
+
+--dasi-boundary
+Content-Disposition: form-data; name="files"; filename="space-photo.jpg"
+Content-Type: image/jpeg
+
+< ./fixtures/space-photo.jpg
+--dasi-boundary
+Content-Disposition: form-data; name="files"; filename="space-photo.png"
+Content-Type: image/png
+
+< ./fixtures/space-photo.png
+--dasi-boundary--
+
+> {%
+    client.test("201 Created + 사진 2장", () => {
+        client.assert(response.status === 201, `실제 ${response.status}`);
+        client.assert(response.body.data.length === 2, `실제 ${response.body.data.length}`);
+        client.assert(response.body.data[0].url.startsWith("http"), `실제 ${response.body.data[0].url}`);
+    });
+    client.global.set("communityPhotoId1", response.body.data[0].id);
+    client.global.set("communityPhotoUrl1", response.body.data[0].url);
+    client.global.set("communityPhotoUrl2", response.body.data[1].url);
+%}
+
+### 게시글 사진 — 확장자만 jpg 인 텍스트 파일 → 400
+# 기대값: 400 UNSUPPORTED_FILE_TYPE (사진은 그대로 2장)
+POST {{baseUrl}}/api/v1/community/posts/{{communityPostId}}/photos
+Authorization: Bearer {{communityToken}}
+Content-Type: multipart/form-data; boundary=dasi-boundary
+
+--dasi-boundary
+Content-Disposition: form-data; name="files"; filename="not-an-image.jpg"
+Content-Type: image/jpeg
+
+< ./fixtures/not-an-image.jpg
+--dasi-boundary--
+
+> {%
+    client.test("400 UNSUPPORTED_FILE_TYPE", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "UNSUPPORTED_FILE_TYPE", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 게시글 사진 — 로그인 없이 → 401
+# 기대값: 401 UNAUTHORIZED
+POST {{baseUrl}}/api/v1/community/posts/{{communityPostId}}/photos
+Content-Type: multipart/form-data; boundary=dasi-boundary
+
+--dasi-boundary
+Content-Disposition: form-data; name="files"; filename="space-photo.jpg"
+Content-Type: image/jpeg
+
+< ./fixtures/space-photo.jpg
+--dasi-boundary--
+
+> {%
+    client.test("401", () => client.assert(response.status === 401, `실제 ${response.status}`));
+%}
+
 ### 게시글 목록 — 분류 · 검색어 (로그인 없이)
-# 기대값: 200 OK, 방금 쓴 글 1건, contentPreview = 본문 앞 100자 (줄바꿈은 공백으로)
+# 기대값: 200 OK, 방금 쓴 글 1건, contentPreview = 본문 앞 100자 (줄바꿈은 공백으로), thumbnailUrl = 첫 사진
 GET {{baseUrl}}/api/v1/community/posts?category=RECRUIT&keyword={{communityKeyword}}
 
 > {%
@@ -82,17 +149,20 @@ GET {{baseUrl}}/api/v1/community/posts?category=RECRUIT&keyword={{communityKeywo
         client.assert(response.body.data.totalElements === 1, `실제 ${response.body.data.totalElements}`);
         const preview = response.body.data.content[0].contentPreview;
         client.assert(preview === "11월 둘째 주말, 핸드메이드 소품 팝업을 함께 열 팀을 찾습니다.", `실제 ${preview}`);
+        const thumbnail = response.body.data.content[0].thumbnailUrl;
+        client.assert(thumbnail === client.global.get("communityPhotoUrl1"), `실제 ${thumbnail}`);
     });
 %}
 
 ### 게시글 상세 (로그인 없이)
-# 기대값: 200 OK, 조회 수 1, mine = false
+# 기대값: 200 OK, 조회 수 1, mine = false, photos 2장 (올린 순)
 GET {{baseUrl}}/api/v1/community/posts/{{communityPostId}}
 
 > {%
     client.test("조회 수 1", () => {
         client.assert(response.body.data.viewCount === 1, `실제 ${response.body.data.viewCount}`);
         client.assert(response.body.data.mine === false, "mine");
+        client.assert(response.body.data.photos.length === 2, `실제 ${response.body.data.photos.length}`);
     });
 %}
 
@@ -143,7 +213,41 @@ Authorization: Bearer {{communityToken}}
     client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
 %}
 
+### 게시글 사진 1장 삭제 → 썸네일이 다음 사진으로
+# 인증: 작성자
+# 기대값: 200 OK
+DELETE {{baseUrl}}/api/v1/community/posts/{{communityPostId}}/photos/{{communityPhotoId1}}
+Authorization: Bearer {{communityToken}}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+%}
+
+### 사진 삭제 뒤 목록 썸네일
+# 기대값: thumbnailUrl = 두 번째로 올린 사진
+GET {{baseUrl}}/api/v1/community/posts?keyword={{communityKeyword}}
+
+> {%
+    client.test("썸네일이 두 번째 사진", () => {
+        const thumbnail = response.body.data.content[0].thumbnailUrl;
+        client.assert(thumbnail === client.global.get("communityPhotoUrl2"), `실제 ${thumbnail}`);
+    });
+%}
+
+### 이미 지운 사진 → 404
+# 기대값: 404 POST_PHOTO_NOT_FOUND
+DELETE {{baseUrl}}/api/v1/community/posts/{{communityPostId}}/photos/{{communityPhotoId1}}
+Authorization: Bearer {{communityToken}}
+
+> {%
+    client.test("404 POST_PHOTO_NOT_FOUND", () => {
+        client.assert(response.status === 404, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "POST_PHOTO_NOT_FOUND", `실제 ${response.body.error.code}`);
+    });
+%}
+
 ### 게시글 삭제
+# 기대값: 200 OK, 댓글 · 남은 사진(파일 포함)도 함께 지워진다
 DELETE {{baseUrl}}/api/v1/community/posts/{{communityPostId}}
 Authorization: Bearer {{communityToken}}
 

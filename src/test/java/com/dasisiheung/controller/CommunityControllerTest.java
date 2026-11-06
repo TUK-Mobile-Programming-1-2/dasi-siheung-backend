@@ -6,12 +6,18 @@ import static com.dasisiheung.support.ApiDocumentation.error;
 import static com.dasisiheung.support.ApiDocumentation.page;
 import static com.dasisiheung.support.ApiDocumentation.resource;
 import static com.dasisiheung.support.ApiDocumentation.success;
+import static com.dasisiheung.support.MultipartDocumentation.filesPart;
+import static com.dasisiheung.support.MultipartDocumentation.requestParts;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.restdocs.headers.HeaderDocumentation.requestHeaders;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.delete;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.get;
+import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.multipart;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.post;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.put;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
@@ -29,6 +35,7 @@ import com.dasisiheung.dto.community.AuthorInfo;
 import com.dasisiheung.dto.community.CommentRequest;
 import com.dasisiheung.dto.community.CommentResponse;
 import com.dasisiheung.dto.community.PostDetailResponse;
+import com.dasisiheung.dto.community.PostPhotoResponse;
 import com.dasisiheung.dto.community.PostRequest;
 import com.dasisiheung.dto.community.PostSummaryResponse;
 import com.dasisiheung.entity.community.PostCategory;
@@ -36,9 +43,11 @@ import com.dasisiheung.entity.member.Role;
 import com.dasisiheung.exception.BusinessException;
 import com.dasisiheung.exception.ErrorCode;
 import com.dasisiheung.service.CommunityService;
+import com.dasisiheung.service.PostPhotoService;
 import com.dasisiheung.support.ApiDocsTest;
 import com.dasisiheung.support.ApiDocsTestSupport;
 import com.dasisiheung.support.FixedClockConfig;
+import com.dasisiheung.support.TestFiles;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -53,10 +62,21 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 class CommunityControllerTest extends ApiDocsTestSupport {
 
     private static final String TAG = "Community";
-    private static final AuthorInfo AUTHOR = new AuthorInfo(USER_ID, "이이용", Role.USER);
+    private static final AuthorInfo AUTHOR = new AuthorInfo(USER_ID, "이이용", Role.USER,
+            "https://abc.supabase.co/storage/v1/object/public/space-photos/members/1/profile/a.jpg");
+
+    private static final String PHOTO_URL_PREFIX =
+            "https://abc.supabase.co/storage/v1/object/public/space-photos/community/posts/1/photos/";
+    private static final String PHOTO_ADD_DESCRIPTION = "글을 쓴 뒤 받은 게시글 ID 로 올립니다. multipart 파트 files 에 여러 장. "
+            + "글당 최대 5장, JPG·PNG·WEBP 10MB. 작성자만 (아니면 403 NOT_POST_AUTHOR). "
+            + "5장을 넘으면 400 POST_PHOTO_LIMIT_EXCEEDED, 형식이 다르면 400 UNSUPPORTED_FILE_TYPE. "
+            + "응답은 전체 사진 목록(올린 순)이고 첫 사진이 목록 썸네일입니다.";
 
     @MockitoBean
     private CommunityService communityService;
+
+    @MockitoBean
+    private PostPhotoService postPhotoService;
 
     @Test
     @DisplayName("게시글 목록 (로그인 없이)")
@@ -64,7 +84,7 @@ class CommunityControllerTest extends ApiDocsTestSupport {
         given(communityService.getPosts(eq(PostCategory.RECRUIT), eq("플리마켓"), any(PageQuery.class)))
                 .willReturn(new PageResponse<>(List.of(new PostSummaryResponse(1L, PostCategory.RECRUIT,
                         "배곧 플리마켓 같이 하실 분 구해요", "11월 둘째 주말, 핸드메이드 소품 팝업을 함께 열 팀을 찾습니다.",
-                        AUTHOR, 3, 42, FixedClockConfig.FIXED_LOCAL_NOW)), 0, 20, 1, 1, false));
+                        PHOTO_URL_PREFIX + "a.jpg", AUTHOR, 3, 42, FixedClockConfig.FIXED_LOCAL_NOW)), 0, 20, 1, 1, false));
 
         mockMvc.perform(get("/api/v1/community/posts").param("category", "RECRUIT").param("keyword", "플리마켓"))
                 .andExpect(status().isOk())
@@ -81,9 +101,13 @@ class CommunityControllerTest extends ApiDocsTestSupport {
                                 fieldWithPath("data.content[].title").type(JsonFieldType.STRING).description("제목"),
                                 fieldWithPath("data.content[].contentPreview").type(JsonFieldType.STRING)
                                         .description("본문 미리보기 — 줄바꿈 · 연속 공백을 공백 하나로 줄인 앞 100자"),
+                                fieldWithPath("data.content[].thumbnailUrl").type(JsonFieldType.STRING).optional()
+                                        .description("썸네일 — 처음 올린 사진 주소 (사진이 없으면 null)"),
                                 fieldWithPath("data.content[].author.id").type(JsonFieldType.NUMBER).description("글쓴이 회원 ID"),
                                 fieldWithPath("data.content[].author.name").type(JsonFieldType.STRING).description("글쓴이 이름"),
                                 fieldWithPath("data.content[].author.role").type(JsonFieldType.STRING).description("글쓴이 역할"),
+                                fieldWithPath("data.content[].author.profileImageUrl").type(JsonFieldType.STRING).optional()
+                                        .description("글쓴이 프로필 사진 주소 (없거나 탈퇴했으면 null)"),
                                 fieldWithPath("data.content[].commentCount").type(JsonFieldType.NUMBER).description("댓글 수"),
                                 fieldWithPath("data.content[].viewCount").type(JsonFieldType.NUMBER).description("조회 수"),
                                 fieldWithPath("data.content[].createdAt").type(JsonFieldType.STRING).description("작성 시각")))));
@@ -109,7 +133,8 @@ class CommunityControllerTest extends ApiDocsTestSupport {
                         .contentType(MediaType.APPLICATION_JSON).content(json(request)))
                 .andExpect(status().isCreated())
                 .andDo(document("community-post-write",
-                        resource(TAG, "게시글 쓰기", "로그인 회원 누구나. 공지(NOTICE)는 관리자만 (아니면 403 NOTICE_ADMIN_ONLY)."),
+                        resource(TAG, "게시글 쓰기", "로그인 회원 누구나. 공지(NOTICE)는 관리자만 (아니면 403 NOTICE_ADMIN_ONLY). "
+                                + "사진은 응답의 id 로 POST /api/v1/community/posts/{postId}/photos 에 이어서 올립니다."),
                         requestHeaders(authorization()),
                         requestFields(postRequestFields()),
                         responseFields(success(detailFields()))));
@@ -127,10 +152,77 @@ class CommunityControllerTest extends ApiDocsTestSupport {
         mockMvc.perform(delete("/api/v1/community/posts/{postId}", 1L).header(HttpHeaders.AUTHORIZATION, userToken()))
                 .andExpect(status().isOk())
                 .andDo(document("community-post-delete",
-                        resource(TAG, "게시글 삭제", "작성자 또는 관리자. 댓글도 함께 지워집니다."),
+                        resource(TAG, "게시글 삭제", "작성자 또는 관리자. 댓글 · 사진도 함께 지워집니다."),
                         requestHeaders(authorization()),
                         pathParameters(parameterWithName("postId").description("게시글 ID")),
                         responseFields(fieldWithPath("success").type(JsonFieldType.BOOLEAN).description("요청 성공 여부 (true)"))));
+    }
+
+    @Test
+    @DisplayName("게시글 사진 추가 · 삭제")
+    void addAndDeletePhotos() throws Exception {
+        given(postPhotoService.addPhotos(eq(USER_ID), eq(1L), anyList())).willReturn(photos());
+
+        mockMvc.perform(multipart("/api/v1/community/posts/{postId}/photos", 1L)
+                        .file(TestFiles.jpeg("files"))
+                        .file(TestFiles.jpeg("files"))
+                        .header(HttpHeaders.AUTHORIZATION, userToken()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andDo(document("community-post-photo-add",
+                        resource(TAG, "게시글 사진 추가", PHOTO_ADD_DESCRIPTION),
+                        requestHeaders(authorization()),
+                        pathParameters(parameterWithName("postId").description("게시글 ID")),
+                        requestParts(filesPart("files", "사진 파일 (같은 이름으로 여러 개)")),
+                        responseFields(success(
+                                fieldWithPath("data[].id").type(JsonFieldType.NUMBER).description("사진 ID"),
+                                fieldWithPath("data[].url").type(JsonFieldType.STRING).description("사진 주소 (공개, 만료 없음)")))));
+
+        mockMvc.perform(delete("/api/v1/community/posts/{postId}/photos/{photoId}", 1L, 2L)
+                        .header(HttpHeaders.AUTHORIZATION, userToken()))
+                .andExpect(status().isOk())
+                .andDo(document("community-post-photo-delete",
+                        resource(TAG, "게시글 사진 삭제", "작성자만 (아니면 403 NOT_POST_AUTHOR). "
+                                + "이 글의 사진이 아니면 404 POST_PHOTO_NOT_FOUND."),
+                        requestHeaders(authorization()),
+                        pathParameters(parameterWithName("postId").description("게시글 ID"),
+                                parameterWithName("photoId").description("사진 ID")),
+                        responseFields(fieldWithPath("success").type(JsonFieldType.BOOLEAN).description("요청 성공 여부 (true)"))));
+        then(postPhotoService).should().deletePhoto(USER_ID, 1L, 2L);
+    }
+
+    @Test
+    @DisplayName("게시글 사진이 5장을 넘으면 400 POST_PHOTO_LIMIT_EXCEEDED")
+    void photoLimitExceeded() throws Exception {
+        given(postPhotoService.addPhotos(eq(USER_ID), eq(1L), anyList()))
+                .willThrow(new BusinessException(ErrorCode.POST_PHOTO_LIMIT_EXCEEDED,
+                        "사진은 글당 최대 5장까지 올릴 수 있습니다. (현재 5장)"));
+
+        mockMvc.perform(multipart("/api/v1/community/posts/{postId}/photos", 1L)
+                        .file(TestFiles.jpeg("files"))
+                        .header(HttpHeaders.AUTHORIZATION, userToken()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("POST_PHOTO_LIMIT_EXCEEDED"))
+                .andDo(document("community-post-photo-add-limit-exceeded",
+                        resource(TAG, "게시글 사진 추가", PHOTO_ADD_DESCRIPTION), responseFields(error())));
+    }
+
+    @Test
+    @DisplayName("남의 글에 사진을 지우면 403 NOT_POST_AUTHOR")
+    void photoDeleteNotAuthor() throws Exception {
+        willThrow(new BusinessException(ErrorCode.NOT_POST_AUTHOR)).given(postPhotoService).deletePhoto(USER_ID, 1L, 2L);
+
+        mockMvc.perform(delete("/api/v1/community/posts/{postId}/photos/{photoId}", 1L, 2L)
+                        .header(HttpHeaders.AUTHORIZATION, userToken()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("NOT_POST_AUTHOR"));
+    }
+
+    @Test
+    @DisplayName("비로그인은 사진을 올릴 수 없다 (401)")
+    void photoRequiresLogin() throws Exception {
+        mockMvc.perform(multipart("/api/v1/community/posts/{postId}/photos", 1L).file(TestFiles.jpeg("files")))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -192,8 +284,13 @@ class CommunityControllerTest extends ApiDocsTestSupport {
 
     private static PostDetailResponse detail(boolean mine) {
         return new PostDetailResponse(1L, PostCategory.RECRUIT, "배곧 플리마켓 같이 하실 분 구해요",
-                "11월 둘째 주말, 핸드메이드 소품 팝업을 함께 열 팀을 찾습니다.", AUTHOR, 3, 42, mine,
+                "11월 둘째 주말, 핸드메이드 소품 팝업을 함께 열 팀을 찾습니다.", photos(), AUTHOR, 3, 42, mine,
                 FixedClockConfig.FIXED_LOCAL_NOW, FixedClockConfig.FIXED_LOCAL_NOW);
+    }
+
+    private static List<PostPhotoResponse> photos() {
+        return List.of(new PostPhotoResponse(1L, PHOTO_URL_PREFIX + "a.jpg"),
+                new PostPhotoResponse(2L, PHOTO_URL_PREFIX + "b.jpg"));
     }
 
     private static List<FieldDescriptor> postRequestFields() {
@@ -209,9 +306,14 @@ class CommunityControllerTest extends ApiDocsTestSupport {
                 fieldWithPath("data.category").type(JsonFieldType.STRING).description("분류"),
                 fieldWithPath("data.title").type(JsonFieldType.STRING).description("제목"),
                 fieldWithPath("data.content").type(JsonFieldType.STRING).description("본문"),
+                fieldWithPath("data.photos[]").type(JsonFieldType.ARRAY).description("사진 (올린 순, 없으면 빈 배열)"),
+                fieldWithPath("data.photos[].id").type(JsonFieldType.NUMBER).description("사진 ID"),
+                fieldWithPath("data.photos[].url").type(JsonFieldType.STRING).description("사진 주소 (공개, 만료 없음)"),
                 fieldWithPath("data.author.id").type(JsonFieldType.NUMBER).description("글쓴이 회원 ID"),
                 fieldWithPath("data.author.name").type(JsonFieldType.STRING).description("글쓴이 이름"),
                 fieldWithPath("data.author.role").type(JsonFieldType.STRING).description("글쓴이 역할"),
+                fieldWithPath("data.author.profileImageUrl").type(JsonFieldType.STRING).optional()
+                        .description("글쓴이 프로필 사진 주소 (없거나 탈퇴했으면 null)"),
                 fieldWithPath("data.commentCount").type(JsonFieldType.NUMBER).description("댓글 수"),
                 fieldWithPath("data.viewCount").type(JsonFieldType.NUMBER).description("조회 수"),
                 fieldWithPath("data.mine").type(JsonFieldType.BOOLEAN).description("내가 쓴 글인지"),
@@ -227,6 +329,8 @@ class CommunityControllerTest extends ApiDocsTestSupport {
                 fieldWithPath(prefix + "author.id").type(JsonFieldType.NUMBER).description("글쓴이 회원 ID"),
                 fieldWithPath(prefix + "author.name").type(JsonFieldType.STRING).description("글쓴이 이름"),
                 fieldWithPath(prefix + "author.role").type(JsonFieldType.STRING).description("글쓴이 역할"),
+                fieldWithPath(prefix + "author.profileImageUrl").type(JsonFieldType.STRING).optional()
+                        .description("글쓴이 프로필 사진 주소 (없거나 탈퇴했으면 null)"),
                 fieldWithPath(prefix + "content").type(JsonFieldType.STRING).description("댓글"),
                 fieldWithPath(prefix + "createdAt").type(JsonFieldType.STRING).description("작성 시각")};
     }

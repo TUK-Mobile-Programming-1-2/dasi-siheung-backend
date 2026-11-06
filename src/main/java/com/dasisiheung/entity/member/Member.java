@@ -59,6 +59,10 @@ public class Member extends BaseTimeEntity {
     @Column(name = "withdrawn_at")
     private LocalDateTime withdrawnAt;
 
+    /** 프로필 사진의 저장소 경로 (공개 버킷). 없으면 null. */
+    @Column(name = "profile_image_path", length = 300)
+    private String profileImagePath;
+
     private Member(String email, String passwordHash, String name, String phone, Role role) {
         this.email = normalizeEmail(email);
         this.passwordHash = passwordHash;
@@ -116,20 +120,43 @@ public class Member extends BaseTimeEntity {
         }
     }
 
+    /**
+     * 프로필 사진을 바꾼다.
+     *
+     * @param storagePath 새 사진의 저장소 경로
+     * @return 바꾸기 전 사진 경로 (저장소에서 지울 대상, 없었으면 null)
+     */
+    public String changeProfileImage(String storagePath) {
+        String previous = this.profileImagePath;
+        this.profileImagePath = storagePath;
+        return previous;
+    }
+
+    /**
+     * 프로필 사진을 지우고 기본 이미지로 돌아간다.
+     *
+     * @return 지운 사진 경로 (저장소에서 지울 대상, 없었으면 null)
+     */
+    public String removeProfileImage() {
+        return changeProfileImage(null);
+    }
+
     /** @param newPasswordHash 이미 암호화된 새 비밀번호 */
     public void changePassword(String newPasswordHash) {
         this.passwordHash = newPasswordHash;
     }
 
     /**
-     * 탈퇴. 다시 로그인할 수 없도록 개인정보를 즉시 지우고 식별할 수 없는 값으로 바꾼다.
-     * 공간·신청 같은 거래 기록은 회원 ID 로만 남는다.
+     * 탈퇴. 다시 로그인할 수 없도록 개인정보(프로필 사진 포함)를 즉시 지우고 식별할 수 없는 값으로 바꾼다.
+     * 공간·신청 같은 거래 기록은 회원 ID 로만 남는다. 사진 파일은 호출하는 쪽이 {@link #removeProfileImage()} 로
+     * 경로를 받아 저장소에서 지운다.
      */
     public void withdraw(LocalDateTime now) {
         this.email = WITHDRAWN_EMAIL_FORMAT.formatted(id);
         this.passwordHash = WITHDRAWN_PASSWORD_HASH;
         this.name = WITHDRAWN_NAME;
         this.phone = null;
+        this.profileImagePath = null;
         this.status = MemberStatus.WITHDRAWN;
         this.suspendedUntil = null;
         this.withdrawnAt = now;

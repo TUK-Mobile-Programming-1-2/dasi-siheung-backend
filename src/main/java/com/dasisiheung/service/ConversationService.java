@@ -51,6 +51,7 @@ public class ConversationService {
     private final MemberRepository memberRepository;
     private final ApplicationRepository applicationRepository;
     private final SpaceResponseMapper spaceResponseMapper;
+    private final ProfileImageResolver profileImageResolver;
     private final Clock clock;
 
     /**
@@ -160,7 +161,8 @@ public class ConversationService {
     }
 
     private ConversationResponse toResponse(Conversation conversation, Long viewerId, long unreadCount) {
-        return ConversationResponse.of(conversation, viewerId,
-                spaceResponseMapper.thumbnailUrl(conversation.getSpace()), unreadCount);
+        Member counterpart = conversation.counterpartOf(viewerId);
+        return ConversationResponse.of(conversation, viewerId, spaceResponseMapper.thumbnailUrl(conversation.getSpace()),
+                ConversationResponse.Counterpart.of(counterpart, profileImageResolver.urlOf(counterpart)), unreadCount);
     }
 }

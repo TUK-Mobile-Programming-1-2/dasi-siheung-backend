@@ -32,6 +32,9 @@ public class Post extends BaseTimeEntity {
     /** 목록 미리보기 최대 글자 수. (이모지 등도 한 글자) */
     public static final int PREVIEW_LENGTH = 100;
 
+    /** 글당 사진 최대 장수. */
+    public static final int MAX_PHOTOS = 5;
+
     private static final Pattern WHITESPACES = Pattern.compile("\\s+");
 
     @Id
@@ -106,6 +109,26 @@ public class Post extends BaseTimeEntity {
         if (role != Role.ADMIN) {
             validateAuthor(memberId);
         }
+    }
+
+    /**
+     * 사진을 더할 수 있는지 확인한다. 파일을 올리기 전에 부른다.
+     *
+     * @param currentCount 이미 올린 사진 수
+     * @param addCount     새로 올릴 사진 수
+     * @throws BusinessException 작성자가 아니면 NOT_POST_AUTHOR, 합쳐서 5장을 넘으면 POST_PHOTO_LIMIT_EXCEEDED
+     */
+    public void validateCanAddPhotos(Long memberId, int currentCount, int addCount) {
+        validateAuthor(memberId);
+        if (currentCount + addCount > MAX_PHOTOS) {
+            throw new BusinessException(ErrorCode.POST_PHOTO_LIMIT_EXCEEDED,
+                    "사진은 글당 최대 %d장까지 올릴 수 있습니다. (현재 %d장)".formatted(MAX_PHOTOS, currentCount));
+        }
+    }
+
+    /** @throws BusinessException 작성자가 아니면 NOT_POST_AUTHOR */
+    public void validateCanDeletePhoto(Long memberId) {
+        validateAuthor(memberId);
     }
 
     /** 신고 처리로 숨긴다. */
