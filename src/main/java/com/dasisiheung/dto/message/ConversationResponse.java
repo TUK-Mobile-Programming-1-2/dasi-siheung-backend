@@ -19,22 +19,27 @@ public record ConversationResponse(
         @Schema(description = "내가 마지막으로 읽은 메시지 ID (없으면 0)", example = "40") long myLastReadMessageId
 ) {
 
+    /**
+     * @param thumbnailUrl 공간 대표 사진 주소 (없으면 null)
+     * @param counterpart  보는 사람의 상대방
+     */
     public static ConversationResponse of(Conversation conversation, Long viewerId, String thumbnailUrl,
-                                          long unreadCount) {
+                                          Counterpart counterpart, long unreadCount) {
         return new ConversationResponse(conversation.getId(), conversation.getSpace().getId(),
-                conversation.getSpace().getTitle(), thumbnailUrl,
-                Counterpart.from(conversation.counterpartOf(viewerId)), conversation.getLastMessagePreview(),
+                conversation.getSpace().getTitle(), thumbnailUrl, counterpart, conversation.getLastMessagePreview(),
                 conversation.getLastMessageAt(), unreadCount, conversation.lastReadMessageIdOf(viewerId));
     }
 
     public record Counterpart(
             @Schema(description = "회원 ID", example = "2") Long id,
             @Schema(description = "이름", example = "김제공") String name,
-            @Schema(description = "역할", example = "PROVIDER") Role role
+            @Schema(description = "역할", example = "PROVIDER") Role role,
+            @Schema(description = "프로필 사진 주소 (없거나 탈퇴했으면 null)") String profileImageUrl
     ) {
 
-        public static Counterpart from(Member member) {
-            return new Counterpart(member.getId(), member.getName(), member.getRole());
+        /** @param profileImageUrl 사진이 없으면 null */
+        public static Counterpart of(Member member, String profileImageUrl) {
+            return new Counterpart(member.getId(), member.getName(), member.getRole(), profileImageUrl);
         }
     }
 }
