@@ -14,7 +14,9 @@ public enum UploadPolicy {
     SPACE_PHOTO(StorageBucket.PUBLIC, 10L * 1024 * 1024, Set.of(FileType.JPEG, FileType.PNG, FileType.WEBP)),
     SPACE_PROOF(StorageBucket.PRIVATE, 20L * 1024 * 1024, Set.of(FileType.PDF, FileType.JPEG, FileType.PNG)),
     ACTIVITY_PHOTO(StorageBucket.PRIVATE, 10L * 1024 * 1024, Set.of(FileType.JPEG, FileType.PNG, FileType.WEBP)),
-    REPORT_PHOTO(StorageBucket.PRIVATE, 10L * 1024 * 1024, Set.of(FileType.JPEG, FileType.PNG, FileType.WEBP));
+    REPORT_PHOTO(StorageBucket.PRIVATE, 10L * 1024 * 1024, Set.of(FileType.JPEG, FileType.PNG, FileType.WEBP)),
+    PROFILE_IMAGE(StorageBucket.PUBLIC, 5L * 1024 * 1024, Set.of(FileType.JPEG, FileType.PNG, FileType.WEBP)),
+    POST_PHOTO(StorageBucket.PUBLIC, 10L * 1024 * 1024, Set.of(FileType.JPEG, FileType.PNG, FileType.WEBP));
 
     private final StorageBucket bucket;
     private final long maxBytes;
