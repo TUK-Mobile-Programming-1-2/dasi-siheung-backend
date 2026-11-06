@@ -33,8 +33,8 @@ Content-Type: application/json
 ### 내 정보 조회
 # 인증: 로그인
 # 기대값: 200 OK
-# { "data": { "id": 1, "email": "...", "name": "김시흥", "phone": "01012345678", "role": "USER",
-#             "status": "ACTIVE", "createdAt": "2026-10-20T21:00:00" } }
+# { "data": { "id": 1, "email": "...", "name": "김시흥", "phone": "01012345678", "profileImageUrl": null,
+#             "role": "USER", "status": "ACTIVE", "createdAt": "2026-10-20T21:00:00" } }
 GET {{baseUrl}}/api/v1/members/me
 Authorization: Bearer {{memberToken}}
 
@@ -77,6 +77,83 @@ Content-Type: application/json
     client.test("400 INVALID_INPUT", () => {
         client.assert(response.status === 400, `실제 ${response.status}`);
         client.assert(response.body.error.code === "INVALID_INPUT", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 프로필 사진 변경 (multipart, 파트 이름 image)
+# 인증: 로그인
+# 기대값: 200 OK, data = 내 정보 + profileImageUrl (공개 주소, 만료 없음)
+#   같은 주소가 게시글 · 댓글의 author.profileImageUrl, 대화 목록의 counterpart.profileImageUrl 에도 내려간다
+POST {{baseUrl}}/api/v1/members/me/profile-image
+Authorization: Bearer {{memberToken}}
+Content-Type: multipart/form-data; boundary=dasi-boundary
+
+--dasi-boundary
+Content-Disposition: form-data; name="image"; filename="space-photo.jpg"
+Content-Type: image/jpeg
+
+< ./fixtures/space-photo.jpg
+--dasi-boundary--
+
+> {%
+    client.test("200 OK + 프로필 사진 주소", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.profileImageUrl.startsWith("http"), `실제 ${response.body.data.profileImageUrl}`);
+        client.assert(response.body.data.profileImageUrl.includes("/members/"), `실제 ${response.body.data.profileImageUrl}`);
+    });
+    client.global.set("profileImageUrl", response.body.data.profileImageUrl);
+%}
+
+### 프로필 사진 다시 변경 (PNG) → 주소가 바뀌고 이전 파일은 지워진다
+# 기대값: 200 OK, profileImageUrl 이 바로 앞 요청과 다름
+POST {{baseUrl}}/api/v1/members/me/profile-image
+Authorization: Bearer {{memberToken}}
+Content-Type: multipart/form-data; boundary=dasi-boundary
+
+--dasi-boundary
+Content-Disposition: form-data; name="image"; filename="space-photo.png"
+Content-Type: image/png
+
+< ./fixtures/space-photo.png
+--dasi-boundary--
+
+> {%
+    client.test("200 OK + 새 주소", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.profileImageUrl !== client.global.get("profileImageUrl"), "주소가 바뀌어야 합니다");
+        client.assert(response.body.data.profileImageUrl.endsWith(".png"), `실제 ${response.body.data.profileImageUrl}`);
+    });
+%}
+
+### 프로필 사진 변경 — 확장자만 jpg 인 텍스트 파일 → 400
+# 기대값: 400 UNSUPPORTED_FILE_TYPE (기존 사진은 그대로)
+POST {{baseUrl}}/api/v1/members/me/profile-image
+Authorization: Bearer {{memberToken}}
+Content-Type: multipart/form-data; boundary=dasi-boundary
+
+--dasi-boundary
+Content-Disposition: form-data; name="image"; filename="not-an-image.jpg"
+Content-Type: image/jpeg
+
+< ./fixtures/not-an-image.jpg
+--dasi-boundary--
+
+> {%
+    client.test("400 UNSUPPORTED_FILE_TYPE", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "UNSUPPORTED_FILE_TYPE", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 프로필 사진 삭제 → 기본 이미지
+# 기대값: 200 OK, profileImageUrl = null (사진이 없어도 200)
+DELETE {{baseUrl}}/api/v1/members/me/profile-image
+Authorization: Bearer {{memberToken}}
+
+> {%
+    client.test("200 OK + profileImageUrl null", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.profileImageUrl === null, `실제 ${response.body.data.profileImageUrl}`);
     });
 %}
 
