@@ -4,6 +4,7 @@ import com.dasisiheung.entity.community.Post;
 import com.dasisiheung.entity.community.PostCategory;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /** 게시글 상세. 댓글은 따로 페이지로 조회한다. */
 public record PostDetailResponse(
@@ -11,6 +12,7 @@ public record PostDetailResponse(
         @Schema(description = "분류", example = "RECRUIT") PostCategory category,
         @Schema(description = "제목") String title,
         @Schema(description = "본문") String content,
+        @Schema(description = "사진 (올린 순, 없으면 빈 배열)") List<PostPhotoResponse> photos,
         @Schema(description = "글쓴이") AuthorInfo author,
         @Schema(description = "댓글 수", example = "3") int commentCount,
         @Schema(description = "조회 수", example = "42") int viewCount,
@@ -19,9 +21,10 @@ public record PostDetailResponse(
         @Schema(description = "마지막 수정 시각") LocalDateTime updatedAt
 ) {
 
-    public static PostDetailResponse of(Post post, Long viewerId) {
-        return new PostDetailResponse(post.getId(), post.getCategory(), post.getTitle(), post.getContent(),
-                AuthorInfo.from(post.getAuthor()), post.getCommentCount(), post.getViewCount(),
+    /** @param viewerId 비로그인이면 null */
+    public static PostDetailResponse of(Post post, AuthorInfo author, List<PostPhotoResponse> photos, Long viewerId) {
+        return new PostDetailResponse(post.getId(), post.getCategory(), post.getTitle(), post.getContent(), photos,
+                author, post.getCommentCount(), post.getViewCount(),
                 viewerId != null && post.isWrittenBy(viewerId), post.getCreatedAt(), post.getUpdatedAt());
     }
 }

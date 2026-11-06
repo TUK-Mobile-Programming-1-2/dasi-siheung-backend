@@ -13,12 +13,12 @@ import com.dasisiheung.entity.community.Post;
 import com.dasisiheung.entity.community.PostCategory;
 import com.dasisiheung.entity.member.Member;
 import com.dasisiheung.entity.member.Role;
-import com.dasisiheung.exception.BusinessException;
-import com.dasisiheung.exception.ErrorCode;
 import com.dasisiheung.repository.CommentRepository;
 import com.dasisiheung.repository.MemberRepository;
+import com.dasisiheung.repository.PostPhotoRepository;
 import com.dasisiheung.repository.PostRepository;
 import com.dasisiheung.util.LikePatterns;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -39,6 +39,9 @@ public class CommunityService {
     private final PostRepository postRepository;
     private final CommentRepository commentRepository;
     private final MemberRepository memberRepository;
+    private final PostPhotoRepository postPhotoRepository;
+    private final FileUploadService fileUploadService;
+    private final CommunityResponseMapper responseMapper;
 
     /**
      * @param category null 이면 전체
@@ -46,52 +49,55 @@ public class CommunityService {
      */
     public PageResponse<PostSummaryResponse> getPosts(PostCategory category, String keyword, PageQuery pageQuery) {
         String pattern = keyword == null || keyword.isBlank() ? null : LikePatterns.containsIgnoreCase(keyword.strip());
-        return PageResponse.from(postRepository.search(ContentStatus.VISIBLE, category, pattern,
-                pageQuery.toPageable(LATEST_FIRST)), PostSummaryResponse::from);
+        return responseMapper.summaries(postRepository.search(ContentStatus.VISIBLE, category, pattern,
+                pageQuery.toPageable(LATEST_FIRST)));
     }
 
     /** 상세를 열 때마다 조회 수가 1 오른다. */
     @Transactional
     public PostDetailResponse getPost(Long postId, Long viewerId) {
-        getVisiblePost(postId);
+        postRepository.getVisiblePost(postId);
         postRepository.increaseViewCount(postId);
-        return PostDetailResponse.of(getVisiblePost(postId), viewerId);
+        return responseMapper.detail(postRepository.getVisiblePost(postId), viewerId);
     }
 
     @Transactional
     public PostDetailResponse write(Long authorId, PostRequest request) {
-        Member author = getActiveMember(authorId);
+        Member author = memberRepository.getActiveMember(authorId);
         Post post = postRepository.save(Post.write(author, request.category(), request.title(), request.content()));
-        return PostDetailResponse.of(post, authorId);
+        return responseMapper.detail(post, authorId);
     }
 
     @Transactional
     public PostDetailResponse edit(Long memberId, Long postId, PostRequest request) {
-        Post post = getVisiblePost(postId);
+        Post post = postRepository.getVisiblePost(postId);
         post.edit(memberId, request.category(), request.title(), request.content());
         postRepository.flush();
-        return PostDetailResponse.of(post, memberId);
+        return responseMapper.detail(post, memberId);
     }
 
-    /** 작성자 또는 관리자. 댓글도 함께 지워진다. */
+    /** 작성자 또는 관리자. 댓글 · 사진도 함께 지워진다. (사진 파일은 커밋된 뒤 저장소에서 지운다) */
     @Transactional
     public void delete(Long memberId, Role role, Long postId) {
         Post post = postRepository.getPost(postId);
         post.validateDeletableBy(memberId, role);
+        List<String> photoPaths = postPhotoRepository.findStoragePathsByPostId(postId);
         postRepository.delete(post);
+        photoPaths.forEach(path -> fileUploadService.deleteAfterCommit(UploadPolicy.POST_PHOTO, path));
     }
 
     public PageResponse<CommentResponse> getComments(Long postId, PageQuery pageQuery) {
-        getVisiblePost(postId);
+        postRepository.getVisiblePost(postId);
         return PageResponse.from(commentRepository.findByPost_IdAndStatus(postId, ContentStatus.VISIBLE,
-                pageQuery.toPageable(OLDEST_FIRST)), CommentResponse::from);
+                pageQuery.toPageable(OLDEST_FIRST)), responseMapper::comment);
     }
 
     @Transactional
     public CommentResponse writeComment(Long authorId, Long postId, CommentRequest request) {
-        Post post = getVisiblePost(postId);
-        Comment comment = commentRepository.saveAndFlush(new Comment(post, getActiveMember(authorId), request.content()));
-        CommentResponse response = CommentResponse.from(comment);
+        Post post = postRepository.getVisiblePost(postId);
+        Member author = memberRepository.getActiveMember(authorId);
+        Comment comment = commentRepository.saveAndFlush(new Comment(post, author, request.content()));
+        CommentResponse response = responseMapper.comment(comment);
         postRepository.addCommentCount(postId, 1);
         return response;
     }
@@ -108,19 +114,5 @@ public class CommunityService {
         if (counted) {
             postRepository.addCommentCount(postId, -1);
         }
-    }
-
-    private Post getVisiblePost(Long postId) {
-        Post post = postRepository.getPost(postId);
-        if (!post.isVisible()) {
-            throw new BusinessException(ErrorCode.POST_NOT_FOUND);
-        }
-        return post;
-    }
-
-    private Member getActiveMember(Long memberId) {
-        return memberRepository.findById(memberId)
-                .filter(Member::isActive)
-                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
     }
 }
