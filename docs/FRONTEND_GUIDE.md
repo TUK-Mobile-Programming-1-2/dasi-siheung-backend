@@ -440,6 +440,36 @@ HIDDEN(숨김): 신고 처리로 관리자가 내린 공간 — 수정 불가
 - 대화는 **공간 · 이용자 한 쌍에 하나**입니다. 어디서 열어도, 같은 공간에 여러 번 신청해도 같은 대화로 이어집니다.
 - 신청 상세 · 목록의 `conversationId` 가 있으면 그 대화방으로 바로 이동하고, `null` 이면 위 '채팅' API 로 연 뒤 이동하세요.
 
+### 3-3-8. 알림 설정
+
+설정 > 알림 화면은 `GET` 으로 불러오고, 바꿀 때마다 **모든 항목을 `PUT`** 합니다. (부분 수정 없음)
+
+```json
+{
+  "push": true, "chat": true, "activity": true, "favoriteSpace": false, "marketing": false,
+  "dndEnabled": true, "dndStartHour": 22, "dndEndHour": 8
+}
+```
+
+| 항목 | 뜻 |
+| --- | --- |
+| `push` | 푸시 전체 스위치. `false` 면 아래 분류와 관계없이 보내지 않음 |
+| `chat` · `activity` · `favoriteSpace` | 1:1 대화 · 활동(신청 · 가격 협의 · 승인 · 거절) · 찜한 공간 소식 |
+| `marketing` | 광고성 정보 수신 동의 |
+| `dndStartHour` · `dndEndHour` | 0~23 정수. **시작은 포함, 끝은 포함하지 않음.** 시작 > 끝이면 자정을 넘는 구간 (22 → 8 = 22:00 ~ 07:59) |
+
+- **저장한 적이 없으면 기본값**(위 예시)을 주고 `updatedAt` 이 `null` 입니다. 기기에만 저장해 둔 값을 첫 동기화 때 올릴지는 이 값으로 판단하세요.
+  (`updatedAt == null` → 기기 값을 `PUT`, 아니면 서버 값으로 덮어쓰기)
+- **방해금지 · 분류별 수신 여부는 서버가 지킵니다.** 서버는 푸시를 보내기 전에 이 설정을 확인하고, 방해금지 시간에는 어떤 분류도 보내지 않습니다. 앱은 받은 알림을 따로 거를 필요가 없습니다.
+- 응답의 `marketingConsentedAt` 은 **서버가 기록**합니다. 동의로 바뀐 순간의 시각이 남고, 계속 동의 중이면 처음 시각을 유지하며, 철회하면 `null` 입니다. 요청에는 보내지 않습니다.
+- 검증 실패는 모두 `400 INVALID_INPUT` + `fieldErrors` 입니다.
+
+| `fieldErrors[].field` | 언제 |
+| --- | --- |
+| `dndStartHour` · `dndEndHour` | 0~23 을 벗어남 |
+| `dndHoursDistinct` | 방해금지를 켰는데 시작 = 끝 (꺼져 있으면 같아도 저장됨) — 시간 선택 UI 에서 막아 주세요 |
+| 그 외 항목 이름 | 항목이 빠졌거나 `null` |
+
 ### 3-4. 인증 (JWT)
 
 | 토큰 | 유효 시간 | 쓰는 곳 |
@@ -816,7 +846,14 @@ try {
 | PATCH | `/api/v1/members/me/password` | 로그인 | 비밀번호 변경 (다른 기기 로그아웃) |
 | POST | `/api/v1/members/me/profile-image` | 로그인 | 프로필 사진 변경 (multipart `image`, 이전 사진은 삭제) |
 | DELETE | `/api/v1/members/me/profile-image` | 로그인 | 프로필 사진 삭제 (기본 이미지로) |
-| POST | `/api/v1/members/me/withdraw` | 로그인 | 회원 탈퇴 (개인정보 · 프로필 사진 즉시 삭제, 진행 중인 신청 · 예약이 있으면 409) |
+| POST | `/api/v1/members/me/withdraw` | 로그인 | 회원 탈퇴 (개인정보 · 프로필 사진 · 알림 설정 즉시 삭제, 진행 중인 신청 · 예약이 있으면 409) |
+
+### 알림 설정 (`http/notification-setting.http`)
+
+| 메서드 | 경로 | 인증 | 설명 |
+| --- | --- | --- | --- |
+| GET | `/api/v1/members/me/notification-settings` | 로그인 | 내 알림 설정 (저장한 적 없으면 기본값, `updatedAt` = null) |
+| PUT | `/api/v1/members/me/notification-settings` | 로그인 | 전체 교체 후 저장된 값 반환 ([3-3-8](#3-3-8-알림-설정)) |
 
 ### 선택지 (`http/option.http`)
 

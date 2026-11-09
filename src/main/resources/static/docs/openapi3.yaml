@@ -869,13 +869,13 @@ paths:
                           "HIDDEN" : 0
                         },
                         "publishedSpacesByRegion" : {
-                          "GEOBUKSEOM" : 0,
+                          "JEONGWANG" : 3,
                           "BAEGOT" : 1,
-                          "JEONGWANG" : 3
+                          "GEOBUKSEOM" : 0
                         },
                         "membersByRole" : {
-                          "ADMIN" : 1,
                           "PROVIDER" : 5,
+                          "ADMIN" : 1,
                           "USER" : 10
                         },
                         "pendingApplicationCount" : 5,
@@ -1312,7 +1312,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-auth-signup-60140286"
+                $ref: "#/components/schemas/api-v1-provider-applications-applicationId-reject-60140286"
               examples:
                 auth-signup-invalid:
                   value: |-
@@ -1328,14 +1328,14 @@ paths:
                           "field" : "password",
                           "reason" : "비밀번호는 영문과 숫자를 포함해 8~64자여야 합니다."
                         }, {
-                          "field" : "email",
-                          "reason" : "must be a well-formed email address"
-                        }, {
                           "field" : "role",
                           "reason" : "must not be null"
                         }, {
                           "field" : "phone",
                           "reason" : "휴대폰 번호 형식이 올바르지 않습니다. (예: 010-1234-5678)"
+                        }, {
+                          "field" : "email",
+                          "reason" : "must be a well-formed email address"
                         } ]
                       }
                     }
@@ -3668,6 +3668,226 @@ paths:
                     }
       security:
       - bearerAuthJWT: []
+  /api/v1/members/me/notification-settings:
+    get:
+      tags:
+      - NotificationSetting
+      summary: 내 알림 설정 조회
+      description: "로그인한 회원의 알림 설정입니다. 저장한 적이 없으면 기본값(push · chat · activity 켜짐, favoriteSpace\
+        \ · marketing 꺼짐, 방해금지 22시 → 8시)을 주고 updatedAt 은 null 입니다. 방해금지 · 분류별 수신 여\
+        부는 서버가 푸시를 보낼 때 지킵니다."
+      operationId: notification-settings-
+      parameters:
+      - name: Authorization
+        in: header
+        description: "Bearer {액세스 토큰}"
+        required: true
+        schema:
+          type: string
+        example: Bearer eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiIxIiwicm9sZSI6IlVTRVIiLCJpYXQiOjE3OTI0OTc2MDAsImV4cCI6MTc5MjQ5OTQwMH0.qCsN0QXweH8Gj_bAv3s3HLo7SnDsOxEnz6rOqzYHwT8m_vfVz4TnSeJzE2f9ib8e
+      responses:
+        "200":
+          description: "200"
+          content:
+            application/json;charset=UTF-8:
+              schema:
+                $ref: "#/components/schemas/api-v1-members-me-notification-settings-447083891"
+              examples:
+                notification-settings-get:
+                  value: |-
+                    {
+                      "success" : true,
+                      "data" : {
+                        "push" : true,
+                        "chat" : true,
+                        "activity" : true,
+                        "favoriteSpace" : false,
+                        "marketing" : true,
+                        "dndEnabled" : true,
+                        "dndStartHour" : 22,
+                        "dndEndHour" : 8,
+                        "marketingConsentedAt" : "2026-10-20T21:00:00",
+                        "updatedAt" : "2026-10-20T21:00:00"
+                      }
+                    }
+                notification-settings-get-default:
+                  value: |-
+                    {
+                      "success" : true,
+                      "data" : {
+                        "push" : true,
+                        "chat" : true,
+                        "activity" : true,
+                        "favoriteSpace" : false,
+                        "marketing" : false,
+                        "dndEnabled" : true,
+                        "dndStartHour" : 22,
+                        "dndEndHour" : 8,
+                        "marketingConsentedAt" : null,
+                        "updatedAt" : null
+                      }
+                    }
+        "401":
+          description: "401"
+          content:
+            application/json;charset=UTF-8:
+              schema:
+                $ref: "#/components/schemas/api-v1-community-posts779366877"
+              examples:
+                notification-settings-unauthorized:
+                  value: |-
+                    {
+                      "success" : false,
+                      "error" : {
+                        "code" : "UNAUTHORIZED",
+                        "message" : "인증이 필요합니다."
+                      }
+                    }
+      security:
+      - bearerAuthJWT: []
+    put:
+      tags:
+      - NotificationSetting
+      summary: 내 알림 설정 변경
+      description: "모든 항목을 보내야 합니다(전체 교체). 저장된 값을 돌려줍니다. 시각은 0~23 정수, 시작은 포함 · 끝은\
+        \ 포함하지 않으며 시작 > 끝이면 자정을 넘는 구간입니다(22 → 8 = 22:00~07:59). 방해금지를 켜면 시작과 끝이 달라\
+        야 합니다. 광고성 정보는 동의로 바뀔 때 서버가 marketingConsentedAt 을 남기고, 철회하면 null 이 됩니다. 항\
+        목이 빠지거나 범위를 벗어나면 400 INVALID_INPUT (fieldErrors)."
+      operationId: notification-settings-replace
+      parameters:
+      - name: Authorization
+        in: header
+        description: "Bearer {액세스 토큰}"
+        required: true
+        schema:
+          type: string
+        example: Bearer eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiIxIiwicm9sZSI6IlVTRVIiLCJpYXQiOjE3OTI0OTc2MDAsImV4cCI6MTc5MjQ5OTQwMH0.qCsN0QXweH8Gj_bAv3s3HLo7SnDsOxEnz6rOqzYHwT8m_vfVz4TnSeJzE2f9ib8e
+      requestBody:
+        content:
+          application/json;charset=UTF-8:
+            schema:
+              $ref: "#/components/schemas/api-v1-members-me-notification-settings957192010"
+            examples:
+              notification-settings-replace-invalid-hour-over:
+                value: |-
+                  {
+                    "push" : true,
+                    "chat" : true,
+                    "activity" : true,
+                    "favoriteSpace" : false,
+                    "marketing" : true,
+                    "dndEnabled" : true,
+                    "dndStartHour" : 24,
+                    "dndEndHour" : 8
+                  }
+              notification-settings-replace-missing-field:
+                value: |-
+                  {
+                    "push" : true,
+                    "chat" : true,
+                    "activity" : true,
+                    "favoriteSpace" : false,
+                    "dndEnabled" : true,
+                    "dndStartHour" : 22,
+                    "dndEndHour" : 8
+                  }
+              notification-settings-replace:
+                value: |-
+                  {
+                    "push" : true,
+                    "chat" : true,
+                    "activity" : true,
+                    "favoriteSpace" : false,
+                    "marketing" : true,
+                    "dndEnabled" : true,
+                    "dndStartHour" : 22,
+                    "dndEndHour" : 8
+                  }
+              notification-settings-replace-invalid-hour-negative:
+                value: |-
+                  {
+                    "push" : true,
+                    "chat" : true,
+                    "activity" : true,
+                    "favoriteSpace" : false,
+                    "marketing" : true,
+                    "dndEnabled" : true,
+                    "dndStartHour" : -1,
+                    "dndEndHour" : 8
+                  }
+      responses:
+        "400":
+          description: "400"
+          content:
+            application/json;charset=UTF-8:
+              schema:
+                $ref: "#/components/schemas/api-v1-provider-applications-applicationId-reject-60140286"
+              examples:
+                notification-settings-replace-invalid-hour-over:
+                  value: |-
+                    {
+                      "success" : false,
+                      "error" : {
+                        "code" : "INVALID_INPUT",
+                        "message" : "요청 값이 올바르지 않습니다.",
+                        "fieldErrors" : [ {
+                          "field" : "dndStartHour",
+                          "reason" : "시각은 0~23 사이의 정수여야 합니다."
+                        } ]
+                      }
+                    }
+                notification-settings-replace-missing-field:
+                  value: |-
+                    {
+                      "success" : false,
+                      "error" : {
+                        "code" : "INVALID_INPUT",
+                        "message" : "요청 값이 올바르지 않습니다.",
+                        "fieldErrors" : [ {
+                          "field" : "marketing",
+                          "reason" : "must not be null"
+                        } ]
+                      }
+                    }
+                notification-settings-replace-invalid-hour-negative:
+                  value: |-
+                    {
+                      "success" : false,
+                      "error" : {
+                        "code" : "INVALID_INPUT",
+                        "message" : "요청 값이 올바르지 않습니다.",
+                        "fieldErrors" : [ {
+                          "field" : "dndStartHour",
+                          "reason" : "시각은 0~23 사이의 정수여야 합니다."
+                        } ]
+                      }
+                    }
+        "200":
+          description: "200"
+          content:
+            application/json;charset=UTF-8:
+              schema:
+                $ref: "#/components/schemas/api-v1-members-me-notification-settings-447083891"
+              examples:
+                notification-settings-replace:
+                  value: |-
+                    {
+                      "success" : true,
+                      "data" : {
+                        "push" : true,
+                        "chat" : true,
+                        "activity" : true,
+                        "favoriteSpace" : false,
+                        "marketing" : true,
+                        "dndEnabled" : true,
+                        "dndStartHour" : 22,
+                        "dndEndHour" : 8,
+                        "marketingConsentedAt" : "2026-10-20T21:00:00",
+                        "updatedAt" : "2026-10-20T21:00:00"
+                      }
+                    }
+      security:
+      - bearerAuthJWT: []
   /api/v1/members/me/password:
     patch:
       tags:
@@ -5383,7 +5603,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-auth-signup-60140286"
+                $ref: "#/components/schemas/api-v1-provider-applications-applicationId-reject-60140286"
               examples:
                 provider-application-reject-without-reason:
                   value: |-
@@ -7944,6 +8164,42 @@ components:
         success:
           type: boolean
           description: 요청 성공 여부 (true)
+    api-v1-members-me-notification-settings957192010:
+      required:
+      - activity
+      - chat
+      - dndEnabled
+      - dndEndHour
+      - dndStartHour
+      - favoriteSpace
+      - marketing
+      - push
+      type: object
+      properties:
+        dndEndHour:
+          type: number
+          description: "방해금지 끝 시각 (0~23시, 미포함). 시작보다 작으면 자정을 넘는 구간"
+        marketing:
+          type: boolean
+          description: 광고성 정보 수신 동의 (이벤트 · 혜택)
+        dndEnabled:
+          type: boolean
+          description: 방해금지 사용
+        activity:
+          type: boolean
+          description: 활동 알림 (신청 · 가격 협의 · 승인 · 거절)
+        chat:
+          type: boolean
+          description: 1:1 대화 알림
+        dndStartHour:
+          type: number
+          description: "방해금지 시작 시각 (0~23시, 포함)"
+        favoriteSpace:
+          type: boolean
+          description: 찜한 공간 소식
+        push:
+          type: boolean
+          description: 푸시 알림 전체. false 면 아래 분류와 관계없이 보내지 않음
     api-v1-auth-signup-1218437977:
       required:
       - email
@@ -8663,6 +8919,58 @@ components:
         success:
           type: boolean
           description: 요청 성공 여부 (true)
+    api-v1-members-me-notification-settings-447083891:
+      required:
+      - success
+      type: object
+      properties:
+        data:
+          required:
+          - activity
+          - chat
+          - dndEnabled
+          - dndEndHour
+          - dndStartHour
+          - favoriteSpace
+          - marketing
+          - push
+          type: object
+          properties:
+            dndEndHour:
+              type: number
+              description: "방해금지 끝 시각 (0~23시, 미포함)"
+            marketing:
+              type: boolean
+              description: 광고성 정보 수신 동의
+            dndEnabled:
+              type: boolean
+              description: 방해금지 사용
+            marketingConsentedAt:
+              type: string
+              description: 광고성 정보 수신 동의 시각 (KST). 동의하지 않았으면 null — 서버가 기록
+              nullable: true
+            activity:
+              type: boolean
+              description: 활동 알림 (신청 · 가격 협의 · 승인 · 거절)
+            chat:
+              type: boolean
+              description: 1:1 대화 알림
+            dndStartHour:
+              type: number
+              description: "방해금지 시작 시각 (0~23시, 포함)"
+            favoriteSpace:
+              type: boolean
+              description: 찜한 공간 소식
+            push:
+              type: boolean
+              description: 푸시 알림 전체
+            updatedAt:
+              type: string
+              description: 마지막 저장 시각 (KST). 저장한 적이 없으면 null — 기본값
+              nullable: true
+        success:
+          type: boolean
+          description: 요청 성공 여부 (true)
     api-v1-spaces1378034036:
       required:
       - success
@@ -9113,7 +9421,7 @@ components:
         content:
           type: string
           description: 후기 (최대 1000자)
-    api-v1-auth-signup-60140286:
+    api-v1-provider-applications-applicationId-reject-60140286:
       required:
       - success
       type: object
@@ -9311,34 +9619,6 @@ components:
         success:
           type: boolean
           description: 요청 성공 여부 (true)
-    api-v1-auth-signup1500708097:
-      required:
-      - success
-      type: object
-      properties:
-        data:
-          required:
-          - email
-          - id
-          - name
-          - role
-          type: object
-          properties:
-            role:
-              type: string
-              description: "역할: USER | PROVIDER | ADMIN"
-            name:
-              type: string
-              description: 이름
-            id:
-              type: number
-              description: 회원 ID
-            email:
-              type: string
-              description: 이메일
-        success:
-          type: boolean
-          description: 요청 성공 여부 (true)
     api-v1-reviews-reviewId796819085:
       required:
       - success
@@ -9404,6 +9684,34 @@ components:
             updatedAt:
               type: string
               description: 마지막 수정 시각
+        success:
+          type: boolean
+          description: 요청 성공 여부 (true)
+    api-v1-auth-signup1500708097:
+      required:
+      - success
+      type: object
+      properties:
+        data:
+          required:
+          - email
+          - id
+          - name
+          - role
+          type: object
+          properties:
+            role:
+              type: string
+              description: "역할: USER | PROVIDER | ADMIN"
+            name:
+              type: string
+              description: 이름
+            id:
+              type: number
+              description: 회원 ID
+            email:
+              type: string
+              description: 이메일
         success:
           type: boolean
           description: 요청 성공 여부 (true)
