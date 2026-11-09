@@ -53,29 +53,18 @@ jobs:
             git diff -- src/main/resources/static/docs/openapi3.yaml
           fi
 
-      - name: 테스트 · 커버리지 리포트 업로드
-        if: always()
+      # 아티팩트 저장 용량(조직 공용)이 차면 업로드가 실패한다. 리포트는 실패를 볼 때만 필요하므로
+      # 실패했을 때만 올리고, 업로드가 안 돼도 빌드 결과(성공 · 실패)는 바꾸지 않는다.
+      - name: 테스트 · 커버리지 리포트 업로드 (실패 시)
+        if: failure()
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: test-reports
           path: |
             build/reports/tests/test
             build/reports/jacoco/test
-          retention-days: 7
-
-      - name: API 명세 업로드
-        uses: actions/upload-artifact@v7
-        with:
-          name: openapi3
-          path: build/api-spec/openapi3.yaml
-          retention-days: 7
-
-      - name: 실행 파일 업로드
-        uses: actions/upload-artifact@v7
-        with:
-          name: app-jar
-          path: build/libs/*.jar
-          retention-days: 1
+          retention-days: 3
 
   http-test:
     name: HTTP 시나리오 테스트 (.http)
@@ -95,11 +84,12 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - name: 실행 파일 받기
-        uses: actions/download-artifact@v8
-        with:
-          name: app-jar
-          path: build/libs
+      - name: Gradle 설정 (캐시)
+        uses: gradle/actions/setup-gradle@v6
+
+      # 빌드 job 의 jar(65MB)를 아티팩트로 넘기면 실행마다 저장 용량을 차지하므로 여기서 다시 만든다.
+      - name: 실행 파일 만들기
+        run: ./gradlew bootJar
 
       - name: 서버 기동 (local 프로필)
         run: |
@@ -143,10 +133,11 @@ jobs:
         working-directory: http
         run: ijhttp --env-file http-client.env.json --private-env-file http-client.private.env.json --env local ./*.http
 
-      - name: 서버 로그 업로드
+      - name: 서버 로그 업로드 (실패 시)
         if: failure()
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: http-test-app-log
           path: app.log
-          retention-days: 7
+          retention-days: 3
