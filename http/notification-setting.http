@@ -1,0 +1,259 @@
+### 준비: 새 이용자 가입
+# 기대값: 201 Created
+POST {{baseUrl}}/api/v1/auth/signup
+Content-Type: application/json
+
+{
+  "email": "http-notification-{{$timestamp}}-{{$randomInt}}@test.dasisiheung.com",
+  "password": "password123",
+  "name": "김시흥",
+  "phone": "010-1234-5678",
+  "role": "USER"
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+    client.global.set("notificationEmail", response.body.data.email);
+%}
+
+### 준비: 로그인
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{notificationEmail}}",
+  "password": "password123"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+    client.global.set("notificationToken", response.body.data.accessToken);
+%}
+
+### 내 알림 설정 조회 — 저장한 적 없음 → 기본값
+# 인증: 로그인
+# 기대값: 200 OK
+# { "data": { "push": true, "chat": true, "activity": true, "favoriteSpace": false, "marketing": false,
+#             "dndEnabled": true, "dndStartHour": 22, "dndEndHour": 8,
+#             "marketingConsentedAt": null, "updatedAt": null } }
+GET {{baseUrl}}/api/v1/members/me/notification-settings
+Authorization: Bearer {{notificationToken}}
+
+> {%
+    client.test("200 OK + 기본값", () => {
+        const data = response.body.data;
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(data.push === true && data.chat === true && data.activity === true, "push · chat · activity 는 켜짐");
+        client.assert(data.favoriteSpace === false && data.marketing === false, "favoriteSpace · marketing 은 꺼짐");
+        client.assert(data.dndEnabled === true && data.dndStartHour === 22 && data.dndEndHour === 8, "방해금지 22 → 8");
+        client.assert(data.marketingConsentedAt === null, `실제 ${data.marketingConsentedAt}`);
+        client.assert(data.updatedAt === null, `실제 ${data.updatedAt}`);
+    });
+%}
+
+### 내 알림 설정 변경 — 광고 동의, 대화 알림 끔, 방해금지 23 → 7
+# 기대값: 200 OK, 보낸 값 그대로 + marketingConsentedAt · updatedAt 에 시각
+PUT {{baseUrl}}/api/v1/members/me/notification-settings
+Authorization: Bearer {{notificationToken}}
+Content-Type: application/json
+
+{
+  "push": true,
+  "chat": false,
+  "activity": true,
+  "favoriteSpace": true,
+  "marketing": true,
+  "dndEnabled": true,
+  "dndStartHour": 23,
+  "dndEndHour": 7
+}
+
+> {%
+    client.test("200 OK + 저장된 값", () => {
+        const data = response.body.data;
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(data.chat === false && data.favoriteSpace === true && data.marketing === true, "보낸 값과 다릅니다");
+        client.assert(data.dndStartHour === 23 && data.dndEndHour === 7, `실제 ${data.dndStartHour} → ${data.dndEndHour}`);
+        client.assert(data.marketingConsentedAt !== null, "동의 시각이 있어야 합니다");
+        client.assert(data.updatedAt !== null, "저장 시각이 있어야 합니다");
+    });
+    client.global.set("marketingConsentedAt", response.body.data.marketingConsentedAt);
+%}
+
+### 내 알림 설정 조회 — 저장한 값
+# 기대값: 200 OK, 바로 앞에서 저장한 값
+GET {{baseUrl}}/api/v1/members/me/notification-settings
+Authorization: Bearer {{notificationToken}}
+
+> {%
+    client.test("200 OK + 저장한 값", () => {
+        const data = response.body.data;
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(data.chat === false && data.marketing === true, "저장한 값과 다릅니다");
+        client.assert(data.dndStartHour === 23 && data.dndEndHour === 7, `실제 ${data.dndStartHour} → ${data.dndEndHour}`);
+        client.assert(data.marketingConsentedAt === client.global.get("marketingConsentedAt"), `실제 ${data.marketingConsentedAt}`);
+    });
+%}
+
+### 내 알림 설정 변경 — 계속 동의 중이면 처음 동의 시각 유지
+# 기대값: 200 OK, dndStartHour = 1, marketingConsentedAt 은 처음 값 그대로
+PUT {{baseUrl}}/api/v1/members/me/notification-settings
+Authorization: Bearer {{notificationToken}}
+Content-Type: application/json
+
+{
+  "push": true,
+  "chat": true,
+  "activity": true,
+  "favoriteSpace": true,
+  "marketing": true,
+  "dndEnabled": true,
+  "dndStartHour": 1,
+  "dndEndHour": 6
+}
+
+> {%
+    client.test("200 OK + 동의 시각 유지", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.dndStartHour === 1, `실제 ${response.body.data.dndStartHour}`);
+        client.assert(response.body.data.marketingConsentedAt === client.global.get("marketingConsentedAt"),
+            `실제 ${response.body.data.marketingConsentedAt}`);
+    });
+%}
+
+### 내 알림 설정 변경 — 광고 철회, 방해금지 끔 (끄면 시작 = 끝 도 저장됨)
+# 기대값: 200 OK, marketing = false, marketingConsentedAt = null
+PUT {{baseUrl}}/api/v1/members/me/notification-settings
+Authorization: Bearer {{notificationToken}}
+Content-Type: application/json
+
+{
+  "push": true,
+  "chat": true,
+  "activity": true,
+  "favoriteSpace": false,
+  "marketing": false,
+  "dndEnabled": false,
+  "dndStartHour": 22,
+  "dndEndHour": 22
+}
+
+> {%
+    client.test("200 OK + 동의 시각 삭제", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.marketing === false, `실제 ${response.body.data.marketing}`);
+        client.assert(response.body.data.marketingConsentedAt === null, `실제 ${response.body.data.marketingConsentedAt}`);
+        client.assert(response.body.data.dndEnabled === false, `실제 ${response.body.data.dndEnabled}`);
+    });
+%}
+
+### 내 알림 설정 변경 — 시각 24 → 400
+# 기대값: 400 INVALID_INPUT, fieldErrors[0].field = dndStartHour
+PUT {{baseUrl}}/api/v1/members/me/notification-settings
+Authorization: Bearer {{notificationToken}}
+Content-Type: application/json
+
+{
+  "push": true,
+  "chat": true,
+  "activity": true,
+  "favoriteSpace": false,
+  "marketing": false,
+  "dndEnabled": true,
+  "dndStartHour": 24,
+  "dndEndHour": 8
+}
+
+> {%
+    client.test("400 INVALID_INPUT (dndStartHour)", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "INVALID_INPUT", `실제 ${response.body.error.code}`);
+        client.assert(response.body.error.fieldErrors[0].field === "dndStartHour", `실제 ${response.body.error.fieldErrors[0].field}`);
+    });
+%}
+
+### 내 알림 설정 변경 — 방해금지를 켰는데 시작 = 끝 → 400
+# 기대값: 400 INVALID_INPUT, fieldErrors[0].field = dndHoursDistinct
+PUT {{baseUrl}}/api/v1/members/me/notification-settings
+Authorization: Bearer {{notificationToken}}
+Content-Type: application/json
+
+{
+  "push": true,
+  "chat": true,
+  "activity": true,
+  "favoriteSpace": false,
+  "marketing": false,
+  "dndEnabled": true,
+  "dndStartHour": 22,
+  "dndEndHour": 22
+}
+
+> {%
+    client.test("400 INVALID_INPUT (dndHoursDistinct)", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "INVALID_INPUT", `실제 ${response.body.error.code}`);
+        client.assert(response.body.error.fieldErrors[0].field === "dndHoursDistinct", `실제 ${response.body.error.fieldErrors[0].field}`);
+    });
+%}
+
+### 내 알림 설정 변경 — 항목 누락(marketing) → 400
+# 기대값: 400 INVALID_INPUT, fieldErrors[0].field = marketing
+PUT {{baseUrl}}/api/v1/members/me/notification-settings
+Authorization: Bearer {{notificationToken}}
+Content-Type: application/json
+
+{
+  "push": true,
+  "chat": true,
+  "activity": true,
+  "favoriteSpace": false,
+  "dndEnabled": true,
+  "dndStartHour": 22,
+  "dndEndHour": 8
+}
+
+> {%
+    client.test("400 INVALID_INPUT (marketing)", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "INVALID_INPUT", `실제 ${response.body.error.code}`);
+        client.assert(response.body.error.fieldErrors[0].field === "marketing", `실제 ${response.body.error.fieldErrors[0].field}`);
+    });
+%}
+
+### 토큰 없이 조회 → 401
+# 기대값: 401 UNAUTHORIZED
+GET {{baseUrl}}/api/v1/members/me/notification-settings
+
+> {%
+    client.test("401 UNAUTHORIZED", () => {
+        client.assert(response.status === 401, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "UNAUTHORIZED", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 정리: 회원 탈퇴 (알림 설정도 지워진다)
+# 기대값: 200 OK
+POST {{baseUrl}}/api/v1/members/me/withdraw
+Authorization: Bearer {{notificationToken}}
+Content-Type: application/json
+
+{
+  "password": "password123"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+%}
+
+### 탈퇴 후 기존 토큰으로 조회 → 404
+# 기대값: 404 MEMBER_NOT_FOUND
+GET {{baseUrl}}/api/v1/members/me/notification-settings
+Authorization: Bearer {{notificationToken}}
+
+> {%
+    client.test("404 MEMBER_NOT_FOUND", () => {
+        client.assert(response.status === 404, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "MEMBER_NOT_FOUND", `실제 ${response.body.error.code}`);
+    });
+%}
