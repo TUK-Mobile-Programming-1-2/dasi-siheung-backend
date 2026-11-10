@@ -105,6 +105,10 @@ public enum ErrorCode {
     CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "대화를 찾을 수 없습니다."),
     NOT_CONVERSATION_MEMBER(HttpStatus.FORBIDDEN, "본인이 참여한 대화만 볼 수 있습니다."),
 
+    // 자주 묻는 질문
+    FAQ_NOT_FOUND(HttpStatus.NOT_FOUND, "자주 묻는 질문을 찾을 수 없습니다."),
+    INVALID_FAQ_ORDER(HttpStatus.BAD_REQUEST, "모든 자주 묻는 질문 ID 를 한 번씩 보내야 합니다. 목록을 새로 불러와 주세요."),
+
     // 신고 · 제재
     REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "신고를 찾을 수 없습니다."),
     REPORT_TARGET_NOT_FOUND(HttpStatus.NOT_FOUND, "신고할 대상을 찾을 수 없습니다."),

@@ -30,7 +30,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
  * 세션 없이 JWT 로 인증한다.
  * <ul>
  *   <li>PUBLIC_ENDPOINTS: 누구나 호출</li>
- *   <li>PUBLIC_READ_ENDPOINTS: 조회(GET)만 누구나 — 로그인 전에도 공간 · 후기 · 커뮤니티를 둘러볼 수 있다</li>
+ *   <li>PUBLIC_READ_ENDPOINTS: 조회(GET)만 누구나 — 로그인 전에도 공간 · 후기 · 커뮤니티 · 자주 묻는 질문을 볼 수 있다</li>
  *   <li>/api/v1/admin/**: 관리자(ADMIN)만</li>
  *   <li>/api/v1/provider/**: 공간 제공자(PROVIDER)만</li>
  *   <li>그 외: 로그인 필요. 역할별 제한은 컨트롤러의 {@code @PreAuthorize} 로 건다.</li>
@@ -52,7 +52,7 @@ public class SecurityConfig {
             "/error"
     };
     private static final String[] PUBLIC_READ_ENDPOINTS = {
-            "/api/v1/spaces", "/api/v1/spaces/**", "/api/v1/community/**"
+            "/api/v1/spaces", "/api/v1/spaces/**", "/api/v1/community/**", "/api/v1/faqs"
     };
     private static final String ADMIN_ENDPOINTS = "/api/v1/admin/**";
     private static final String PROVIDER_ENDPOINTS = "/api/v1/provider/**";
