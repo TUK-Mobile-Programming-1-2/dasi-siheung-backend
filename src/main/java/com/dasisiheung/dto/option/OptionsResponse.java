@@ -24,6 +24,7 @@ public record OptionsResponse(
         @Schema(description = "신고 대상 종류") List<OptionItem> reportTargetTypes,
         @Schema(description = "신고 사유") List<OptionItem> reportReasons,
         @Schema(description = "신고 처리 상태") List<OptionItem> reportStatuses,
-        @Schema(description = "신고 처리 방법") List<OptionItem> reportActions
+        @Schema(description = "신고 처리 방법") List<OptionItem> reportActions,
+        @Schema(description = "자주 묻는 질문 분류") List<OptionItem> faqCategories
 ) {
 }
