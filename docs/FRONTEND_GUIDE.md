@@ -280,6 +280,13 @@ flowchart LR
 | `INVALID_REPORT_ACTION` | 400 | 회원 신고를 숨김 처리 | 정지 · 기각만 보여주기 |
 | `CANNOT_SUSPEND_MEMBER` | 409 | 관리자 · 탈퇴 회원 정지 | 버튼 숨기기 |
 
+**자주 묻는 질문 (관리자)**
+
+| `error.code` | HTTP 상태 | 언제 | 화면 처리 예시 |
+| --- | --- | --- | --- |
+| `FAQ_NOT_FOUND` | 404 | 이미 지운 질문을 수정 · 삭제 | 목록 새로고침 |
+| `INVALID_FAQ_ORDER` | 400 | 순서 변경에 모든 ID 를 한 번씩 보내지 않음 (그사이 다른 관리자가 추가 · 삭제한 경우 포함) | 목록을 다시 불러온 뒤 다시 정렬 |
+
 ### 3-3-1. 목록 응답 (페이지)
 
 목록 API 는 `page`(0부터), `size`(기본 20, 최대 100) 쿼리 파라미터를 받고 아래 형식으로 응답합니다.
@@ -859,7 +866,13 @@ try {
 
 | 메서드 | 경로 | 인증 | 설명 |
 | --- | --- | --- | --- |
-| GET | `/api/v1/options` | 공개 | 지역·허용 활동·시설·용도·상권 테마·이용 목적 등 선택 목록 (1시간 캐시) |
+| GET | `/api/v1/options` | 공개 | 지역·허용 활동·시설·용도·상권 테마·이용 목적·자주 묻는 질문 분류 등 선택 목록 (1시간 캐시) |
+
+### 자주 묻는 질문 (`http/faq.http`)
+
+| 메서드 | 경로 | 인증 | 설명 |
+| --- | --- | --- | --- |
+| GET | `/api/v1/faqs` | 공개 | 관리자가 정한 순서대로 전체 (페이지 없음, `category` 로 거르기). 분류 이름은 선택지 `faqCategories` |
 
 ### 공간 제공자 — 내 공간 (`http/provider-space.http`)
 
@@ -1016,3 +1029,14 @@ try {
 | POST | `/api/v1/admin/privacy/purge` | ADMIN | 파기 실행 (매일 04:30 자동) |
 | GET | `/api/v1/admin/privacy/purge-logs` | ADMIN | 파기 실행 기록 |
 | GET | `/api/v1/admin/statistics/monthly` | ADMIN | 월별 이용 통계 (from · to = yyyy-MM) |
+
+### 관리자 — 자주 묻는 질문 (`http/faq.http`)
+
+목록은 공개 API `GET /api/v1/faqs` 를 같이 씁니다.
+
+| 메서드 | 경로 | 인증 | 설명 |
+| --- | --- | --- | --- |
+| POST | `/api/v1/admin/faqs` | ADMIN | 추가 (맨 뒤에 붙음) |
+| PUT | `/api/v1/admin/faqs/{faqId}` | ADMIN | 수정 (분류 · 질문 · 답변 모두, 순서는 그대로) |
+| DELETE | `/api/v1/admin/faqs/{faqId}` | ADMIN | 삭제 |
+| PUT | `/api/v1/admin/faqs/order` | ADMIN | 순서 변경 (모든 ID 를 보여줄 순서대로 한 번씩) |
