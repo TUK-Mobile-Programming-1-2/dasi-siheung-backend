@@ -260,6 +260,45 @@ paths:
                     }
       security:
       - bearerAuthJWT: []
+  /api/v1/faqs:
+    get:
+      tags:
+      - Faq
+      summary: 자주 묻는 질문 목록
+      description: "로그인 없이 볼 수 있습니다. 관리자가 정한 순서대로 전체를 한 번에 줍니다(페이지 없음). category 로\
+        \ 거를 수 있고, 분류의 화면 이름은 선택지 faqCategories 에 있습니다. 답변에는 줄바꿈(\\n)이 들어갈 수 있습니다."
+      operationId: faq-list
+      parameters:
+      - name: category
+        in: query
+        description: 분류 (선택지 faqCategories). 없으면 전체
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: "200"
+          content:
+            application/json;charset=UTF-8:
+              schema:
+                $ref: "#/components/schemas/api-v1-faqs-2000522056"
+              examples:
+                faq-list:
+                  value: |-
+                    {
+                      "success" : true,
+                      "data" : [ {
+                        "id" : 3,
+                        "category" : "APPLICATION",
+                        "question" : "결제는 어떻게 하나요?",
+                        "answer" : "앱에서는 결제하지 않습니다.\n예약이 확정되면 공간 제공자와 1:1 대화로 결제 방법을 정해 주세요."
+                      }, {
+                        "id" : 1,
+                        "category" : "ACCOUNT",
+                        "question" : "이용자와 공간 제공자 역할을 바꿀 수 있나요?",
+                        "answer" : "역할은 가입할 때 하나만 고르며 바꿀 수 없습니다."
+                      } ]
+                    }
   /api/v1/options:
     get:
       tags:
@@ -274,7 +313,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-options-539524950"
+                $ref: "#/components/schemas/api-v1-options-1183811374"
               examples:
                 option-list:
                   value: |-
@@ -585,6 +624,22 @@ paths:
                         }, {
                           "code" : "HIDE_AND_SUSPEND",
                           "label" : "숨김 + 이용 정지"
+                        } ],
+                        "faqCategories" : [ {
+                          "code" : "ACCOUNT",
+                          "label" : "회원 · 계정"
+                        }, {
+                          "code" : "APPLICATION",
+                          "label" : "신청 · 예약"
+                        }, {
+                          "code" : "SPACE",
+                          "label" : "공간 등록 · 관리"
+                        }, {
+                          "code" : "COMMUNITY",
+                          "label" : "커뮤니티 · 신고"
+                        }, {
+                          "code" : "ETC",
+                          "label" : "기타"
                         } ]
                       }
                     }
@@ -870,13 +925,13 @@ paths:
                         },
                         "publishedSpacesByRegion" : {
                           "JEONGWANG" : 3,
-                          "BAEGOT" : 1,
-                          "GEOBUKSEOM" : 0
+                          "GEOBUKSEOM" : 0,
+                          "BAEGOT" : 1
                         },
                         "membersByRole" : {
-                          "PROVIDER" : 5,
                           "ADMIN" : 1,
-                          "USER" : 10
+                          "USER" : 10,
+                          "PROVIDER" : 5
                         },
                         "pendingApplicationCount" : 5,
                         "applicationsByStatus" : {
@@ -895,6 +950,107 @@ paths:
                           "createdAt" : "2026-10-20T21:00:00"
                         } ],
                         "generatedAt" : "2026-10-20T21:00:00"
+                      }
+                    }
+      security:
+      - bearerAuthJWT: []
+  /api/v1/admin/faqs:
+    post:
+      tags:
+      - Admin Faq
+      summary: 자주 묻는 질문 추가
+      description: 항목이 비었거나 길이를 넘은 예시
+      operationId: admin-faq-
+      parameters:
+      - name: Authorization
+        in: header
+        description: "Bearer {액세스 토큰}"
+        required: true
+        schema:
+          type: string
+        example: Bearer eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiIzIiwicm9sZSI6IkFETUlOIiwiaWF0IjoxNzkyNDk3NjAwLCJleHAiOjE3OTI0OTk0MDB9.-bGjJqKfwPtBUraViq_2HVoX_aBU15ZI6-oVzrDIC1mG6jlYCbQsBW6CrcrC6Xlt
+      requestBody:
+        content:
+          application/json;charset=UTF-8:
+            schema:
+              $ref: "#/components/schemas/api-v1-admin-faqs-faqId1691331599"
+            examples:
+              admin-faq-create-invalid:
+                value: |-
+                  {
+                    "question" : " ",
+                    "answer" : "답변"
+                  }
+              admin-faq-create:
+                value: |-
+                  {
+                    "category" : "APPLICATION",
+                    "question" : "결제는 어떻게 하나요?",
+                    "answer" : "앱에서는 결제하지 않습니다."
+                  }
+              admin-faq-forbidden:
+                value: |-
+                  {
+                    "category" : "APPLICATION",
+                    "question" : "결제는 어떻게 하나요?",
+                    "answer" : "앱에서는 결제하지 않습니다."
+                  }
+      responses:
+        "400":
+          description: "400"
+          content:
+            application/json;charset=UTF-8:
+              schema:
+                $ref: "#/components/schemas/api-v1-provider-applications-applicationId-reject-60140286"
+              examples:
+                admin-faq-create-invalid:
+                  value: |-
+                    {
+                      "success" : false,
+                      "error" : {
+                        "code" : "INVALID_INPUT",
+                        "message" : "요청 값이 올바르지 않습니다.",
+                        "fieldErrors" : [ {
+                          "field" : "category",
+                          "reason" : "must not be null"
+                        }, {
+                          "field" : "question",
+                          "reason" : "must not be blank"
+                        } ]
+                      }
+                    }
+        "201":
+          description: "201"
+          content:
+            application/json;charset=UTF-8:
+              schema:
+                $ref: "#/components/schemas/api-v1-admin-faqs-faqId-622886557"
+              examples:
+                admin-faq-create:
+                  value: |-
+                    {
+                      "success" : true,
+                      "data" : {
+                        "id" : 10,
+                        "category" : "APPLICATION",
+                        "question" : "결제는 어떻게 하나요?",
+                        "answer" : "앱에서는 결제하지 않습니다."
+                      }
+                    }
+        "403":
+          description: "403"
+          content:
+            application/json;charset=UTF-8:
+              schema:
+                $ref: "#/components/schemas/api-v1-community-posts779366877"
+              examples:
+                admin-faq-forbidden:
+                  value: |-
+                    {
+                      "success" : false,
+                      "error" : {
+                        "code" : "FORBIDDEN",
+                        "message" : "접근 권한이 없습니다."
                       }
                     }
       security:
@@ -1322,20 +1478,20 @@ paths:
                         "code" : "INVALID_INPUT",
                         "message" : "요청 값이 올바르지 않습니다.",
                         "fieldErrors" : [ {
-                          "field" : "name",
-                          "reason" : "must not be blank"
-                        }, {
                           "field" : "password",
                           "reason" : "비밀번호는 영문과 숫자를 포함해 8~64자여야 합니다."
-                        }, {
-                          "field" : "role",
-                          "reason" : "must not be null"
                         }, {
                           "field" : "phone",
                           "reason" : "휴대폰 번호 형식이 올바르지 않습니다. (예: 010-1234-5678)"
                         }, {
+                          "field" : "role",
+                          "reason" : "must not be null"
+                        }, {
                           "field" : "email",
                           "reason" : "must be a well-formed email address"
+                        }, {
+                          "field" : "name",
+                          "reason" : "must not be blank"
                         } ]
                       }
                     }
@@ -2389,6 +2545,193 @@ paths:
                         "serverTime" : "2026-10-20T21:00:00+09:00"
                       }
                     }
+  /api/v1/admin/faqs/order:
+    put:
+      tags:
+      - Admin Faq
+      summary: 자주 묻는 질문 순서 변경
+      description: 모든 ID 를 보여줄 순서대로 한 번씩 보냅니다(첫 번째가 맨 위). 빠지거나 겹치거나 없는 ID 가 있으면 400
+        INVALID_FAQ_ORDER — 그사이 다른 관리자가 추가 · 삭제한 경우이니 목록을 다시 불러오세요. 응답은 바뀐 전체 목록입니다.
+      operationId: admin-faq-reorder
+      parameters:
+      - name: Authorization
+        in: header
+        description: "Bearer {액세스 토큰}"
+        required: true
+        schema:
+          type: string
+        example: Bearer eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiIzIiwicm9sZSI6IkFETUlOIiwiaWF0IjoxNzkyNDk3NjAwLCJleHAiOjE3OTI0OTk0MDB9.-bGjJqKfwPtBUraViq_2HVoX_aBU15ZI6-oVzrDIC1mG6jlYCbQsBW6CrcrC6Xlt
+      requestBody:
+        content:
+          application/json;charset=UTF-8:
+            schema:
+              $ref: "#/components/schemas/api-v1-admin-faqs-order-1594599012"
+            examples:
+              admin-faq-reorder-invalid:
+                value: |-
+                  {
+                    "faqIds" : [ 3 ]
+                  }
+              admin-faq-reorder:
+                value: |-
+                  {
+                    "faqIds" : [ 3, 1 ]
+                  }
+      responses:
+        "400":
+          description: "400"
+          content:
+            application/json;charset=UTF-8:
+              schema:
+                $ref: "#/components/schemas/api-v1-community-posts779366877"
+              examples:
+                admin-faq-reorder-invalid:
+                  value: |-
+                    {
+                      "success" : false,
+                      "error" : {
+                        "code" : "INVALID_FAQ_ORDER",
+                        "message" : "모든 자주 묻는 질문 ID 를 한 번씩 보내야 합니다. 목록을 새로 불러와 주세요."
+                      }
+                    }
+        "200":
+          description: "200"
+          content:
+            application/json;charset=UTF-8:
+              schema:
+                $ref: "#/components/schemas/api-v1-admin-faqs-order455512682"
+              examples:
+                admin-faq-reorder:
+                  value: |-
+                    {
+                      "success" : true,
+                      "data" : [ {
+                        "id" : 3,
+                        "category" : "APPLICATION",
+                        "question" : "결제는 어떻게 하나요?",
+                        "answer" : "앱에서는 결제하지 않습니다.\n예약이 확정되면 공간 제공자와 1:1 대화로 결제 방법을 정해 주세요."
+                      }, {
+                        "id" : 1,
+                        "category" : "ACCOUNT",
+                        "question" : "이용자와 공간 제공자 역할을 바꿀 수 있나요?",
+                        "answer" : "역할은 가입할 때 하나만 고르며 바꿀 수 없습니다."
+                      } ]
+                    }
+      security:
+      - bearerAuthJWT: []
+  /api/v1/admin/faqs/{faqId}:
+    put:
+      tags:
+      - Admin Faq
+      summary: 자주 묻는 질문 수정
+      description: 분류 · 질문 · 답변을 모두 보냅니다. 순서는 그대로입니다. 없는 ID 면 404 FAQ_NOT_FOUND.
+      operationId: admin-faq-
+      parameters:
+      - name: faqId
+        in: path
+        description: 자주 묻는 질문 ID
+        required: true
+        schema:
+          type: string
+      - name: Authorization
+        in: header
+        description: "Bearer {액세스 토큰}"
+        required: true
+        schema:
+          type: string
+        example: Bearer eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiIzIiwicm9sZSI6IkFETUlOIiwiaWF0IjoxNzkyNDk3NjAwLCJleHAiOjE3OTI0OTk0MDB9.-bGjJqKfwPtBUraViq_2HVoX_aBU15ZI6-oVzrDIC1mG6jlYCbQsBW6CrcrC6Xlt
+      requestBody:
+        content:
+          application/json;charset=UTF-8:
+            schema:
+              $ref: "#/components/schemas/api-v1-admin-faqs-faqId1691331599"
+            examples:
+              admin-faq-update:
+                value: |-
+                  {
+                    "category" : "APPLICATION",
+                    "question" : "결제는 어떻게 하나요?",
+                    "answer" : "앱에서는 결제하지 않습니다."
+                  }
+              admin-faq-not-found:
+                value: |-
+                  {
+                    "category" : "APPLICATION",
+                    "question" : "결제는 어떻게 하나요?",
+                    "answer" : "앱에서는 결제하지 않습니다."
+                  }
+      responses:
+        "200":
+          description: "200"
+          content:
+            application/json;charset=UTF-8:
+              schema:
+                $ref: "#/components/schemas/api-v1-admin-faqs-faqId-622886557"
+              examples:
+                admin-faq-update:
+                  value: |-
+                    {
+                      "success" : true,
+                      "data" : {
+                        "id" : 10,
+                        "category" : "APPLICATION",
+                        "question" : "결제는 어떻게 하나요?",
+                        "answer" : "앱에서는 결제하지 않습니다."
+                      }
+                    }
+        "404":
+          description: "404"
+          content:
+            application/json;charset=UTF-8:
+              schema:
+                $ref: "#/components/schemas/api-v1-community-posts779366877"
+              examples:
+                admin-faq-not-found:
+                  value: |-
+                    {
+                      "success" : false,
+                      "error" : {
+                        "code" : "FAQ_NOT_FOUND",
+                        "message" : "자주 묻는 질문을 찾을 수 없습니다."
+                      }
+                    }
+      security:
+      - bearerAuthJWT: []
+    delete:
+      tags:
+      - Admin Faq
+      summary: 자주 묻는 질문 삭제
+      description: 없는 ID 면 404 FAQ_NOT_FOUND.
+      operationId: admin-faq-delete
+      parameters:
+      - name: faqId
+        in: path
+        description: 자주 묻는 질문 ID
+        required: true
+        schema:
+          type: string
+      - name: Authorization
+        in: header
+        description: "Bearer {액세스 토큰}"
+        required: true
+        schema:
+          type: string
+        example: Bearer eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiIzIiwicm9sZSI6IkFETUlOIiwiaWF0IjoxNzkyNDk3NjAwLCJleHAiOjE3OTI0OTk0MDB9.-bGjJqKfwPtBUraViq_2HVoX_aBU15ZI6-oVzrDIC1mG6jlYCbQsBW6CrcrC6Xlt
+      responses:
+        "200":
+          description: "200"
+          content:
+            application/json;charset=UTF-8:
+              schema:
+                $ref: "#/components/schemas/api-v1-provider-spaces-spaceId-proofs-proofId-34535438"
+              examples:
+                admin-faq-delete:
+                  value: |-
+                    {
+                      "success" : true
+                    }
+      security:
+      - bearerAuthJWT: []
   /api/v1/admin/privacy/purge:
     post:
       tags:
@@ -6992,6 +7335,354 @@ components:
         success:
           type: boolean
           description: 요청 성공 여부 (true)
+    api-v1-options-1183811374:
+      required:
+      - success
+      type: object
+      properties:
+        data:
+          required:
+          - activityTypes
+          - applicationStatuses
+          - buildingUses
+          - commercialThemes
+          - facilities
+          - faqCategories
+          - negotiationStatuses
+          - offerSides
+          - photoPhases
+          - postCategories
+          - proofTypes
+          - regions
+          - reportActions
+          - reportReasons
+          - reportStatuses
+          - reportTargetTypes
+          - reviewDecisions
+          - signupRoles
+          - spaceSorts
+          - spaceStatuses
+          - usePurposes
+          type: object
+          properties:
+            faqCategories:
+              type: array
+              description: 자주 묻는 질문 분류
+              items:
+                required:
+                - code
+                - label
+                type: object
+                properties:
+                  code:
+                    type: string
+                    description: 코드
+                  label:
+                    type: string
+                    description: 화면 이름
+            proofTypes:
+              type: array
+              description: 권한 증빙 종류
+              items:
+                required:
+                - code
+                - label
+                type: object
+                properties:
+                  code:
+                    type: string
+                    description: 코드
+                  label:
+                    type: string
+                    description: 화면 이름
+            postCategories:
+              type: array
+              description: 커뮤니티 분류
+              items:
+                required:
+                - code
+                - label
+                type: object
+                properties:
+                  code:
+                    type: string
+                    description: 코드
+                  label:
+                    type: string
+                    description: 화면 이름
+            regions:
+              type: array
+              description: 서비스 지역
+              items:
+                required:
+                - code
+                - label
+                type: object
+                properties:
+                  code:
+                    type: string
+                    description: 코드
+                  label:
+                    type: string
+                    description: 화면 이름
+            negotiationStatuses:
+              type: array
+              description: 가격 협의 상태
+              items:
+                required:
+                - code
+                - label
+                type: object
+                properties:
+                  code:
+                    type: string
+                    description: 코드
+                  label:
+                    type: string
+                    description: 화면 이름
+            reportReasons:
+              type: array
+              description: 신고 사유
+              items:
+                required:
+                - code
+                - label
+                type: object
+                properties:
+                  code:
+                    type: string
+                    description: 코드
+                  label:
+                    type: string
+                    description: 화면 이름
+            spaceSorts:
+              type: array
+              description: 공간 검색 정렬
+              items:
+                required:
+                - code
+                - label
+                type: object
+                properties:
+                  code:
+                    type: string
+                    description: 코드
+                  label:
+                    type: string
+                    description: 화면 이름
+            commercialThemes:
+              type: array
+              description: 상권 테마
+              items:
+                required:
+                - code
+                - label
+                type: object
+                properties:
+                  code:
+                    type: string
+                    description: 코드
+                  label:
+                    type: string
+                    description: 화면 이름
+            reviewDecisions:
+              type: array
+              description: 관리자 검수 결과
+              items:
+                required:
+                - code
+                - label
+                type: object
+                properties:
+                  code:
+                    type: string
+                    description: 코드
+                  label:
+                    type: string
+                    description: 화면 이름
+            activityTypes:
+              type: array
+              description: 허용 활동 · 신청 활동 종류
+              items:
+                required:
+                - code
+                - label
+                type: object
+                properties:
+                  code:
+                    type: string
+                    description: 코드
+                  label:
+                    type: string
+                    description: 화면 이름
+            spaceStatuses:
+              type: array
+              description: 공간 공개 상태
+              items:
+                required:
+                - code
+                - label
+                type: object
+                properties:
+                  code:
+                    type: string
+                    description: 코드
+                  label:
+                    type: string
+                    description: 화면 이름
+            signupRoles:
+              type: array
+              description: "가입할 수 있는 역할 (USER, PROVIDER)"
+              items:
+                required:
+                - code
+                - label
+                type: object
+                properties:
+                  code:
+                    type: string
+                    description: 코드
+                  label:
+                    type: string
+                    description: 화면 이름
+            buildingUses:
+              type: array
+              description: 건축물 용도
+              items:
+                required:
+                - code
+                - label
+                type: object
+                properties:
+                  code:
+                    type: string
+                    description: 코드
+                  label:
+                    type: string
+                    description: 화면 이름
+            offerSides:
+              type: array
+              description: 가격 제안한 쪽
+              items:
+                required:
+                - code
+                - label
+                type: object
+                properties:
+                  code:
+                    type: string
+                    description: 코드
+                  label:
+                    type: string
+                    description: 화면 이름
+            reportStatuses:
+              type: array
+              description: 신고 처리 상태
+              items:
+                required:
+                - code
+                - label
+                type: object
+                properties:
+                  code:
+                    type: string
+                    description: 코드
+                  label:
+                    type: string
+                    description: 화면 이름
+            applicationStatuses:
+              type: array
+              description: 신청 상태
+              items:
+                required:
+                - code
+                - label
+                type: object
+                properties:
+                  code:
+                    type: string
+                    description: 코드
+                  label:
+                    type: string
+                    description: 화면 이름
+            reportTargetTypes:
+              type: array
+              description: 신고 대상 종류
+              items:
+                required:
+                - code
+                - label
+                type: object
+                properties:
+                  code:
+                    type: string
+                    description: 코드
+                  label:
+                    type: string
+                    description: 화면 이름
+            reportActions:
+              type: array
+              description: 신고 처리 방법
+              items:
+                required:
+                - code
+                - label
+                type: object
+                properties:
+                  code:
+                    type: string
+                    description: 코드
+                  label:
+                    type: string
+                    description: 화면 이름
+            facilities:
+              type: array
+              description: 보유 시설
+              items:
+                required:
+                - code
+                - label
+                type: object
+                properties:
+                  code:
+                    type: string
+                    description: 코드
+                  label:
+                    type: string
+                    description: 화면 이름
+            photoPhases:
+              type: array
+              description: 활동 사진 시점
+              items:
+                required:
+                - code
+                - label
+                type: object
+                properties:
+                  code:
+                    type: string
+                    description: 코드
+                  label:
+                    type: string
+                    description: 화면 이름
+            usePurposes:
+              type: array
+              description: 이용 목적
+              items:
+                required:
+                - code
+                - label
+                type: object
+                properties:
+                  code:
+                    type: string
+                    description: 코드
+                  label:
+                    type: string
+                    description: 화면 이름
+        success:
+          type: boolean
+          description: 요청 성공 여부 (true)
     api-v1-admin-members-memberId-suspend702606918:
       required:
       - days
@@ -7941,6 +8632,35 @@ components:
         success:
           type: boolean
           description: 요청 성공 여부 (true)
+    api-v1-admin-faqs-faqId-622886557:
+      required:
+      - success
+      type: object
+      properties:
+        data:
+          required:
+          - answer
+          - category
+          - id
+          - question
+          type: object
+          properties:
+            answer:
+              type: string
+              description: 답변 (줄바꿈 포함 가능)
+            question:
+              type: string
+              description: 질문
+            id:
+              type: number
+              description: 자주 묻는 질문 ID
+            category:
+              type: string
+              description: "분류: ACCOUNT | APPLICATION | SPACE | COMMUNITY | ETC (화\
+                면 이름은 선택지 faqCategories)"
+        success:
+          type: boolean
+          description: 요청 성공 여부 (true)
     api-v1-conversations-unread-count255570948:
       required:
       - success
@@ -7957,6 +8677,22 @@ components:
         success:
           type: boolean
           description: 요청 성공 여부 (true)
+    api-v1-admin-faqs-faqId1691331599:
+      required:
+      - answer
+      - category
+      - question
+      type: object
+      properties:
+        answer:
+          type: string
+          description: "답변 (최대 2000자, 줄바꿈 가능)"
+        question:
+          type: string
+          description: 질문 (최대 200자)
+        category:
+          type: string
+          description: "분류: ACCOUNT | APPLICATION | SPACE | COMMUNITY | ETC (선택지 faqCategories)"
     api-v1-members-me1177973623:
       type: object
       properties:
@@ -8261,6 +8997,39 @@ components:
             url:
               type: string
               description: 열람용 임시 주소 (10분 뒤 만료)
+        success:
+          type: boolean
+          description: 요청 성공 여부 (true)
+    api-v1-admin-faqs-order455512682:
+      required:
+      - data
+      - success
+      type: object
+      properties:
+        data:
+          type: array
+          description: 바뀐 순서의 전체 목록
+          items:
+            required:
+            - answer
+            - category
+            - id
+            - question
+            type: object
+            properties:
+              answer:
+                type: string
+                description: 답변 (줄바꿈 포함 가능)
+              question:
+                type: string
+                description: 질문
+              id:
+                type: number
+                description: 자주 묻는 질문 ID
+              category:
+                type: string
+                description: "분류: ACCOUNT | APPLICATION | SPACE | COMMUNITY | ETC\
+                  \ (화면 이름은 선택지 faqCategories)"
         success:
           type: boolean
           description: 요청 성공 여부 (true)
@@ -9421,6 +10190,20 @@ components:
         content:
           type: string
           description: 후기 (최대 1000자)
+    api-v1-admin-faqs-order-1594599012:
+      required:
+      - faqIds
+      type: object
+      properties:
+        faqIds:
+          type: array
+          description: 모든 자주 묻는 질문 ID (보여줄 순서대로)
+          items:
+            oneOf:
+            - type: object
+            - type: boolean
+            - type: string
+            - type: number
     api-v1-provider-applications-applicationId-reject-60140286:
       required:
       - success
@@ -10044,6 +10827,39 @@ components:
         success:
           type: boolean
           description: 요청 성공 여부 (true)
+    api-v1-faqs-2000522056:
+      required:
+      - data
+      - success
+      type: object
+      properties:
+        data:
+          type: array
+          description: 자주 묻는 질문 (보여줄 순서)
+          items:
+            required:
+            - answer
+            - category
+            - id
+            - question
+            type: object
+            properties:
+              answer:
+                type: string
+                description: 답변 (줄바꿈 포함 가능)
+              question:
+                type: string
+                description: 질문
+              id:
+                type: number
+                description: 자주 묻는 질문 ID
+              category:
+                type: string
+                description: "분류: ACCOUNT | APPLICATION | SPACE | COMMUNITY | ETC\
+                  \ (화면 이름은 선택지 faqCategories)"
+        success:
+          type: boolean
+          description: 요청 성공 여부 (true)
     api-v1-admin-reports-reportId-resolve-1119150928:
       required:
       - action
@@ -10067,338 +10883,6 @@ components:
           type: string
           description: "취소 사유 (선택, 최대 500자) — 공간 제공자에게 보입니다"
           nullable: true
-    api-v1-options-539524950:
-      required:
-      - success
-      type: object
-      properties:
-        data:
-          required:
-          - activityTypes
-          - applicationStatuses
-          - buildingUses
-          - commercialThemes
-          - facilities
-          - negotiationStatuses
-          - offerSides
-          - photoPhases
-          - postCategories
-          - proofTypes
-          - regions
-          - reportActions
-          - reportReasons
-          - reportStatuses
-          - reportTargetTypes
-          - reviewDecisions
-          - signupRoles
-          - spaceSorts
-          - spaceStatuses
-          - usePurposes
-          type: object
-          properties:
-            proofTypes:
-              type: array
-              description: 권한 증빙 종류
-              items:
-                required:
-                - code
-                - label
-                type: object
-                properties:
-                  code:
-                    type: string
-                    description: 코드
-                  label:
-                    type: string
-                    description: 화면 이름
-            postCategories:
-              type: array
-              description: 커뮤니티 분류
-              items:
-                required:
-                - code
-                - label
-                type: object
-                properties:
-                  code:
-                    type: string
-                    description: 코드
-                  label:
-                    type: string
-                    description: 화면 이름
-            regions:
-              type: array
-              description: 서비스 지역
-              items:
-                required:
-                - code
-                - label
-                type: object
-                properties:
-                  code:
-                    type: string
-                    description: 코드
-                  label:
-                    type: string
-                    description: 화면 이름
-            negotiationStatuses:
-              type: array
-              description: 가격 협의 상태
-              items:
-                required:
-                - code
-                - label
-                type: object
-                properties:
-                  code:
-                    type: string
-                    description: 코드
-                  label:
-                    type: string
-                    description: 화면 이름
-            reportReasons:
-              type: array
-              description: 신고 사유
-              items:
-                required:
-                - code
-                - label
-                type: object
-                properties:
-                  code:
-                    type: string
-                    description: 코드
-                  label:
-                    type: string
-                    description: 화면 이름
-            spaceSorts:
-              type: array
-              description: 공간 검색 정렬
-              items:
-                required:
-                - code
-                - label
-                type: object
-                properties:
-                  code:
-                    type: string
-                    description: 코드
-                  label:
-                    type: string
-                    description: 화면 이름
-            commercialThemes:
-              type: array
-              description: 상권 테마
-              items:
-                required:
-                - code
-                - label
-                type: object
-                properties:
-                  code:
-                    type: string
-                    description: 코드
-                  label:
-                    type: string
-                    description: 화면 이름
-            reviewDecisions:
-              type: array
-              description: 관리자 검수 결과
-              items:
-                required:
-                - code
-                - label
-                type: object
-                properties:
-                  code:
-                    type: string
-                    description: 코드
-                  label:
-                    type: string
-                    description: 화면 이름
-            activityTypes:
-              type: array
-              description: 허용 활동 · 신청 활동 종류
-              items:
-                required:
-                - code
-                - label
-                type: object
-                properties:
-                  code:
-                    type: string
-                    description: 코드
-                  label:
-                    type: string
-                    description: 화면 이름
-            spaceStatuses:
-              type: array
-              description: 공간 공개 상태
-              items:
-                required:
-                - code
-                - label
-                type: object
-                properties:
-                  code:
-                    type: string
-                    description: 코드
-                  label:
-                    type: string
-                    description: 화면 이름
-            signupRoles:
-              type: array
-              description: "가입할 수 있는 역할 (USER, PROVIDER)"
-              items:
-                required:
-                - code
-                - label
-                type: object
-                properties:
-                  code:
-                    type: string
-                    description: 코드
-                  label:
-                    type: string
-                    description: 화면 이름
-            buildingUses:
-              type: array
-              description: 건축물 용도
-              items:
-                required:
-                - code
-                - label
-                type: object
-                properties:
-                  code:
-                    type: string
-                    description: 코드
-                  label:
-                    type: string
-                    description: 화면 이름
-            offerSides:
-              type: array
-              description: 가격 제안한 쪽
-              items:
-                required:
-                - code
-                - label
-                type: object
-                properties:
-                  code:
-                    type: string
-                    description: 코드
-                  label:
-                    type: string
-                    description: 화면 이름
-            reportStatuses:
-              type: array
-              description: 신고 처리 상태
-              items:
-                required:
-                - code
-                - label
-                type: object
-                properties:
-                  code:
-                    type: string
-                    description: 코드
-                  label:
-                    type: string
-                    description: 화면 이름
-            applicationStatuses:
-              type: array
-              description: 신청 상태
-              items:
-                required:
-                - code
-                - label
-                type: object
-                properties:
-                  code:
-                    type: string
-                    description: 코드
-                  label:
-                    type: string
-                    description: 화면 이름
-            reportTargetTypes:
-              type: array
-              description: 신고 대상 종류
-              items:
-                required:
-                - code
-                - label
-                type: object
-                properties:
-                  code:
-                    type: string
-                    description: 코드
-                  label:
-                    type: string
-                    description: 화면 이름
-            reportActions:
-              type: array
-              description: 신고 처리 방법
-              items:
-                required:
-                - code
-                - label
-                type: object
-                properties:
-                  code:
-                    type: string
-                    description: 코드
-                  label:
-                    type: string
-                    description: 화면 이름
-            facilities:
-              type: array
-              description: 보유 시설
-              items:
-                required:
-                - code
-                - label
-                type: object
-                properties:
-                  code:
-                    type: string
-                    description: 코드
-                  label:
-                    type: string
-                    description: 화면 이름
-            photoPhases:
-              type: array
-              description: 활동 사진 시점
-              items:
-                required:
-                - code
-                - label
-                type: object
-                properties:
-                  code:
-                    type: string
-                    description: 코드
-                  label:
-                    type: string
-                    description: 화면 이름
-            usePurposes:
-              type: array
-              description: 이용 목적
-              items:
-                required:
-                - code
-                - label
-                type: object
-                properties:
-                  code:
-                    type: string
-                    description: 코드
-                  label:
-                    type: string
-                    description: 화면 이름
-        success:
-          type: boolean
-          description: 요청 성공 여부 (true)
   securitySchemes:
     bearerAuthJWT:
       type: http

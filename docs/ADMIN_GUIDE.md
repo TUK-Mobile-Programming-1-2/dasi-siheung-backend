@@ -83,7 +83,9 @@ CI 는 서버를 띄운 뒤 같은 방식(SQL)으로 테스트용 관리자를 �
 | 공간 검수 | `GET /admin/spaces`, `GET /admin/spaces/{id}`, `POST /admin/spaces/{id}/reviews`, `PUT /admin/spaces/{id}/theme` | `admin-review.http`, `space.http` |
 | 신고 처리 | `GET /admin/reports`, `POST /admin/reports/{id}/resolve` (기각 · 숨김 · 정지), `POST /admin/members/{id}/suspend · unsuspend` | `report.http` |
 | 개인정보 · 통계 | `GET /admin/privacy/purge-preview`, `POST /admin/privacy/purge`, `GET /admin/statistics/monthly` | `admin-privacy.http` |
+| 자주 묻는 질문 | `GET /faqs` (목록, 공개), `POST /admin/faqs`, `PUT /admin/faqs/{id}`, `DELETE /admin/faqs/{id}`, `PUT /admin/faqs/order` | `faq.http` |
 
 - 이용 정지된 회원은 로그인 · 토큰 재발급이 막힙니다. 이미 받은 액세스 토큰은 최대 30분 동안 유효합니다.
 - 숨김 처리한 공간은 이용자에게 보이지 않고 제공자도 수정할 수 없습니다. 되돌릴 때는 DB 에서 상태를 바꾸고 다시 검수합니다.
+- 자주 묻는 질문은 처음 9개가 들어 있습니다(V22). 순서를 바꿀 때는 목록의 **모든 ID** 를 원하는 순서대로 보냅니다. 그사이 다른 관리자가 추가 · 삭제했으면 `INVALID_FAQ_ORDER` 이니 목록을 다시 불러오세요.
 

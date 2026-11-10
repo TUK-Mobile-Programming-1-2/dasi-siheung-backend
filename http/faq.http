@@ -1,0 +1,216 @@
+# 자주 묻는 질문 — 공개 조회 + 관리자 관리
+# 관리자 계정은 http-client.private.env.json 의 adminEmail / adminPassword 를 쓴다. (docs/ADMIN_GUIDE.md)
+# 순서를 바꿨다가 원래대로 되돌리고, 만든 질문은 지운다. (실행 전후 목록이 같다)
+
+### 자주 묻는 질문 목록 (토큰 없음)
+# 기대값: 200 OK, data = [{ "id": 1, "category": "ACCOUNT", "question": "...", "answer": "..." }, ...] (관리자가 정한 순서)
+GET {{baseUrl}}/api/v1/faqs
+
+> {%
+    client.test("200 OK + 목록", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(Array.isArray(response.body.data), "data 는 배열");
+        response.body.data.forEach(faq => {
+            client.assert(faq.id && faq.category && faq.question && faq.answer, `항목이 비었습니다: ${JSON.stringify(faq)}`);
+        });
+    });
+    client.global.set("faqOriginalIds", JSON.stringify(response.body.data.map(faq => faq.id)));
+%}
+
+### 분류로 거르기 (SPACE)
+# 기대값: 200 OK, 모두 category = SPACE
+GET {{baseUrl}}/api/v1/faqs?category=SPACE
+
+> {%
+    client.test("200 OK + SPACE 만", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.every(faq => faq.category === "SPACE"), JSON.stringify(response.body.data));
+    });
+%}
+
+### 없는 분류 → 400
+# 기대값: 400 INVALID_INPUT
+GET {{baseUrl}}/api/v1/faqs?category=PAYMENT
+
+> {%
+    client.test("400 INVALID_INPUT", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "INVALID_INPUT", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 토큰 없이 추가 → 401
+# 기대값: 401 UNAUTHORIZED
+POST {{baseUrl}}/api/v1/admin/faqs
+Content-Type: application/json
+
+{
+  "category": "ETC",
+  "question": "토큰 없는 요청",
+  "answer": "만들어지면 안 됩니다."
+}
+
+> {%
+    client.test("401 UNAUTHORIZED", () => {
+        client.assert(response.status === 401, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "UNAUTHORIZED", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 준비: 관리자 로그인
+# 기대값: 200 OK, member.role = ADMIN
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+> {%
+    client.test("200 OK + ADMIN", () => {
+        client.assert(response.status === 200, `실제 ${response.status} — http-client.private.env.json 의 관리자 계정 확인`);
+        client.assert(response.body.data.member.role === "ADMIN", `실제 ${response.body.data.member.role}`);
+    });
+    client.global.set("faqAdminToken", response.body.data.accessToken);
+%}
+
+### 관리자: 추가 → 맨 뒤
+# 기대값: 201 Created, data = { id, category: "ETC", question, answer }
+POST {{baseUrl}}/api/v1/admin/faqs
+Authorization: Bearer {{faqAdminToken}}
+Content-Type: application/json
+
+{
+  "category": "ETC",
+  "question": "  .http 시나리오 질문  ",
+  "answer": "시나리오가 끝나면 지워집니다."
+}
+
+> {%
+    client.test("201 Created + 앞뒤 공백 제거", () => {
+        client.assert(response.status === 201, `실제 ${response.status}`);
+        client.assert(response.body.data.category === "ETC", `실제 ${response.body.data.category}`);
+        client.assert(response.body.data.question === ".http 시나리오 질문", `실제 "${response.body.data.question}"`);
+    });
+    const created = response.body.data.id;
+    const original = JSON.parse(client.global.get("faqOriginalIds"));
+    client.global.set("faqId", String(created));
+    client.global.set("faqMovedIds", JSON.stringify([created, ...original]));
+    client.global.set("faqRestoreIds", JSON.stringify([...original, created]));
+%}
+
+### 목록 맨 뒤에 보인다
+# 기대값: 200 OK, 마지막 항목 id = 방금 만든 질문
+GET {{baseUrl}}/api/v1/faqs
+
+> {%
+    client.test("맨 뒤에 붙음", () => {
+        const data = response.body.data;
+        client.assert(String(data[data.length - 1].id) === client.global.get("faqId"), `실제 마지막 ${data[data.length - 1].id}`);
+    });
+%}
+
+### 관리자: 수정
+# 기대값: 200 OK, category = COMMUNITY, 질문 · 답변 변경
+PUT {{baseUrl}}/api/v1/admin/faqs/{{faqId}}
+Authorization: Bearer {{faqAdminToken}}
+Content-Type: application/json
+
+{
+  "category": "COMMUNITY",
+  "question": ".http 시나리오 질문 (수정)",
+  "answer": "줄바꿈도\n그대로 저장됩니다."
+}
+
+> {%
+    client.test("200 OK + 수정됨", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.category === "COMMUNITY", `실제 ${response.body.data.category}`);
+        client.assert(response.body.data.answer === "줄바꿈도\n그대로 저장됩니다.", `실제 ${response.body.data.answer}`);
+    });
+%}
+
+### 관리자: 순서 변경 — 새 질문을 맨 위로
+# 기대값: 200 OK, data[0].id = 새 질문
+PUT {{baseUrl}}/api/v1/admin/faqs/order
+Authorization: Bearer {{faqAdminToken}}
+Content-Type: application/json
+
+{
+  "faqIds": {{faqMovedIds}}
+}
+
+> {%
+    client.test("200 OK + 맨 위", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(String(response.body.data[0].id) === client.global.get("faqId"), `실제 ${response.body.data[0].id}`);
+    });
+%}
+
+### 관리자: 순서 변경 — 일부 ID 만 보냄 → 400
+# 기대값: 400 INVALID_FAQ_ORDER
+PUT {{baseUrl}}/api/v1/admin/faqs/order
+Authorization: Bearer {{faqAdminToken}}
+Content-Type: application/json
+
+{
+  "faqIds": [{{faqId}}]
+}
+
+> {%
+    client.test("400 INVALID_FAQ_ORDER", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "INVALID_FAQ_ORDER", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 관리자: 순서 되돌리기 (원래 순서 + 새 질문 맨 뒤)
+# 기대값: 200 OK, 마지막 항목 = 새 질문
+PUT {{baseUrl}}/api/v1/admin/faqs/order
+Authorization: Bearer {{faqAdminToken}}
+Content-Type: application/json
+
+{
+  "faqIds": {{faqRestoreIds}}
+}
+
+> {%
+    client.test("200 OK + 원래 순서", () => {
+        const data = response.body.data;
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(String(data[data.length - 1].id) === client.global.get("faqId"), `실제 마지막 ${data[data.length - 1].id}`);
+    });
+%}
+
+### 관리자: 삭제
+# 기대값: 200 OK
+DELETE {{baseUrl}}/api/v1/admin/faqs/{{faqId}}
+Authorization: Bearer {{faqAdminToken}}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+%}
+
+### 관리자: 이미 지운 질문 삭제 → 404
+# 기대값: 404 FAQ_NOT_FOUND
+DELETE {{baseUrl}}/api/v1/admin/faqs/{{faqId}}
+Authorization: Bearer {{faqAdminToken}}
+
+> {%
+    client.test("404 FAQ_NOT_FOUND", () => {
+        client.assert(response.status === 404, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "FAQ_NOT_FOUND", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 목록이 시나리오 전과 같다
+# 기대값: 200 OK, id 순서가 처음 조회와 같음
+GET {{baseUrl}}/api/v1/faqs
+
+> {%
+    client.test("원래 목록 그대로", () => {
+        const ids = JSON.stringify(response.body.data.map(faq => faq.id));
+        client.assert(ids === client.global.get("faqOriginalIds"), `실제 ${ids}`);
+    });
+%}
