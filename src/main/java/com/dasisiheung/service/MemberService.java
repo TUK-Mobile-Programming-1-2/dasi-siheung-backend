@@ -9,6 +9,7 @@ import com.dasisiheung.exception.ErrorCode;
 import com.dasisiheung.repository.ApplicationRepository;
 import com.dasisiheung.repository.MemberRepository;
 import com.dasisiheung.repository.NotificationSettingRepository;
+import com.dasisiheung.repository.PushTokenRepository;
 import com.dasisiheung.repository.RefreshTokenRepository;
 import java.time.Clock;
 import java.time.LocalDate;
@@ -31,6 +32,7 @@ public class MemberService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final ApplicationRepository applicationRepository;
     private final NotificationSettingRepository notificationSettingRepository;
+    private final PushTokenRepository pushTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final FileUploadService fileUploadService;
     private final ProfileImageResolver profileImageResolver;
@@ -85,7 +87,7 @@ public class MemberService {
 
     /**
      * 진행 중인 신청 · 예약이 있으면 막는다. (상대방이 연락할 수 없는 예약이 남지 않게)
-     * 알림 설정(광고성 정보 수신 동의 기록 포함)도 함께 지운다.
+     * 알림 설정(광고성 정보 수신 동의 기록 포함) · 푸시 기기 토큰도 함께 지운다.
      *
      * @throws BusinessException 비밀번호가 틀리면 PASSWORD_MISMATCH,
      *                           이용자 · 공간 제공자로 진행 중인 신청 · 예약이 있으면 WITHDRAWAL_BLOCKED_BY_APPLICATION
@@ -101,6 +103,7 @@ public class MemberService {
         member.withdraw(LocalDateTime.now(clock));
         refreshTokenRepository.deleteAllByMemberId(memberId);
         notificationSettingRepository.deleteById(memberId);
+        pushTokenRepository.deleteAllByMemberId(memberId);
     }
 
     private MyProfileResponse toProfile(Member member) {
