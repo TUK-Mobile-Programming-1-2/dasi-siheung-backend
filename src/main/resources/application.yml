@@ -75,5 +75,8 @@ app:
     application-retention-days: ${PRIVACY_APPLICATION_RETENTION_DAYS:365}
     conversation-retention-days: ${PRIVACY_CONVERSATION_RETENTION_DAYS:365}
     activity-photo-retention-days: ${PRIVACY_ACTIVITY_PHOTO_RETENTION_DAYS:90}
+  push:
+    # Firebase 서비스 계정 키(JSON)를 base64 한 줄로. 비워 두면 푸시를 보내지 않고 로그만 남긴다. (README '배포 준비')
+    firebase-credentials: ${FIREBASE_CREDENTIALS:}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
