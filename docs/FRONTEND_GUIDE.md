@@ -477,6 +477,46 @@ HIDDEN(숨김): 신고 처리로 관리자가 내린 공간 — 수정 불가
 | `dndHoursDistinct` | 방해금지를 켰는데 시작 = 끝 (꺼져 있으면 같아도 저장됨) — 시간 선택 UI 에서 막아 주세요 |
 | 그 외 항목 이름 | 항목이 빠졌거나 `null` |
 
+### 3-3-9. 푸시 알림 (FCM)
+
+새 1:1 메시지가 오면 서버가 **받는 사람의 모든 기기**에 FCM 푸시를 보냅니다. 폴링([3-3-7](#3-3-7-11-소통-폴링))은 그대로 두고, 푸시는 앱이 꺼져 있을 때 알려 주는 용도입니다.
+
+**토큰 등록 · 해제**
+
+| 언제 | 호출 |
+| --- | --- |
+| 앱 시작 · 로그인 직후 · `onNewToken` | `PUT /api/v1/members/me/push-tokens` `{"token": "..."}` |
+| 로그아웃 (로그아웃 API **전에**) | `DELETE /api/v1/members/me/push-tokens?token=...` |
+
+```kotlin
+// 로그인 후 · 앱 시작 시
+val token = FirebaseMessaging.getInstance().token.await()
+api.registerPushToken(PushTokenRequest(token))
+
+// FirebaseMessagingService
+override fun onNewToken(token: String) { /* 로그인 상태면 registerPushToken(token) */ }
+```
+
+- 같은 토큰을 여러 번 보내도 됩니다. 같은 기기에서 다른 계정으로 로그인하면 토큰이 새 계정으로 옮겨집니다. (한 기기 = 마지막 로그인 계정)
+- 60일 넘게 다시 등록되지 않은 토큰, 앱 삭제 등으로 FCM 이 거절한 토큰은 서버가 지웁니다. 탈퇴하면 모두 지웁니다.
+
+**받는 알림**
+
+```json
+{
+  "notification": { "title": "김시흥", "body": "11월 첫 주말 가능할까요?" },
+  "data": { "type": "CHAT_MESSAGE", "conversationId": "5", "messageId": "40" },
+  "android": { "priority": "HIGH", "notification": { "channel_id": "chat", "tag": "conversation-5" } }
+}
+```
+
+- 제목은 보낸 사람 이름, 본문은 메시지 앞 100자입니다.
+- **알림 채널 `chat`** 을 앱에서 만들어 주세요. (없으면 FCM 기본 채널로 표시됩니다)
+- 같은 대화방 알림은 `tag` 로 하나만 보이고 새 메시지로 바뀝니다.
+- 알림을 누르면 `data.type == "CHAT_MESSAGE"` → `conversationId` 대화방으로 이동하세요. `data` 값은 모두 **문자열**입니다.
+- 앱이 화면에 떠 있을 때(포그라운드)는 시스템이 알림을 띄우지 않고 `onMessageReceived` 로 옵니다. 그 대화방을 보고 있으면 무시하고, 아니면 직접 알림을 띄우면 됩니다.
+- **알림 설정([3-3-8](#3-3-8-알림-설정))을 서버가 지킵니다.** 푸시 전체 · 대화 알림을 껐거나 방해금지 시간이면 보내지 않습니다. 방해금지 중의 알림은 나중에 다시 보내지 않습니다.
+
 ### 3-4. 인증 (JWT)
 
 | 토큰 | 유효 시간 | 쓰는 곳 |
@@ -862,6 +902,13 @@ try {
 | GET | `/api/v1/members/me/notification-settings` | 로그인 | 내 알림 설정 (저장한 적 없으면 기본값, `updatedAt` = null) |
 | PUT | `/api/v1/members/me/notification-settings` | 로그인 | 전체 교체 후 저장된 값 반환 ([3-3-8](#3-3-8-알림-설정)) |
 
+### 푸시 알림 (`http/push-token.http`)
+
+| 메서드 | 경로 | 인증 | 설명 |
+| --- | --- | --- | --- |
+| PUT | `/api/v1/members/me/push-tokens` | 로그인 | 기기 FCM 토큰 등록 (앱 시작 · 로그인 · `onNewToken`, 여러 번 보내도 됨) |
+| DELETE | `/api/v1/members/me/push-tokens?token=` | 로그인 | 기기 토큰 해제 (로그아웃 전, 없어도 200) ([3-3-9](#3-3-9-푸시-알림-fcm)) |
+
 ### 선택지 (`http/option.http`)
 
 | 메서드 | 경로 | 인증 | 설명 |
@@ -1005,7 +1052,7 @@ try {
 | POST | `/api/v1/applications/{applicationId}/conversation` | 신청자 · 공간 제공자 | 신청에서 대화 열기 (멱등, '채팅' 버튼) |
 | GET | `/api/v1/conversations` | 로그인 | 내 대화 목록 (안 읽은 수 포함) |
 | GET | `/api/v1/conversations/{conversationId}/messages` | 참여자 | 메시지 조회 (after · before 폴링) |
-| POST | `/api/v1/conversations/{conversationId}/messages` | 참여자 | 메시지 보내기 |
+| POST | `/api/v1/conversations/{conversationId}/messages` | 참여자 | 메시지 보내기 (상대에게 푸시, [3-3-9](#3-3-9-푸시-알림-fcm)) |
 | POST | `/api/v1/conversations/{conversationId}/read` | 참여자 | 읽음 처리 |
 | GET | `/api/v1/conversations/unread-count` | 로그인 | 안 읽은 메시지 수 (배지) |
 

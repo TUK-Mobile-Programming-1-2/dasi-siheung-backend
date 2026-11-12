@@ -1,0 +1,98 @@
+# 푸시 실제 발송 확인 (수동) — CI 는 http/*.http 만 실행하므로 이 폴더는 돌지 않는다.
+# 준비
+#   1) 서버: set -a; source .env; set +a; ./gradlew bootRun --args='--spring.profiles.active=local,demo'
+#      시작 로그에 "FCM 푸시 사용: 프로젝트 dasi-siheung-326b1" 이 보여야 한다.
+#   2) 아래 deviceToken 에 휴대폰 앱의 FCM 토큰을 붙여 넣는다. (Logcat 에서 복사)
+#   3) 휴대폰 앱은 홈 화면으로 내려 둔다. (앱이 떠 있으면 시스템 알림이 뜨지 않고 onMessageReceived 로만 온다)
+# 흐름: provider3(이거북) 기기 등록 → user4(오체험)가 기존 대화에 메시지 → provider3 휴대폰에 알림
+
+@deviceToken = 여기에_휴대폰_FCM_토큰_붙여넣기
+
+### 1. 받는 사람 로그인 (provider3 이거북)
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "provider3@demo.dasisiheung.com",
+  "password": "demo1234!"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status} — demo 프로필로 서버를 켰는지 확인`));
+    client.global.set("receiverToken", response.body.data.accessToken);
+%}
+
+### 2. 받는 사람 기기 토큰 등록
+PUT {{baseUrl}}/api/v1/members/me/push-tokens
+Authorization: Bearer {{receiverToken}}
+Content-Type: application/json
+
+{
+  "token": "{{deviceToken}}"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+%}
+
+### 3. 받는 사람 방해금지 끄기 (기본값 22시~8시라 밤에 시험하면 알림이 안 간다)
+PUT {{baseUrl}}/api/v1/members/me/notification-settings
+Authorization: Bearer {{receiverToken}}
+Content-Type: application/json
+
+{
+  "push": true,
+  "chat": true,
+  "activity": true,
+  "favoriteSpace": false,
+  "marketing": false,
+  "dndEnabled": false,
+  "dndStartHour": 22,
+  "dndEndHour": 8
+}
+
+> {%
+    client.test("200 OK + 방해금지 꺼짐", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.dndEnabled === false, "방해금지가 꺼지지 않았습니다");
+    });
+%}
+
+### 4. 보내는 사람 로그인 (user4 오체험)
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "user4@demo.dasisiheung.com",
+  "password": "demo1234!"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+    client.global.set("senderToken", response.body.data.accessToken);
+%}
+
+### 5. 보내는 사람의 대화 목록 → 이거북과의 대화
+GET {{baseUrl}}/api/v1/conversations
+Authorization: Bearer {{senderToken}}
+
+> {%
+    client.test("대화가 있다", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.content.length > 0, "user4 의 대화가 없습니다 — 시연 데이터 확인");
+    });
+    client.global.set("pushConversationId", String(response.body.data.content[0].id));
+%}
+
+### 6. 메시지 보내기 → 휴대폰에 "오체험 / 푸시 테스트 …" 알림이 와야 한다
+POST {{baseUrl}}/api/v1/conversations/{{pushConversationId}}/messages
+Authorization: Bearer {{senderToken}}
+Content-Type: application/json
+
+{
+  "content": "푸시 테스트 {{$timestamp}} — 이 알림이 보이면 성공입니다."
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+%}

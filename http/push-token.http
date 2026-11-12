@@ -1,0 +1,145 @@
+# 푸시 알림 기기 토큰 — 등록 · 해제
+# 실제 FCM 발송은 FIREBASE_CREDENTIALS 가 있는 서버에서만 일어난다. (로컬 · CI 는 서버 로그에 '푸시(로그만)')
+
+### 준비: 새 이용자 가입
+# 기대값: 201 Created
+POST {{baseUrl}}/api/v1/auth/signup
+Content-Type: application/json
+
+{
+  "email": "http-push-{{$timestamp}}-{{$randomInt}}@test.dasisiheung.com",
+  "password": "password123",
+  "name": "김시흥",
+  "phone": "010-1234-5678",
+  "role": "USER"
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+    client.global.set("pushEmail", response.body.data.email);
+    client.global.set("pushDeviceToken", "http-test-token-" + Date.now() + "-" + Math.floor(Math.random() * 100000));
+%}
+
+### 준비: 로그인
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{pushEmail}}",
+  "password": "password123"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+    client.global.set("pushAccessToken", response.body.data.accessToken);
+%}
+
+### 기기 토큰 등록
+# 인증: 로그인
+# 기대값: 200 OK { "success": true }
+PUT {{baseUrl}}/api/v1/members/me/push-tokens
+Authorization: Bearer {{pushAccessToken}}
+Content-Type: application/json
+
+{
+  "token": "{{pushDeviceToken}}"
+}
+
+> {%
+    client.test("200 OK", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.success === true, JSON.stringify(response.body));
+    });
+%}
+
+### 같은 토큰 다시 등록 (앱을 다시 켠 경우) → 200
+# 기대값: 200 OK (중복으로 쌓이지 않음)
+PUT {{baseUrl}}/api/v1/members/me/push-tokens
+Authorization: Bearer {{pushAccessToken}}
+Content-Type: application/json
+
+{
+  "token": "{{pushDeviceToken}}"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+%}
+
+### 빈 토큰 → 400
+# 기대값: 400 INVALID_INPUT, fieldErrors[0].field = token
+PUT {{baseUrl}}/api/v1/members/me/push-tokens
+Authorization: Bearer {{pushAccessToken}}
+Content-Type: application/json
+
+{
+  "token": " "
+}
+
+> {%
+    client.test("400 INVALID_INPUT", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "INVALID_INPUT", `실제 ${response.body.error.code}`);
+        client.assert(response.body.error.fieldErrors[0].field === "token", `실제 ${response.body.error.fieldErrors[0].field}`);
+    });
+%}
+
+### 토큰 없이 등록 → 401
+# 기대값: 401 UNAUTHORIZED
+PUT {{baseUrl}}/api/v1/members/me/push-tokens
+Content-Type: application/json
+
+{
+  "token": "{{pushDeviceToken}}"
+}
+
+> {%
+    client.test("401 UNAUTHORIZED", () => {
+        client.assert(response.status === 401, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "UNAUTHORIZED", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 기기 토큰 해제 (로그아웃 전)
+# 기대값: 200 OK
+DELETE {{baseUrl}}/api/v1/members/me/push-tokens?token={{pushDeviceToken}}
+Authorization: Bearer {{pushAccessToken}}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+%}
+
+### 이미 해제한 토큰 다시 해제 → 200
+# 기대값: 200 OK (없어도 성공)
+DELETE {{baseUrl}}/api/v1/members/me/push-tokens?token={{pushDeviceToken}}
+Authorization: Bearer {{pushAccessToken}}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+%}
+
+### token 없이 해제 → 400
+# 기대값: 400 INVALID_INPUT
+DELETE {{baseUrl}}/api/v1/members/me/push-tokens
+Authorization: Bearer {{pushAccessToken}}
+
+> {%
+    client.test("400 INVALID_INPUT", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "INVALID_INPUT", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 정리: 회원 탈퇴
+# 기대값: 200 OK
+POST {{baseUrl}}/api/v1/members/me/withdraw
+Authorization: Bearer {{pushAccessToken}}
+Content-Type: application/json
+
+{
+  "password": "password123"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+%}

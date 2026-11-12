@@ -283,6 +283,7 @@ CI 는 러너에 기본 설치된 PostgreSQL 에 PostGIS 를 apt 로 추가해 �
 | `JWT_SECRET` | JWT 서명 키. 32바이트 이상 임의 문자열 (`openssl rand -base64 48`) |
 | `SUPABASE_URL` | 운영 Supabase 프로젝트 주소 `https://<project-ref>.supabase.co` (파일 저장소) |
 | `SUPABASE_SERVICE_KEY` | 운영 Supabase **secret 키**(`sb_secret_...`) 또는 service_role 키. 서버에만 둔다 |
+| `FIREBASE_CREDENTIALS` | Firebase 서비스 계정 키(JSON)를 base64 한 줄로 (`base64 -i 키.json \| tr -d '\n'`). 없으면 푸시를 보내지 않고 로그만 남김 (선택) |
 | `BACKUP_PASSPHRASE` | DB 백업 암호화 암호 (`openssl rand -base64 32`). 잃으면 백업을 열 수 없으니 따로 보관 |
 
 배포 대상(`wonjongwoo01/dasi-siheung-backend`, 스테이지 `main`)과 실행 옵션은 `cd.yml` 에 적혀 있습니다.

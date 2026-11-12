@@ -93,6 +93,9 @@ jobs:
                   value: "${{ secrets.SUPABASE_URL }}"
                 - name: SUPABASE_SERVICE_KEY
                   value: "${{ secrets.SUPABASE_SERVICE_KEY }}"
+                # 선택: 비어 있으면 푸시를 보내지 않고 로그만 남긴다 (배포는 막지 않음)
+                - name: FIREBASE_CREDENTIALS
+                  value: "${{ secrets.FIREBASE_CREDENTIALS }}"
               buildenv: []
             context:
               git:
