@@ -20,3 +20,6 @@ app:
     provider: local
     local:
       root: build/test-storage
+  push:
+    # .env 를 불러온 채로 테스트해도 실제 FCM 으로 보내지 않는다 (로그만)
+    firebase-credentials: ""
