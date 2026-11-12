@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -36,6 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>대화방 화면: 5초마다 {@code after=마지막 메시지 ID} 로 새 메시지 조회</li>
  *   <li>탭 배지: 30초마다 안 읽은 수 조회</li>
  * </ul>
+ * 메시지를 보내면 커밋된 뒤 상대에게 푸시를 보낸다. ({@link ChatMessageSentEvent} → {@link PushNotificationService})
  */
 @Service
 @RequiredArgsConstructor
@@ -52,6 +54,7 @@ public class ConversationService {
     private final ApplicationRepository applicationRepository;
     private final SpaceResponseMapper spaceResponseMapper;
     private final ProfileImageResolver profileImageResolver;
+    private final ApplicationEventPublisher eventPublisher;
     private final Clock clock;
 
     /**
@@ -126,6 +129,8 @@ public class ConversationService {
         Message message = messageRepository.saveAndFlush(
                 new Message(conversation, sender, content, LocalDateTime.now(clock)));
         conversation.onMessageSent(message);
+        eventPublisher.publishEvent(new ChatMessageSentEvent(conversationId, message.getId(), memberId,
+                sender.getName(), conversation.counterpartOf(memberId).getId(), content));
         return MessageResponse.of(message, memberId);
     }
 
