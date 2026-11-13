@@ -72,12 +72,17 @@ class GoogleAccessTokenProvider {
         return response;
     }
 
+    /**
+     * Google 토큰 서버는 aud 를 배열이 아닌 문자열 하나로만 받는다. (배열이면 "Failed audience check")
+     * JJWT 는 기본으로 배열을 만들므로 single() 을 쓴다. (JJWT 가 사용을 권하지 않아 deprecated 표시만 붙어 있다)
+     */
+    @SuppressWarnings("deprecation")
     private String assertion(Instant now) {
         return Jwts.builder()
                 .header().keyId(account.privateKeyId()).and()
                 .issuer(account.clientEmail())
                 .subject(account.clientEmail())
-                .audience().add(account.tokenUri()).and()
+                .audience().single(account.tokenUri())
                 .claim("scope", SCOPE)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plus(ASSERTION_LIFETIME)))
