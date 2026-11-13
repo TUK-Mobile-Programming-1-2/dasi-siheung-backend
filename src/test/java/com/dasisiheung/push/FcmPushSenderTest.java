@@ -177,6 +177,10 @@ class FcmPushSenderTest {
                 fields.put(keyValue[0], URLDecoder.decode(keyValue[1], StandardCharsets.UTF_8));
             }
             assertThat(fields.get("grant_type")).isEqualTo("urn:ietf:params:oauth:grant-type:jwt-bearer");
+            String payload = new String(java.util.Base64.getUrlDecoder().decode(fields.get("assertion").split("\\.")[1]),
+                    StandardCharsets.UTF_8);
+            assertThat(objectMapper.readTree(payload).get("aud").isTextual())
+                    .as("Google 은 aud 를 문자열 하나로만 받는다: %s", payload).isTrue();
             Claims claims = Jwts.parser().verifyWith(KEY_PAIR.getPublic())
                     .clock(() -> java.util.Date.from(clock.instant()))
                     .build().parseSignedClaims(fields.get("assertion")).getPayload();
