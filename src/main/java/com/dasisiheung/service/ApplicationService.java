@@ -21,6 +21,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -40,6 +41,7 @@ public class ApplicationService {
     private final MemberRepository memberRepository;
     private final PriceOfferRepository priceOfferRepository;
     private final ApplicationResponseMapper responseMapper;
+    private final ApplicationEventPublisher eventPublisher;
     private final Clock clock;
 
     /**
@@ -68,6 +70,9 @@ public class ApplicationService {
             priceOfferRepository.save(application.offer(applicant, request.offerAmount(), request.offerMessage(),
                     LocalDateTime.now(clock)));
         }
+        eventPublisher.publishEvent(new ApplicationSubmittedEvent(application.getId(), space.getId(), space.getTitle(),
+                space.getProvider().getId(), applicant.getName(), period.startDate(), period.endDate(),
+                request.hasOffer()));
         return responseMapper.detail(application);
     }
 

@@ -929,9 +929,9 @@ paths:
                           "GEOBUKSEOM" : 0
                         },
                         "membersByRole" : {
-                          "PROVIDER" : 5,
+                          "ADMIN" : 1,
                           "USER" : 10,
-                          "ADMIN" : 1
+                          "PROVIDER" : 5
                         },
                         "pendingApplicationCount" : 5,
                         "applicationsByStatus" : {
@@ -1487,11 +1487,11 @@ paths:
                           "field" : "name",
                           "reason" : "must not be blank"
                         }, {
-                          "field" : "email",
-                          "reason" : "must be a well-formed email address"
-                        }, {
                           "field" : "password",
                           "reason" : "비밀번호는 영문과 숫자를 포함해 8~64자여야 합니다."
+                        }, {
+                          "field" : "email",
+                          "reason" : "must be a well-formed email address"
                         } ]
                       }
                     }
@@ -2067,7 +2067,7 @@ paths:
         content:
           application/json;charset=UTF-8:
             schema:
-              $ref: "#/components/schemas/api-v1-provider-spaces-1769093125"
+              $ref: "#/components/schemas/api-v1-provider-spaces-spaceId-1769093125"
             examples:
               provider-space-register-out-of-area:
                 value: |-
@@ -2084,8 +2084,8 @@ paths:
                     "buildingUse" : "NEIGHBORHOOD_1",
                     "commercialTheme" : "FOOD_ALLEY",
                     "dailyPrice" : 50000,
-                    "facilities" : [ "WIFI", "ELECTRICITY" ],
-                    "activityTypes" : [ "POPUP_STORE", "EXHIBITION" ],
+                    "facilities" : [ "ELECTRICITY", "WIFI" ],
+                    "activityTypes" : [ "EXHIBITION", "POPUP_STORE" ],
                     "availableDates" : [ ],
                     "maxCapacity" : 10,
                     "equipment" : [ {
@@ -2112,9 +2112,9 @@ paths:
                     "buildingUse" : "NEIGHBORHOOD_1",
                     "commercialTheme" : "FOOD_ALLEY",
                     "dailyPrice" : 50000,
-                    "facilities" : [ "WIFI", "ELECTRICITY" ],
-                    "activityTypes" : [ "POPUP_STORE", "EXHIBITION" ],
-                    "availableDates" : [ "2026-10-21", "2026-10-22" ],
+                    "facilities" : [ "ELECTRICITY", "WIFI" ],
+                    "activityTypes" : [ "EXHIBITION", "POPUP_STORE" ],
+                    "availableDates" : [ "2026-10-22", "2026-10-21" ],
                     "maxCapacity" : 10,
                     "equipment" : [ {
                       "name" : "접이식 테이블",
@@ -4837,7 +4837,7 @@ paths:
         content:
           application/json;charset=UTF-8:
             schema:
-              $ref: "#/components/schemas/api-v1-provider-spaces-1769093125"
+              $ref: "#/components/schemas/api-v1-provider-spaces-spaceId-1769093125"
             examples:
               provider-space-update:
                 value: |-
@@ -4854,8 +4854,8 @@ paths:
                     "buildingUse" : "NEIGHBORHOOD_1",
                     "commercialTheme" : "FOOD_ALLEY",
                     "dailyPrice" : 50000,
-                    "facilities" : [ "WIFI", "ELECTRICITY" ],
-                    "activityTypes" : [ "POPUP_STORE", "EXHIBITION" ],
+                    "facilities" : [ "ELECTRICITY", "WIFI" ],
+                    "activityTypes" : [ "EXHIBITION", "POPUP_STORE" ],
                     "availableDates" : [ "2026-10-21" ],
                     "maxCapacity" : 10,
                     "equipment" : [ {
@@ -9068,6 +9068,30 @@ components:
         push:
           type: boolean
           description: 푸시 알림 전체. false 면 아래 분류와 관계없이 보내지 않음
+    api-v1-auth-signup-1218437977:
+      required:
+      - email
+      - name
+      - password
+      - phone
+      - role
+      type: object
+      properties:
+        password:
+          type: string
+          description: 비밀번호 (영문·숫자 포함 8~64자)
+        role:
+          type: string
+          description: "역할: USER(이용자) | PROVIDER(공간 제공자)"
+        phone:
+          type: string
+          description: 휴대폰 번호 (하이픈 선택)
+        name:
+          type: string
+          description: 이름 (최대 30자)
+        email:
+          type: string
+          description: "이메일 (로그인 아이디, 최대 254자)"
     api-v1-provider-spaces-spaceId-proofs833204462:
       required:
       - success
@@ -9108,30 +9132,6 @@ components:
         success:
           type: boolean
           description: 요청 성공 여부 (true)
-    api-v1-auth-signup-1218437977:
-      required:
-      - email
-      - name
-      - password
-      - phone
-      - role
-      type: object
-      properties:
-        password:
-          type: string
-          description: 비밀번호 (영문·숫자 포함 8~64자)
-        role:
-          type: string
-          description: "역할: USER(이용자) | PROVIDER(공간 제공자)"
-        phone:
-          type: string
-          description: 휴대폰 번호 (하이픈 선택)
-        name:
-          type: string
-          description: 이름 (최대 30자)
-        email:
-          type: string
-          description: "이메일 (로그인 아이디, 최대 254자)"
     api-v1-admin-faqs-order455512682:
       required:
       - data
@@ -10602,6 +10602,34 @@ components:
         success:
           type: boolean
           description: 요청 성공 여부 (true)
+    api-v1-auth-signup1500708097:
+      required:
+      - success
+      type: object
+      properties:
+        data:
+          required:
+          - email
+          - id
+          - name
+          - role
+          type: object
+          properties:
+            role:
+              type: string
+              description: "역할: USER | PROVIDER | ADMIN"
+            name:
+              type: string
+              description: 이름
+            id:
+              type: number
+              description: 회원 ID
+            email:
+              type: string
+              description: 이메일
+        success:
+          type: boolean
+          description: 요청 성공 여부 (true)
     api-v1-reports-1981119463:
       required:
       - success
@@ -10658,35 +10686,7 @@ components:
         success:
           type: boolean
           description: 요청 성공 여부 (true)
-    api-v1-auth-signup1500708097:
-      required:
-      - success
-      type: object
-      properties:
-        data:
-          required:
-          - email
-          - id
-          - name
-          - role
-          type: object
-          properties:
-            role:
-              type: string
-              description: "역할: USER | PROVIDER | ADMIN"
-            name:
-              type: string
-              description: 이름
-            id:
-              type: number
-              description: 회원 ID
-            email:
-              type: string
-              description: 이메일
-        success:
-          type: boolean
-          description: 요청 성공 여부 (true)
-    api-v1-provider-spaces-1769093125:
+    api-v1-provider-spaces-spaceId-1769093125:
       required:
       - activityTypes
       - address

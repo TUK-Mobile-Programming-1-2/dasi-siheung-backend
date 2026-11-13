@@ -21,6 +21,7 @@ import com.dasisiheung.repository.PushTokenRepository;
 import com.dasisiheung.support.FixedClockConfig;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -38,6 +39,10 @@ class PushNotificationServiceTest {
     private static final Clock EVENING = FixedClockConfig.fixedClock();
     /** 23:30 KST — 기본 방해금지 안 */
     private static final Clock NIGHT = Clock.fixed(Instant.parse("2026-10-20T14:30:00Z"), FixedClockConfig.fixedClock().getZone());
+    private static final long PROVIDER_ID = 3L;
+    private static final ApplicationSubmittedEvent APPLICATION = new ApplicationSubmittedEvent(31L, 8L,
+            "배곧 카페거리 2층 갤러리", PROVIDER_ID, "최팝업", LocalDate.of(2026, 11, 20), LocalDate.of(2026, 11, 22),
+            false);
     private static final ChatMessageSentEvent EVENT =
             new ChatMessageSentEvent(5L, 40L, 1L, "김시흥", RECIPIENT_ID, "  안녕하세요\n11월 첫 주말 가능할까요?  ");
 
@@ -119,6 +124,59 @@ class PushNotificationServiceTest {
         service(EVENING).onChatMessageSent(EVENT);
 
         then(pushTokenService).should().deleteInvalid(List.of("old-phone"));
+    }
+
+    @Test
+    @DisplayName("새 이용 신청은 공간 제공자의 모든 기기에 보낸다 (활동 알림 채널)")
+    void applicationSubmitted() {
+        given(notificationSettingRepository.findById(PROVIDER_ID)).willReturn(Optional.empty());
+        given(pushTokenRepository.findTokensByMemberId(PROVIDER_ID)).willReturn(List.of("provider-phone"));
+        given(pushSender.send(anyList(), any())).willReturn(new PushResult(1, List.of()));
+
+        service(EVENING).onApplicationSubmitted(APPLICATION);
+
+        ArgumentCaptor<PushMessage> message = ArgumentCaptor.forClass(PushMessage.class);
+        then(pushSender).should().send(eq(List.of("provider-phone")), message.capture());
+        assertThat(message.getValue().title()).isEqualTo("새 이용 신청");
+        assertThat(message.getValue().body()).isEqualTo("최팝업님이 '배곧 카페거리 2층 갤러리' 11/20~11/22 이용을 신청했어요.");
+        assertThat(message.getValue().data())
+                .containsEntry("type", "APPLICATION_SUBMITTED")
+                .containsEntry("applicationId", "31")
+                .containsEntry("spaceId", "8");
+        assertThat(message.getValue().channelId()).isEqualTo("activity");
+        assertThat(message.getValue().tag()).isEqualTo("application-31");
+    }
+
+    @Test
+    @DisplayName("하루짜리 신청 · 가격 제안이 있으면 본문에 함께 보여준다")
+    void applicationSubmittedOneDayWithOffer() {
+        PushMessage message = PushNotificationService.applicationSubmitted(new ApplicationSubmittedEvent(31L, 8L,
+                "배곧 카페거리 2층 갤러리", PROVIDER_ID, "최팝업", LocalDate.of(2026, 11, 20), LocalDate.of(2026, 11, 20),
+                true));
+
+        assertThat(message.body()).isEqualTo("최팝업님이 '배곧 카페거리 2층 갤러리' 11/20 이용을 신청했어요. (희망 가격 제안 있음)");
+    }
+
+    @Test
+    @DisplayName("활동 알림을 끈 공간 제공자에게는 신청 알림을 보내지 않는다 (대화 알림과 별개)")
+    void skipApplicationWhenActivityOff() {
+        NotificationPreferences activityOff = new NotificationPreferences(true, true, false, false, false,
+                DoNotDisturb.of(false, 22, 8));
+        given(notificationSettingRepository.findById(PROVIDER_ID)).willReturn(Optional.of(setting(activityOff)));
+
+        service(EVENING).onApplicationSubmitted(APPLICATION);
+
+        then(pushSender).should(never()).send(anyList(), any());
+    }
+
+    @Test
+    @DisplayName("방해금지 시간에는 신청 알림도 보내지 않는다")
+    void skipApplicationDuringDoNotDisturb() {
+        given(notificationSettingRepository.findById(PROVIDER_ID)).willReturn(Optional.empty());
+
+        service(NIGHT).onApplicationSubmitted(APPLICATION);
+
+        then(pushSender).should(never()).send(anyList(), any());
     }
 
     @Test

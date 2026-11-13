@@ -9,7 +9,9 @@ import com.dasisiheung.push.PushSender;
 import com.dasisiheung.repository.NotificationSettingRepository;
 import com.dasisiheung.repository.PushTokenRepository;
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +25,11 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * 저장이 커밋된 일에 대해 받는 사람에게 푸시를 보낸다. 응답을 늦추지 않도록 별도 스레드에서 실행한다.
  * <p>
  * 회원의 알림 설정(전체 스위치 · 분류 · 방해금지)을 지킨다. 방해금지 시간의 알림은 미루지 않고 버린다.
- * (앱은 폴링 · 안 읽은 수로 새 메시지를 그대로 볼 수 있다)
+ * (앱은 폴링 · 목록 조회로 새 메시지 · 신청을 그대로 볼 수 있다)
+ * <ul>
+ *   <li>채팅 메시지 → 대화 상대 (대화 알림)</li>
+ *   <li>새 이용 신청 → 공간 제공자 (활동 알림)</li>
+ * </ul>
  */
 @Slf4j
 @Service
@@ -31,7 +37,10 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class PushNotificationService {
 
     static final String CHAT_CHANNEL = "chat";
+    static final String ACTIVITY_CHANNEL = "activity";
     static final String TYPE_CHAT_MESSAGE = "CHAT_MESSAGE";
+    static final String TYPE_APPLICATION_SUBMITTED = "APPLICATION_SUBMITTED";
+    private static final DateTimeFormatter SHORT_DATE = DateTimeFormatter.ofPattern("M/d");
     static final int MAX_BODY_LENGTH = 100;
 
     private final NotificationSettingRepository notificationSettingRepository;
@@ -44,6 +53,13 @@ public class PushNotificationService {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onChatMessageSent(ChatMessageSentEvent event) {
         send(event.recipientId(), NotificationCategory.CHAT, chatMessage(event));
+    }
+
+    /** 공간 제공자에게 새 이용 신청을 알린다. (알림 설정의 활동 알림) */
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onApplicationSubmitted(ApplicationSubmittedEvent event) {
+        send(event.providerId(), NotificationCategory.ACTIVITY, applicationSubmitted(event));
     }
 
     private void send(Long recipientId, NotificationCategory category, PushMessage message) {
@@ -76,6 +92,22 @@ public class PushNotificationService {
                 "messageId", String.valueOf(event.messageId()));
         return new PushMessage(event.senderName(), preview(event.content()), data, CHAT_CHANNEL,
                 "conversation-" + event.conversationId());
+    }
+
+    /** 제목: 새 이용 신청 / 본문: 누가 · 어느 공간 · 언제 (+ 가격 제안) / 신청마다 알림 하나. */
+    static PushMessage applicationSubmitted(ApplicationSubmittedEvent event) {
+        String body = "%s님이 '%s' %s 이용을 신청했어요.%s".formatted(event.applicantName(), event.spaceTitle(),
+                period(event.startDate(), event.endDate()), event.withOffer() ? " (희망 가격 제안 있음)" : "");
+        Map<String, String> data = Map.of(
+                "type", TYPE_APPLICATION_SUBMITTED,
+                "applicationId", String.valueOf(event.applicationId()),
+                "spaceId", String.valueOf(event.spaceId()));
+        return new PushMessage("새 이용 신청", body, data, ACTIVITY_CHANNEL, "application-" + event.applicationId());
+    }
+
+    /** 11/20 또는 11/20~11/22 */
+    private static String period(LocalDate start, LocalDate end) {
+        return start.equals(end) ? SHORT_DATE.format(start) : SHORT_DATE.format(start) + "~" + SHORT_DATE.format(end);
     }
 
     private static String preview(String content) {
