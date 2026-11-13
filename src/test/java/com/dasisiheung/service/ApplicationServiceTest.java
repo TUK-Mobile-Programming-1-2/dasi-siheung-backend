@@ -30,6 +30,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.context.ApplicationEventPublisher;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -56,6 +58,9 @@ class ApplicationServiceTest {
     @Mock
     private ConversationRepository conversationRepository;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private ApplicationService applicationService;
     private Space space;
 
@@ -65,7 +70,7 @@ class ApplicationServiceTest {
                 priceOfferRepository, new ApplicationResponseMapper(
                         new SpaceResponseMapper(mock(FileUploadService.class)), priceOfferRepository,
                         conversationRepository),
-                FixedClockConfig.fixedClock());
+                eventPublisher, FixedClockConfig.fixedClock());
         space = ApplicationFixtures.publishedSpace(
                 SpaceFixtures.space(10L, SpaceFixtures.provider(PROVIDER_ID), Set.of(START, START.plusDays(1)), TODAY));
     }
@@ -82,6 +87,13 @@ class ApplicationServiceTest {
         assertThat(response.status()).isEqualTo(ApplicationStatus.PENDING);
         assertThat(response.totalPrice()).isEqualTo(50_000);
         assertThat(response.space().id()).isEqualTo(10L);
+        ApplicationSubmittedEvent event = publishedEvent();
+        assertThat(event.providerId()).isEqualTo(PROVIDER_ID);
+        assertThat(event.spaceId()).isEqualTo(10L);
+        assertThat(event.spaceTitle()).isEqualTo("정왕역 앞 1층 상가");
+        assertThat(event.applicantName()).isEqualTo("이이용");
+        assertThat(event.startDate()).isEqualTo(START);
+        assertThat(event.withOffer()).isFalse();
     }
 
     @Test
@@ -95,6 +107,7 @@ class ApplicationServiceTest {
         assertThatThrownBy(() -> applicationService.submit(USER_ID, ApplicationFixtures.request(10L, START, START)))
                 .extracting("errorCode").isEqualTo(ErrorCode.DUPLICATE_APPLICATION);
         then(applicationRepository).should(never()).save(any());
+        then(eventPublisher).should(never()).publishEvent(any(Object.class));
     }
 
     @Test
@@ -124,5 +137,12 @@ class ApplicationServiceTest {
         assertThat(response.pendingOfferAmount()).isEqualTo(90_000);
         assertThat(response.totalPrice()).isEqualTo(100_000);
         then(priceOfferRepository).should().save(any(PriceOffer.class));
+        assertThat(publishedEvent().withOffer()).isTrue();
+    }
+
+    private ApplicationSubmittedEvent publishedEvent() {
+        ArgumentCaptor<ApplicationSubmittedEvent> event = ArgumentCaptor.forClass(ApplicationSubmittedEvent.class);
+        then(eventPublisher).should().publishEvent(event.capture());
+        return event.getValue();
     }
 }
