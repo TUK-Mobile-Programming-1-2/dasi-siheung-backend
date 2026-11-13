@@ -8,12 +8,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.dasisiheung.entity.member.Role;
 import com.dasisiheung.repository.PushTokenRepository;
+import com.dasisiheung.service.ApplicationSubmittedEvent;
 import com.dasisiheung.service.ChatMessageSentEvent;
+import com.dasisiheung.support.ApplicationScenario;
 import com.dasisiheung.support.IntegrationTest;
 import com.dasisiheung.support.SpaceScenario;
 import com.dasisiheung.support.TestAccounts;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -45,6 +49,9 @@ class PushTokenIntegrationTest {
 
     @Autowired
     private SpaceScenario spaceScenario;
+
+    @Autowired
+    private ApplicationScenario applicationScenario;
 
     @Autowired
     private PushTokenRepository pushTokenRepository;
@@ -111,6 +118,25 @@ class PushTokenIntegrationTest {
             assertThat(event.senderId()).isEqualTo(user.id());
             assertThat(event.recipientId()).isEqualTo(provider.id());
             assertThat(event.content()).isEqualTo("이번 주말 가능할까요?");
+        });
+    }
+
+    @Test
+    @DisplayName("이용 신청을 내면 공간 제공자에게 보낼 푸시 이벤트가 생긴다 (발송은 커밋 뒤)")
+    void submitApplicationPublishesEvent() throws Exception {
+        TestAccounts.Account provider = testAccounts.create(Role.PROVIDER);
+        TestAccounts.Account user = testAccounts.create(Role.USER);
+        LocalDate day = LocalDate.now(ZoneId.of("Asia/Seoul")).plusDays(3);
+        long spaceId = spaceScenario.publishedSpace(provider, testAccounts.create(Role.ADMIN), Set.of(day));
+
+        long applicationId = applicationScenario.submit(user, spaceId, day, day);
+
+        assertThat(events.stream(ApplicationSubmittedEvent.class)).singleElement().satisfies(event -> {
+            assertThat(event.applicationId()).isEqualTo(applicationId);
+            assertThat(event.spaceId()).isEqualTo(spaceId);
+            assertThat(event.providerId()).isEqualTo(provider.id());
+            assertThat(event.startDate()).isEqualTo(day);
+            assertThat(event.endDate()).isEqualTo(day);
         });
     }
 
