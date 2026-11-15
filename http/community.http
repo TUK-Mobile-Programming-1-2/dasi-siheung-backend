@@ -189,6 +189,115 @@ GET {{baseUrl}}/api/v1/community/posts/{{communityPostId}}/comments
     client.test("200 OK + 1건", () => client.assert(response.body.data.totalElements === 1, `실제 ${response.body.data.totalElements}`));
 %}
 
+### 댓글 수정
+# 인증: 작성자만 (관리자도 남의 댓글은 고칠 수 없음)
+# 기대값: 200 OK, 바뀐 내용 + editedAt (값이 있으면 앱이 '(수정됨)' 표시)
+PATCH {{baseUrl}}/api/v1/community/comments/{{communityCommentId}}
+Authorization: Bearer {{communityToken}}
+Content-Type: application/json
+
+{
+  "content": "관심 있는 분은 댓글이나 쪽지 남겨 주세요!"
+}
+
+> {%
+    client.test("200 OK + editedAt", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.content === "관심 있는 분은 댓글이나 쪽지 남겨 주세요!", response.body.data.content);
+        client.assert(response.body.data.editedAt, "editedAt 이 있어야 함");
+    });
+%}
+
+### 수정한 댓글이 목록에 보인다 (로그인 없이)
+# 기대값: 200 OK, 바뀐 내용 + editedAt
+GET {{baseUrl}}/api/v1/community/posts/{{communityPostId}}/comments
+
+> {%
+    client.test("바뀐 내용", () => {
+        const comment = response.body.data.content.find(c => String(c.id) === String(client.global.get("communityCommentId")));
+        client.assert(comment && comment.content === "관심 있는 분은 댓글이나 쪽지 남겨 주세요!", JSON.stringify(comment));
+        client.assert(comment.editedAt, "editedAt");
+    });
+%}
+
+### 댓글 수정 — 빈 값
+# 기대값: 400 INVALID_INPUT
+PATCH {{baseUrl}}/api/v1/community/comments/{{communityCommentId}}
+Authorization: Bearer {{communityToken}}
+Content-Type: application/json
+
+{
+  "content": "   "
+}
+
+> {%
+    client.test("400 INVALID_INPUT", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "INVALID_INPUT", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 댓글 수정 — 로그인 없이
+# 기대값: 401
+PATCH {{baseUrl}}/api/v1/community/comments/{{communityCommentId}}
+Content-Type: application/json
+
+{
+  "content": "로그인 없이 수정"
+}
+
+> {%
+    client.test("401", () => client.assert(response.status === 401, `실제 ${response.status}`));
+%}
+
+### 준비: 다른 회원 가입
+POST {{baseUrl}}/api/v1/auth/signup
+Content-Type: application/json
+
+{
+  "email": "http-community-other-{{$timestamp}}-{{$randomInt}}@test.dasisiheung.com",
+  "password": "password123",
+  "name": "다른 회원",
+  "phone": "010-3000-0002",
+  "role": "PROVIDER"
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+    client.global.set("communityOtherEmail", response.body.data.email);
+%}
+
+### 준비: 다른 회원 로그인
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{communityOtherEmail}}",
+  "password": "password123"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+    client.global.set("communityOtherToken", response.body.data.accessToken);
+%}
+
+### 남의 댓글은 고칠 수 없다
+# 기대값: 403 NOT_COMMENT_AUTHOR
+PATCH {{baseUrl}}/api/v1/community/comments/{{communityCommentId}}
+Authorization: Bearer {{communityOtherToken}}
+Content-Type: application/json
+
+{
+  "content": "남의 댓글 가로채기"
+}
+
+> {%
+    client.test("403 NOT_COMMENT_AUTHOR", () => {
+        client.assert(response.status === 403, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "NOT_COMMENT_AUTHOR", `실제 ${response.body.error.code}`);
+    });
+%}
+
 ### 게시글 수정
 # 기대값: 200 OK, 분류 QUESTION
 PUT {{baseUrl}}/api/v1/community/posts/{{communityPostId}}
