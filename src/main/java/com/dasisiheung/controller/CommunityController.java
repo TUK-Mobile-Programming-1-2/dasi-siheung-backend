@@ -27,6 +27,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -123,6 +124,15 @@ public class CommunityController {
     public ApiResult<CommentResponse> writeComment(@LoginMember AuthMember loginMember, @PathVariable Long postId,
                                                    @Valid @RequestBody CommentRequest request) {
         return ApiResult.ok(communityService.writeComment(loginMember.id(), postId, request));
+    }
+
+    @Operation(summary = "댓글 수정",
+            description = "작성자만 (관리자도 남의 댓글은 고칠 수 없음). 규칙은 댓글 쓰기와 같고, 응답의 editedAt 으로 '(수정됨)'을 표시합니다.")
+    @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
+    @PatchMapping("/comments/{commentId}")
+    public ApiResult<CommentResponse> editComment(@LoginMember AuthMember loginMember, @PathVariable Long commentId,
+                                                  @Valid @RequestBody CommentRequest request) {
+        return ApiResult.ok(communityService.editComment(loginMember.id(), commentId, request));
     }
 
     @Operation(summary = "댓글 삭제", description = "작성자 또는 관리자.")
