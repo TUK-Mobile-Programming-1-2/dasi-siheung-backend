@@ -104,6 +104,10 @@ public enum ErrorCode {
     // 1:1 소통
     CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "대화를 찾을 수 없습니다."),
     NOT_CONVERSATION_MEMBER(HttpStatus.FORBIDDEN, "본인이 참여한 대화만 볼 수 있습니다."),
+    BLOCKED_MEMBER(HttpStatus.FORBIDDEN, "차단 관계인 상대와는 메시지를 주고받을 수 없습니다."),
+
+    // 사용자 차단
+    CANNOT_BLOCK_SELF(HttpStatus.BAD_REQUEST, "본인은 차단할 수 없습니다."),
 
     // 자주 묻는 질문
     FAQ_NOT_FOUND(HttpStatus.NOT_FOUND, "자주 묻는 질문을 찾을 수 없습니다."),
