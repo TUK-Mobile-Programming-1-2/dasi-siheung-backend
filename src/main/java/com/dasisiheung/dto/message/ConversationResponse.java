@@ -16,7 +16,9 @@ public record ConversationResponse(
         @Schema(description = "마지막 메시지 미리보기 (최대 100자, 없으면 null)") String lastMessagePreview,
         @Schema(description = "마지막 메시지 시각 (없으면 null)") LocalDateTime lastMessageAt,
         @Schema(description = "안 읽은 메시지 수", example = "2") long unreadCount,
-        @Schema(description = "내가 마지막으로 읽은 메시지 ID (없으면 0)", example = "40") long myLastReadMessageId
+        @Schema(description = "내가 마지막으로 읽은 메시지 ID (없으면 0)", example = "40") long myLastReadMessageId,
+        @Schema(description = "상대가 마지막으로 읽은 메시지 ID (없으면 0). id 가 이 값 이하인 내 메시지는 상대가 읽었다",
+                example = "38") long counterpartLastReadMessageId
 ) {
 
     /**
@@ -27,7 +29,8 @@ public record ConversationResponse(
                                           Counterpart counterpart, long unreadCount) {
         return new ConversationResponse(conversation.getId(), conversation.getSpace().getId(),
                 conversation.getSpace().getTitle(), thumbnailUrl, counterpart, conversation.getLastMessagePreview(),
-                conversation.getLastMessageAt(), unreadCount, conversation.lastReadMessageIdOf(viewerId));
+                conversation.getLastMessageAt(), unreadCount, conversation.lastReadMessageIdOf(viewerId),
+                conversation.counterpartLastReadMessageIdOf(viewerId));
     }
 
     public record Counterpart(

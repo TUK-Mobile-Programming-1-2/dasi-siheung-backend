@@ -90,6 +90,11 @@ public class Conversation extends BaseTimeEntity {
         return isUser(memberId) ? userLastReadMessageId : providerLastReadMessageId;
     }
 
+    /** 보는 사람의 상대가 마지막으로 읽은 메시지 ID. 이 값 이하인 내 메시지는 상대가 읽은 것이다. */
+    public long counterpartLastReadMessageIdOf(Long memberId) {
+        return isUser(memberId) ? providerLastReadMessageId : userLastReadMessageId;
+    }
+
     /** 보낸 메시지를 목록 미리보기에 반영하고, 보낸 사람은 그 메시지까지 읽은 것으로 한다. */
     public void onMessageSent(Message message) {
         this.lastMessageAt = message.getCreatedAt();
