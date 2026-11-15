@@ -253,9 +253,9 @@ flowchart LR
 | `error.code` | HTTP 상태 | 언제 | 화면 처리 예시 |
 | --- | --- | --- | --- |
 | `POST_NOT_FOUND` | 404 | 없거나 숨김(신고 처리)된 글 | 목록으로 돌아가기 |
-| `COMMENT_NOT_FOUND` | 404 | 없는 댓글 | 댓글 새로고침 |
+| `COMMENT_NOT_FOUND` | 404 | 없거나 숨김(신고 처리)된 댓글 | 댓글 새로고침 |
 | `NOT_POST_AUTHOR` | 403 | 남의 글을 고치거나 지움 | 수정 · 삭제 버튼은 mine 일 때만 |
-| `NOT_COMMENT_AUTHOR` | 403 | 남의 댓글을 지움 | 삭제 버튼 숨기기 |
+| `NOT_COMMENT_AUTHOR` | 403 | 남의 댓글을 고치거나 지움 (관리자도 남의 댓글은 고칠 수 없음) | 수정은 `author.id` 가 내 ID 일 때만 |
 | `POST_PHOTO_LIMIT_EXCEEDED` | 400 | 게시글 사진 5장 초과 (이미 올린 사진 포함) | 사진 선택을 남은 장수로 제한 |
 | `POST_PHOTO_NOT_FOUND` | 404 | 이미 지웠거나 이 글의 사진이 아님 | 상세를 다시 조회 |
 | `NOTICE_ADMIN_ONLY` | 403 | 관리자가 아닌데 공지 작성 | 분류 선택지에서 공지 빼기 |
@@ -266,6 +266,14 @@ flowchart LR
 | --- | --- | --- | --- |
 | `CONVERSATION_NOT_FOUND` | 404 | 없는 대화 | 대화 목록으로 |
 | `NOT_CONVERSATION_MEMBER` | 403 | 참여하지 않은 대화를 조회 · 전송 | 접근 불가 안내 |
+| `BLOCKED_MEMBER` | 403 | 한 사람이라도 상대를 차단했는데 메시지 전송 · 새 대화 열기 (누가 차단했는지는 알리지 않음) | `error.message` 를 그대로 보여주고 입력창 막기 |
+
+**사용자 차단**
+
+| `error.code` | HTTP 상태 | 언제 | 화면 처리 예시 |
+| --- | --- | --- | --- |
+| `CANNOT_BLOCK_SELF` | 400 | 자기 자신 차단 | 내 프로필에서는 차단 메뉴 숨기기 |
+| `MEMBER_NOT_FOUND` | 404 | 없거나 탈퇴한 회원 차단 | 이미 탈퇴한 사용자라고 안내 |
 
 **신고 · 제재**
 
@@ -432,10 +440,25 @@ HIDDEN(숨김): 신고 처리로 관리자가 내린 공간 — 수정 불가
 | --- | --- | --- |
 | 대화방 | `GET /conversations/{id}/messages?after={마지막 메시지 ID}` → 받은 게 있으면 목록 끝에 붙이고 `POST /read` | 5초 (화면을 떠나면 멈춤) |
 | 대화방 위로 스크롤 | `GET /conversations/{id}/messages?before={첫 메시지 ID}` | 필요할 때 |
+| 대화방 '읽음' 표시 | `GET /conversations/{id}` → `counterpartLastReadMessageId` | 5초 (메시지 폴링과 함께) |
 | 탭 배지 | `GET /conversations/unread-count` | 30초 |
 
 - 메시지 ID 는 클수록 최근입니다. 응답은 항상 **오래된 순**입니다.
 - 읽음 위치는 뒤로 돌아가지 않으므로 같은 ID 를 여러 번 보내도 됩니다.
+- 대화 정보(`GET /conversations` 목록 · `GET /conversations/{id}` · 대화 열기 · 읽음 처리 응답)에는 읽음 위치가 둘 다 있습니다.
+
+| 필드 | 뜻 |
+| --- | --- |
+| `myLastReadMessageId` | 내가 마지막으로 읽은 메시지 ID (없으면 `0`) |
+| `counterpartLastReadMessageId` | 상대가 마지막으로 읽은 메시지 ID (없으면 `0`). **내 메시지 중 `id <= 이 값`에 "읽음"** 을 붙입니다 |
+| `blockedByMe` | 내가 이 상대를 차단했는지. `true` 면 입력창을 막습니다 (상대가 나를 차단했는지는 알려 주지 않음) |
+
+**차단 ([사용자 차단 API](#사용자-차단-httpblockhttp))**
+
+- 한 사람이라도 상대를 차단했으면 두 사람 모두 **메시지 전송 · 새 대화 열기가 `403 BLOCKED_MEMBER`** 입니다. 전송이 막히므로 푸시도 가지 않습니다.
+- 이미 있는 대화방 · 지난 메시지는 그대로 보입니다. (신고 증거로도 쓰입니다) 이미 있는 대화를 다시 열어도 그 대화를 돌려줍니다.
+- 차단한 사람 화면은 `blockedByMe` 로 입력창을 막고, 차단당한 사람은 보낼 때 받은 `error.message` 를 그대로 보여 주세요.
+- 차단한 상대의 글 · 댓글 숨김은 **앱에서 거릅니다.** 글 · 댓글의 `author.id` 가 차단 목록의 `id` 와 같으면 숨겨 주세요. (서버는 걸러 내지 않습니다)
 
 **대화 여는 곳**
 
@@ -1064,7 +1087,11 @@ try {
 | DELETE | `/api/v1/community/posts/{postId}/photos/{photoId}` | 작성자 | 게시글 사진 삭제 |
 | GET | `/api/v1/community/posts/{postId}/comments` | 공개 | 댓글 목록 (오래된 순) |
 | POST | `/api/v1/community/posts/{postId}/comments` | 로그인 | 댓글 쓰기 |
+| PATCH | `/api/v1/community/comments/{commentId}` | 작성자 | 댓글 수정 (관리자도 남의 댓글은 불가, 응답 `editedAt` 이 있으면 '(수정됨)') |
 | DELETE | `/api/v1/community/comments/{commentId}` | 작성자 · ADMIN | 댓글 삭제 |
+
+- 댓글의 `editedAt` 은 작성자가 마지막으로 고친 시각이고, 고친 적 없으면 `null` 입니다.
+- 내 댓글은 `author.id` 를 내 회원 ID 와 비교해 판별하세요. 길게 누르면 내 댓글은 수정하기, 남의 댓글은 신고하기(`POST /reports`, `targetType=COMMENT`)입니다.
 
 ### 1:1 소통 (`http/conversation.http`)
 
@@ -1072,11 +1099,28 @@ try {
 | --- | --- | --- | --- |
 | POST | `/api/v1/spaces/{spaceId}/conversations` | USER | 대화 열기 (멱등) |
 | POST | `/api/v1/applications/{applicationId}/conversation` | 신청자 · 공간 제공자 | 신청에서 대화 열기 (멱등, '채팅' 버튼) |
-| GET | `/api/v1/conversations` | 로그인 | 내 대화 목록 (안 읽은 수 포함) |
+| GET | `/api/v1/conversations` | 로그인 | 내 대화 목록 (안 읽은 수 · 읽음 위치 · `blockedByMe` 포함) |
+| GET | `/api/v1/conversations/{conversationId}` | 참여자 | 대화 정보 (대화방에서 상대 읽음 위치 `counterpartLastReadMessageId` · `blockedByMe`, [3-3-7](#3-3-7-11-소통-폴링)) |
 | GET | `/api/v1/conversations/{conversationId}/messages` | 참여자 | 메시지 조회 (after · before 폴링) |
-| POST | `/api/v1/conversations/{conversationId}/messages` | 참여자 | 메시지 보내기 (상대에게 푸시, [3-3-9](#3-3-9-푸시-알림-fcm)) |
+| POST | `/api/v1/conversations/{conversationId}/messages` | 참여자 | 메시지 보내기 (상대에게 푸시 [3-3-9](#3-3-9-푸시-알림-fcm), 차단 관계면 403 `BLOCKED_MEMBER`) |
 | POST | `/api/v1/conversations/{conversationId}/read` | 참여자 | 읽음 처리 |
 | GET | `/api/v1/conversations/unread-count` | 로그인 | 안 읽은 메시지 수 (배지) |
+
+### 사용자 차단 (`http/block.http`)
+
+| 메서드 | 경로 | 인증 | 설명 |
+| --- | --- | --- | --- |
+| PUT | `/api/v1/members/me/blocks/{memberId}` | 로그인 | 차단하기 (멱등 — 이미 차단했으면 처음 차단 시각 그대로, 본인 400 · 없거나 탈퇴 404) |
+| DELETE | `/api/v1/members/me/blocks/{memberId}` | 로그인 | 차단 해제 (차단하지 않았어도 200) |
+| GET | `/api/v1/members/me/blocks` | 로그인 | 차단한 사용자 목록 (최근 차단 순, 탈퇴한 회원도 남아 해제 가능) |
+
+```json
+{ "id": 7, "name": "시흥러버", "profileImageUrl": null, "blockedAt": "2026-11-13T11:30:00" }
+```
+
+- `memberId` · `id` 는 회원 번호로, 대화의 `counterpart.id` · 글 · 댓글의 `author.id` 와 같은 값입니다.
+- 탈퇴한 회원은 이름이 `"탈퇴한 회원"` 으로 보입니다.
+- 차단하면 막히는 것 · 그대로인 것은 [3-3-7](#3-3-7-11-소통-폴링) 의 '차단'을 보세요.
 
 ### 신고 · 제재 (`http/report.http`)
 
