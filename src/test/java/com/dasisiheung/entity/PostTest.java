@@ -11,6 +11,7 @@ import com.dasisiheung.entity.member.Member;
 import com.dasisiheung.entity.member.Role;
 import com.dasisiheung.exception.ErrorCode;
 import com.dasisiheung.support.ApplicationFixtures;
+import com.dasisiheung.support.FixedClockConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -57,6 +58,22 @@ class PostTest {
                 .extracting("errorCode").isEqualTo(ErrorCode.NOT_COMMENT_AUTHOR);
         comment.hide();
         assertThat(comment.isVisible()).isFalse();
+    }
+
+    @Test
+    @DisplayName("댓글 수정은 작성자만 (관리자도 불가), 고친 시각이 남는다")
+    void editComment() {
+        Comment comment = new Comment(Post.write(user, PostCategory.QUESTION, "질문", "내용"), user, "답변");
+        assertThat(comment.getEditedAt()).isNull();
+
+        assertThatThrownBy(() -> comment.edit(2L, "가로채기", FixedClockConfig.FIXED_LOCAL_NOW))
+                .extracting("errorCode").isEqualTo(ErrorCode.NOT_COMMENT_AUTHOR);
+        assertThat(comment.getContent()).isEqualTo("답변");
+
+        comment.edit(1L, "  고친 답변 ", FixedClockConfig.FIXED_LOCAL_NOW);
+
+        assertThat(comment.getContent()).isEqualTo("고친 답변");
+        assertThat(comment.getEditedAt()).isEqualTo(FixedClockConfig.FIXED_LOCAL_NOW);
     }
 
     @Test
