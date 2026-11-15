@@ -110,21 +110,35 @@ public class FcmPushSender implements PushSender {
         return error.path("status").asText(null);
     }
 
-    /** notification: 앱이 백그라운드면 시스템이 바로 표시 / data: 앱이 눌렀을 때 화면 이동에 쓴다. */
+    /**
+     * notification 이 있으면 앱이 백그라운드일 때 시스템이 바로 표시하고, data 는 눌렀을 때 화면 이동에 쓴다.
+     * data-only 면 notification 블록 없이 보내 앱이 onMessageReceived 로 받아 직접 그린다.
+     * 어느 쪽이든 잠든 기기도 바로 깨우도록 우선순위는 HIGH 로 보낸다.
+     */
     static Map<String, Object> payload(String token, PushMessage message) {
-        Map<String, Object> androidNotification = new LinkedHashMap<>();
-        if (message.channelId() != null) {
-            androidNotification.put("channel_id", message.channelId());
-        }
-        if (message.tag() != null) {
-            androidNotification.put("tag", message.tag());
-        }
+        Map<String, Object> android = new LinkedHashMap<>();
+        android.put("priority", "HIGH");
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("token", token);
-        payload.put("notification", Map.of("title", message.title(), "body", message.body()));
+        if (!message.isDataOnly()) {
+            PushMessage.Display display = message.display();
+            payload.put("notification", Map.of("title", display.title(), "body", display.body()));
+            android.put("notification", androidNotification(display));
+        }
         payload.put("data", message.data());
-        payload.put("android", Map.of("priority", "HIGH", "notification", androidNotification));
+        payload.put("android", android);
         return payload;
+    }
+
+    private static Map<String, Object> androidNotification(PushMessage.Display display) {
+        Map<String, Object> notification = new LinkedHashMap<>();
+        if (display.channelId() != null) {
+            notification.put("channel_id", display.channelId());
+        }
+        if (display.tag() != null) {
+            notification.put("tag", display.tag());
+        }
+        return notification;
     }
 
     private enum Outcome {
