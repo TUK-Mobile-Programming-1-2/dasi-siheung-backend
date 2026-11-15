@@ -99,6 +99,16 @@ public class ConversationService {
     }
 
     /**
+     * 대화방 화면의 대화 정보. 앱은 메시지 폴링과 함께 불러 상대가 읽은 위치로 내 메시지에 '읽음'을 표시한다.
+     *
+     * @throws BusinessException 대화가 없으면 CONVERSATION_NOT_FOUND, 참여자가 아니면 NOT_CONVERSATION_MEMBER
+     */
+    public ConversationResponse getConversation(Long memberId, Long conversationId) {
+        Conversation conversation = getParticipatingConversation(memberId, conversationId);
+        return toResponse(conversation, memberId, unreadCount(conversation, memberId));
+    }
+
+    /**
      * 메시지 조회 (오래된 순).
      * <ul>
      *   <li>after: 그 ID 뒤의 새 메시지 (폴링)</li>
