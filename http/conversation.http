@@ -155,8 +155,10 @@ Authorization: Bearer {{chatUserToken}}
         client.assert(response.status === 200, `실제 ${response.status}`);
         client.assert(response.body.data.counterpart.role === "PROVIDER", `실제 ${response.body.data.counterpart.role}`);
         client.assert(response.body.data.lastMessageAt === null || response.body.data.lastMessageAt === undefined, "메시지 없음");
+        client.assert(response.body.data.blockedByMe === false, "blockedByMe");
     });
     client.global.set("chatConversationId", response.body.data.id);
+    client.global.set("chatProviderId", response.body.data.counterpart.id);
 %}
 
 ### 한 번 더 열면 같은 대화 (멱등)
@@ -370,4 +372,102 @@ Authorization: Bearer {{adminToken}}
         client.assert(response.status === 403, `실제 ${response.status}`);
         client.assert(response.body.error.code === "NOT_APPLICATION_PARTICIPANT", `실제 ${response.body.error.code}`);
     });
+%}
+
+### 차단: 이용자가 공간 제공자를 차단
+# 기대값: 200 OK (차단 API 자체는 block.http)
+PUT {{baseUrl}}/api/v1/members/me/blocks/{{chatProviderId}}
+Authorization: Bearer {{chatUserToken}}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+%}
+
+### 차단 뒤 대화 정보 (이용자)
+# 기대값: blockedByMe = true → 앱은 입력창을 막는다
+GET {{baseUrl}}/api/v1/conversations/{{chatConversationId}}
+Authorization: Bearer {{chatUserToken}}
+
+> {%
+    client.test("blockedByMe", () => client.assert(response.body.data.blockedByMe === true, `실제 ${response.body.data.blockedByMe}`));
+%}
+
+### 차단 뒤 대화 목록 (제공자) — 차단당한 쪽에는 알리지 않는다
+# 기대값: 이 대화의 blockedByMe = false
+GET {{baseUrl}}/api/v1/conversations
+Authorization: Bearer {{chatProviderToken}}
+
+> {%
+    client.test("blockedByMe false", () => {
+        const c = response.body.data.content.find(c => String(c.id) === String(client.global.get("chatConversationId")));
+        client.assert(c && c.blockedByMe === false, JSON.stringify(c));
+    });
+%}
+
+### 차단한 사람은 보낼 수 없다
+# 기대값: 403 BLOCKED_MEMBER
+POST {{baseUrl}}/api/v1/conversations/{{chatConversationId}}/messages
+Authorization: Bearer {{chatUserToken}}
+Content-Type: application/json
+
+{
+  "content": "차단한 뒤 보내기"
+}
+
+> {%
+    client.test("403 BLOCKED_MEMBER", () => {
+        client.assert(response.status === 403, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "BLOCKED_MEMBER", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 차단당한 사람도 보낼 수 없다 (같은 오류 — 누가 차단했는지 알리지 않음, 푸시도 가지 않음)
+# 기대값: 403 BLOCKED_MEMBER
+POST {{baseUrl}}/api/v1/conversations/{{chatConversationId}}/messages
+Authorization: Bearer {{chatProviderToken}}
+Content-Type: application/json
+
+{
+  "content": "차단당한 뒤 보내기"
+}
+
+> {%
+    client.test("403 BLOCKED_MEMBER", () => {
+        client.assert(response.status === 403, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "BLOCKED_MEMBER", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 차단해도 지난 메시지는 그대로 보인다 (신고 증거)
+# 기대값: 200 OK, 2건 이상
+GET {{baseUrl}}/api/v1/conversations/{{chatConversationId}}/messages
+Authorization: Bearer {{chatProviderToken}}
+
+> {%
+    client.test("지난 메시지", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.length >= 2, `실제 ${response.body.data.length}`);
+    });
+%}
+
+### 차단 해제
+DELETE {{baseUrl}}/api/v1/members/me/blocks/{{chatProviderId}}
+Authorization: Bearer {{chatUserToken}}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+%}
+
+### 해제하면 다시 보낼 수 있다
+# 기대값: 201 Created
+POST {{baseUrl}}/api/v1/conversations/{{chatConversationId}}/messages
+Authorization: Bearer {{chatUserToken}}
+Content-Type: application/json
+
+{
+  "content": "차단을 풀고 다시 보냅니다."
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
 %}
