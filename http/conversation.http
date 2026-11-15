@@ -238,7 +238,38 @@ Content-Type: application/json
 }
 
 > {%
-    client.test("안 읽은 0", () => client.assert(response.body.data.unreadCount === 0, `실제 ${response.body.data.unreadCount}`));
+    client.test("안 읽은 0 + 제공자 읽음 위치", () => {
+        client.assert(response.body.data.unreadCount === 0, `실제 ${response.body.data.unreadCount}`);
+        client.assert(String(response.body.data.myLastReadMessageId) === String(client.global.get("chatFirstMessageId")),
+            `실제 ${response.body.data.myLastReadMessageId}`);
+    });
+%}
+
+### 대화 정보 (이용자) — 상대가 읽은 위치
+# 인증: 대화 참여자
+# 기대값: 200 OK, counterpartLastReadMessageId = 제공자가 읽은 첫 메시지 → 이 ID 이하인 내 메시지에 '읽음'
+GET {{baseUrl}}/api/v1/conversations/{{chatConversationId}}
+Authorization: Bearer {{chatUserToken}}
+
+> {%
+    client.test("200 OK + 상대 읽음 위치", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(String(response.body.data.counterpartLastReadMessageId) === String(client.global.get("chatFirstMessageId")),
+            `실제 ${response.body.data.counterpartLastReadMessageId}`);
+        client.assert(response.body.data.counterpart.role === "PROVIDER", `실제 ${response.body.data.counterpart.role}`);
+    });
+%}
+
+### 대화 정보 — 참여자가 아니면 볼 수 없다 (관리자도 마찬가지)
+# 기대값: 403 NOT_CONVERSATION_MEMBER
+GET {{baseUrl}}/api/v1/conversations/{{chatConversationId}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("403", () => {
+        client.assert(response.status === 403, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "NOT_CONVERSATION_MEMBER", `실제 ${response.body.error.code}`);
+    });
 %}
 
 ### 답장 (제공자)
