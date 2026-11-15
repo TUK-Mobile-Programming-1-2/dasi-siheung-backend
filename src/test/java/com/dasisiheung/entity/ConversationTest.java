@@ -52,4 +52,14 @@ class ConversationTest {
 
         assertThat(conversation.getProviderLastReadMessageId()).isEqualTo(10L);
     }
+
+    @Test
+    @DisplayName("상대 읽음 위치 — 이용자에게는 제공자의, 제공자에게는 이용자의 읽음 위치")
+    void counterpartLastReadMessageId() {
+        conversation.markRead(1L, 3L);
+        conversation.markRead(2L, 8L);
+
+        assertThat(conversation.counterpartLastReadMessageIdOf(1L)).isEqualTo(8L);
+        assertThat(conversation.counterpartLastReadMessageIdOf(2L)).isEqualTo(3L);
+    }
 }
