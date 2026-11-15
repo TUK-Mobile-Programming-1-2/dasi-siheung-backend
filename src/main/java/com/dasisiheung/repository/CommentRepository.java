@@ -16,6 +16,15 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
         return findById(commentId).orElseThrow(() -> new BusinessException(ErrorCode.COMMENT_NOT_FOUND));
     }
 
+    /** @throws BusinessException 없거나 숨김 처리됐으면 COMMENT_NOT_FOUND */
+    default Comment getVisibleComment(Long commentId) {
+        Comment comment = getComment(commentId);
+        if (!comment.isVisible()) {
+            throw new BusinessException(ErrorCode.COMMENT_NOT_FOUND);
+        }
+        return comment;
+    }
+
     @EntityGraph(attributePaths = "author")
     Page<Comment> findByPost_IdAndStatus(Long postId, ContentStatus status, Pageable pageable);
 }
