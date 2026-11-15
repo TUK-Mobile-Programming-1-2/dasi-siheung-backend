@@ -87,6 +87,22 @@ class ConversationControllerTest extends ApiDocsTestSupport {
     }
 
     @Test
+    @DisplayName("대화 정보 — 대화방에서 상대 읽음 위치를 다시 읽는다")
+    void conversation() throws Exception {
+        given(conversationService.getConversation(USER_ID, 1L)).willReturn(conversation(0));
+
+        mockMvc.perform(get("/api/v1/conversations/{conversationId}", 1L).header(HttpHeaders.AUTHORIZATION, userToken()))
+                .andExpect(status().isOk())
+                .andDo(document("conversation-detail",
+                        resource(TAG, "대화 정보", "대화방 화면용. counterpartLastReadMessageId 이하인 내 메시지에 '읽음'을 표시합니다. "
+                                + "메시지 폴링과 함께 5초마다 불러도 됩니다. 참여자가 아니면 403 NOT_CONVERSATION_MEMBER, "
+                                + "대화가 없으면 404 CONVERSATION_NOT_FOUND."),
+                        requestHeaders(authorization()),
+                        pathParameters(parameterWithName("conversationId").description("대화 ID")),
+                        responseFields(success(conversationFields("data.")))));
+    }
+
+    @Test
     @DisplayName("메시지 조회(폴링) · 보내기 · 안 읽은 수")
     void messages() throws Exception {
         MessageResponse message = new MessageResponse(43L, 1L, USER_ID, "이이용", true,
@@ -135,7 +151,7 @@ class ConversationControllerTest extends ApiDocsTestSupport {
         given(conversationService.openForApplication(PROVIDER_ID, 7L)).willReturn(new ConversationResponse(1L, 10L,
                 "정왕역 앞 1층 상가", ProviderSpaceControllerTest.photos().get(0).url(),
                 new ConversationResponse.Counterpart(USER_ID, "이이용", Role.USER, null),
-                "안녕하세요! 11월 첫 주말에 팝업 가능할까요?", FixedClockConfig.FIXED_LOCAL_NOW, 1, 0L));
+                "안녕하세요! 11월 첫 주말에 팝업 가능할까요?", FixedClockConfig.FIXED_LOCAL_NOW, 1, 0L, 0L));
 
         mockMvc.perform(post("/api/v1/applications/{applicationId}/conversation", 7L)
                         .header(HttpHeaders.AUTHORIZATION, providerToken()))
@@ -161,7 +177,7 @@ class ConversationControllerTest extends ApiDocsTestSupport {
         return new ConversationResponse(1L, 10L, "정왕역 앞 1층 상가", ProviderSpaceControllerTest.photos().get(0).url(),
                 new ConversationResponse.Counterpart(PROVIDER_ID, "김제공", Role.PROVIDER,
                         "https://abc.supabase.co/storage/v1/object/public/space-photos/members/2/profile/a.jpg"),
-                "네 가능합니다. 신청서 보내 주세요.", FixedClockConfig.FIXED_LOCAL_NOW, unread, 40L);
+                "네 가능합니다. 신청서 보내 주세요.", FixedClockConfig.FIXED_LOCAL_NOW, unread, 40L, 38L);
     }
 
     private static FieldDescriptor[] conversationFields(String prefix) {
@@ -178,7 +194,9 @@ class ConversationControllerTest extends ApiDocsTestSupport {
                 fieldWithPath(prefix + "lastMessagePreview").type(JsonFieldType.STRING).optional().description("마지막 메시지 미리보기"),
                 fieldWithPath(prefix + "lastMessageAt").type(JsonFieldType.STRING).optional().description("마지막 메시지 시각"),
                 fieldWithPath(prefix + "unreadCount").type(JsonFieldType.NUMBER).description("안 읽은 메시지 수"),
-                fieldWithPath(prefix + "myLastReadMessageId").type(JsonFieldType.NUMBER).description("내가 마지막으로 읽은 메시지 ID")};
+                fieldWithPath(prefix + "myLastReadMessageId").type(JsonFieldType.NUMBER).description("내가 마지막으로 읽은 메시지 ID (없으면 0)"),
+                fieldWithPath(prefix + "counterpartLastReadMessageId").type(JsonFieldType.NUMBER)
+                        .description("상대가 마지막으로 읽은 메시지 ID (없으면 0). id 가 이 값 이하인 내 메시지에 '읽음' 표시")};
     }
 
     private static FieldDescriptor[] messageFields(String prefix) {
