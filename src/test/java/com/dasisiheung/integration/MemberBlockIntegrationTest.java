@@ -73,6 +73,8 @@ class MemberBlockIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").value(provider.id()))
                 .andExpect(jsonPath("$.data.name").value("통합테스트"))).at("/data/blockedAt").asText();
+        assertThat(blockedAt).as("DB 에 저장되는 정밀도(마이크로초)까지만 내려간다")
+                .matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,6})?");
         block(user, provider.id())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.blockedAt").value(blockedAt));

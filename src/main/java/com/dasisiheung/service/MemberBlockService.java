@@ -11,6 +11,7 @@ import com.dasisiheung.repository.MemberBlockRepository;
 import com.dasisiheung.repository.MemberRepository;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -44,7 +45,7 @@ public class MemberBlockService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
         MemberBlock block = memberBlockRepository.findByBlocker_IdAndBlocked_Id(blockerId, targetId)
                 .orElseGet(() -> memberBlockRepository.save(MemberBlock.block(
-                        memberRepository.getReferenceById(blockerId), target, LocalDateTime.now(clock))));
+                        memberRepository.getReferenceById(blockerId), target, now())));
         return toResponse(block);
     }
 
@@ -58,6 +59,14 @@ public class MemberBlockService {
     public PageResponse<BlockedMemberResponse> getMyBlocks(Long blockerId, PageQuery pageQuery) {
         return PageResponse.from(memberBlockRepository.findByBlocker_Id(blockerId, pageQuery.toPageable(LATEST_FIRST)),
                 this::toResponse);
+    }
+
+    /**
+     * DB(TIMESTAMP)는 마이크로초까지만 저장한다. 처음 차단할 때의 응답과 다시 조회한 값이 같도록 미리 자른다.
+     * (자르지 않으면 같은 차단의 blockedAt 이 나노초 자리만큼 달라 보인다)
+     */
+    private LocalDateTime now() {
+        return LocalDateTime.now(clock).truncatedTo(ChronoUnit.MICROS);
     }
 
     private BlockedMemberResponse toResponse(MemberBlock block) {
