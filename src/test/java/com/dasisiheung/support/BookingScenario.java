@@ -3,6 +3,7 @@ package com.dasisiheung.support;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.dasisiheung.config.ClockConfig;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDate;
 import java.util.stream.Collectors;
@@ -42,8 +43,10 @@ public class BookingScenario {
     /** 이용 기간을 오늘 기준으로 옮긴다 (예: -3, -2 → 사흘 전~이틀 전). 영속성 컨텍스트도 비운다. */
     public void movePeriod(long applicationId, int startOffsetDays, int endOffsetDays) {
         entityManager.flush();
-        jdbcTemplate.update("UPDATE space_application SET start_date = current_date + ?, end_date = current_date + ? "
-                + "WHERE id = ?", startOffsetDays, endOffsetDays, applicationId);
+        // DB 의 current_date 는 접속 시간대(CI 는 UTC)를 따라 서비스 날짜(KST)와 하루 어긋날 수 있어 서비스 시간대로 계산한다
+        LocalDate today = LocalDate.now(ClockConfig.SERVICE_ZONE);
+        jdbcTemplate.update("UPDATE space_application SET start_date = ?, end_date = ? WHERE id = ?",
+                today.plusDays(startOffsetDays), today.plusDays(endOffsetDays), applicationId);
         entityManager.clear();
     }
 }
