@@ -18,6 +18,7 @@ import static org.springframework.restdocs.headers.HeaderDocumentation.requestHe
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.delete;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.get;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.multipart;
+import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.patch;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.post;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.put;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
@@ -243,7 +244,7 @@ class CommunityControllerTest extends ApiDocsTestSupport {
     @Test
     @DisplayName("댓글 목록 · 쓰기 · 삭제")
     void comments() throws Exception {
-        CommentResponse comment = new CommentResponse(5L, 1L, AUTHOR, "저도 관심 있어요!", FixedClockConfig.FIXED_LOCAL_NOW);
+        CommentResponse comment = new CommentResponse(5L, 1L, AUTHOR, "저도 관심 있어요!", FixedClockConfig.FIXED_LOCAL_NOW, null);
         given(communityService.getComments(eq(1L), any(PageQuery.class)))
                 .willReturn(new PageResponse<>(List.of(comment), 0, 20, 1, 1, false));
         given(communityService.writeComment(eq(USER_ID), eq(1L), any(CommentRequest.class))).willReturn(comment);
@@ -265,6 +266,22 @@ class CommunityControllerTest extends ApiDocsTestSupport {
                         requestFields(fieldWithPath("content").type(JsonFieldType.STRING).description("댓글 (최대 1000자)")),
                         responseFields(success(commentFields("data.")))));
 
+        CommentResponse edited = new CommentResponse(5L, 1L, AUTHOR, "저도 관심 있어요! 쪽지 드릴게요.",
+                FixedClockConfig.FIXED_LOCAL_NOW, FixedClockConfig.FIXED_LOCAL_NOW.plusMinutes(30));
+        given(communityService.editComment(eq(USER_ID), eq(5L), any(CommentRequest.class))).willReturn(edited);
+        mockMvc.perform(patch("/api/v1/community/comments/{commentId}", 5L).header(HttpHeaders.AUTHORIZATION, userToken())
+                        .contentType(MediaType.APPLICATION_JSON).content(json(new CommentRequest("저도 관심 있어요! 쪽지 드릴게요."))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.editedAt").exists())
+                .andDo(document("community-comment-edit",
+                        resource(TAG, "댓글 수정", "작성자만 (아니면 403 NOT_COMMENT_AUTHOR, 관리자도 남의 댓글은 고칠 수 없음). "
+                                + "규칙은 댓글 쓰기와 같습니다. 숨김 처리된 댓글 · 없는 댓글은 404 COMMENT_NOT_FOUND, "
+                                + "숨김 처리된 글의 댓글은 404 POST_NOT_FOUND. 응답의 editedAt 이 있으면 '(수정됨)'을 표시합니다."),
+                        requestHeaders(authorization()),
+                        pathParameters(parameterWithName("commentId").description("댓글 ID")),
+                        requestFields(fieldWithPath("content").type(JsonFieldType.STRING).description("댓글 (최대 1000자)")),
+                        responseFields(success(commentFields("data.")))));
+
         mockMvc.perform(delete("/api/v1/community/comments/{commentId}", 5L).header(HttpHeaders.AUTHORIZATION, userToken()))
                 .andExpect(status().isOk())
                 .andDo(document("community-comment-delete",
@@ -272,6 +289,33 @@ class CommunityControllerTest extends ApiDocsTestSupport {
                         requestHeaders(authorization()),
                         pathParameters(parameterWithName("commentId").description("댓글 ID")),
                         responseFields(fieldWithPath("success").type(JsonFieldType.BOOLEAN).description("요청 성공 여부 (true)"))));
+    }
+
+    @Test
+    @DisplayName("남의 댓글을 고치면 403 NOT_COMMENT_AUTHOR")
+    void editOthersComment() throws Exception {
+        given(communityService.editComment(eq(PROVIDER_ID), eq(5L), any(CommentRequest.class)))
+                .willThrow(new BusinessException(ErrorCode.NOT_COMMENT_AUTHOR));
+
+        mockMvc.perform(patch("/api/v1/community/comments/{commentId}", 5L).header(HttpHeaders.AUTHORIZATION, providerToken())
+                        .contentType(MediaType.APPLICATION_JSON).content(json(new CommentRequest("가로채기"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("NOT_COMMENT_AUTHOR"))
+                .andDo(document("community-comment-edit-forbidden",
+                        resource(TAG, "댓글 수정", "남의 댓글을 고친 예시"), responseFields(error())));
+    }
+
+    @Test
+    @DisplayName("댓글 수정도 빈 값은 400, 로그인이 필요하다 (401)")
+    void editCommentValidation() throws Exception {
+        mockMvc.perform(patch("/api/v1/community/comments/{commentId}", 5L).header(HttpHeaders.AUTHORIZATION, userToken())
+                        .contentType(MediaType.APPLICATION_JSON).content(json(new CommentRequest("  "))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_INPUT"));
+        mockMvc.perform(patch("/api/v1/community/comments/{commentId}", 5L)
+                        .contentType(MediaType.APPLICATION_JSON).content(json(new CommentRequest("내용"))))
+                .andExpect(status().isUnauthorized());
+        then(communityService).shouldHaveNoInteractions();
     }
 
     @Test
@@ -332,6 +376,8 @@ class CommunityControllerTest extends ApiDocsTestSupport {
                 fieldWithPath(prefix + "author.profileImageUrl").type(JsonFieldType.STRING).optional()
                         .description("글쓴이 프로필 사진 주소 (없거나 탈퇴했으면 null)"),
                 fieldWithPath(prefix + "content").type(JsonFieldType.STRING).description("댓글"),
-                fieldWithPath(prefix + "createdAt").type(JsonFieldType.STRING).description("작성 시각")};
+                fieldWithPath(prefix + "createdAt").type(JsonFieldType.STRING).description("작성 시각"),
+                fieldWithPath(prefix + "editedAt").type(JsonFieldType.STRING).optional()
+                        .description("작성자가 마지막으로 고친 시각 (고친 적 없으면 null). 값이 있으면 '(수정됨)' 표시")};
     }
 }
