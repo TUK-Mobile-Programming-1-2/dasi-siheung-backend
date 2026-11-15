@@ -76,9 +76,20 @@ class ConversationIntegrationTest {
                 .andExpect(jsonPath("$.data[0].id").value(first))
                 .andExpect(jsonPath("$.data[1].id").value(second));
 
+        mockMvc.perform(get("/api/v1/conversations/{id}", conversationId).header(HttpHeaders.AUTHORIZATION, user.bearer()))
+                .andExpect(jsonPath("$.data.myLastReadMessageId").value(second))
+                .andExpect(jsonPath("$.data.counterpartLastReadMessageId").value(0));
         mockMvc.perform(post("/api/v1/conversations/{id}/read", conversationId).header(HttpHeaders.AUTHORIZATION, provider.bearer())
                         .contentType(MediaType.APPLICATION_JSON).content("{\"lastMessageId\": " + second + "}"))
-                .andExpect(jsonPath("$.data.unreadCount").value(0));
+                .andExpect(jsonPath("$.data.unreadCount").value(0))
+                .andExpect(jsonPath("$.data.myLastReadMessageId").value(second))
+                .andExpect(jsonPath("$.data.counterpartLastReadMessageId").value(second));
+        mockMvc.perform(get("/api/v1/conversations/{id}", conversationId).header(HttpHeaders.AUTHORIZATION, user.bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.counterpartLastReadMessageId").value(second))
+                .andExpect(jsonPath("$.data.counterpart.role").value("PROVIDER"));
+        mockMvc.perform(get("/api/v1/conversations").header(HttpHeaders.AUTHORIZATION, user.bearer()))
+                .andExpect(jsonPath("$.data.content[0].counterpartLastReadMessageId").value(second));
 
         send(provider, conversationId, "네 가능합니다. 신청서 보내 주세요.");
         mockMvc.perform(get("/api/v1/conversations/unread-count").header(HttpHeaders.AUTHORIZATION, user.bearer()))
@@ -88,6 +99,13 @@ class ConversationIntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, testAccounts.create(Role.USER).bearer()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.code").value("NOT_CONVERSATION_MEMBER"));
+        mockMvc.perform(get("/api/v1/conversations/{id}", conversationId)
+                        .header(HttpHeaders.AUTHORIZATION, testAccounts.create(Role.USER).bearer()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("NOT_CONVERSATION_MEMBER"));
+        mockMvc.perform(get("/api/v1/conversations/{id}", Long.MAX_VALUE).header(HttpHeaders.AUTHORIZATION, user.bearer()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("CONVERSATION_NOT_FOUND"));
     }
 
     @Test
