@@ -18,19 +18,22 @@ public record ConversationResponse(
         @Schema(description = "안 읽은 메시지 수", example = "2") long unreadCount,
         @Schema(description = "내가 마지막으로 읽은 메시지 ID (없으면 0)", example = "40") long myLastReadMessageId,
         @Schema(description = "상대가 마지막으로 읽은 메시지 ID (없으면 0). id 가 이 값 이하인 내 메시지는 상대가 읽었다",
-                example = "38") long counterpartLastReadMessageId
+                example = "38") long counterpartLastReadMessageId,
+        @Schema(description = "내가 이 상대를 차단했는지. true 면 입력창을 막는다 (상대가 나를 차단했는지는 알려 주지 않음)")
+        boolean blockedByMe
 ) {
 
     /**
      * @param thumbnailUrl 공간 대표 사진 주소 (없으면 null)
      * @param counterpart  보는 사람의 상대방
+     * @param blockedByMe  보는 사람이 상대를 차단했는지
      */
     public static ConversationResponse of(Conversation conversation, Long viewerId, String thumbnailUrl,
-                                          Counterpart counterpart, long unreadCount) {
+                                          Counterpart counterpart, long unreadCount, boolean blockedByMe) {
         return new ConversationResponse(conversation.getId(), conversation.getSpace().getId(),
                 conversation.getSpace().getTitle(), thumbnailUrl, counterpart, conversation.getLastMessagePreview(),
                 conversation.getLastMessageAt(), unreadCount, conversation.lastReadMessageIdOf(viewerId),
-                conversation.counterpartLastReadMessageIdOf(viewerId));
+                conversation.counterpartLastReadMessageIdOf(viewerId), blockedByMe);
     }
 
     public record Counterpart(

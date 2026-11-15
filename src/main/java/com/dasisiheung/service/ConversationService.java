@@ -15,6 +15,7 @@ import com.dasisiheung.exception.BusinessException;
 import com.dasisiheung.exception.ErrorCode;
 import com.dasisiheung.repository.ApplicationRepository;
 import com.dasisiheung.repository.ConversationRepository;
+import com.dasisiheung.repository.MemberBlockRepository;
 import com.dasisiheung.repository.MemberRepository;
 import com.dasisiheung.repository.MessageRepository;
 import com.dasisiheung.repository.SpaceRepository;
@@ -23,6 +24,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -38,6 +40,9 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>탭 배지: 30초마다 안 읽은 수 조회</li>
  * </ul>
  * 메시지를 보내면 커밋된 뒤 상대에게 푸시를 보낸다. ({@link ChatMessageSentEvent} → {@link PushNotificationService})
+ * <p>
+ * 한 사람이라도 상대를 차단했으면 메시지를 보내거나 새 대화를 열 수 없다. 전송 자체가 막히므로 푸시도 가지 않는다.
+ * 이미 있는 대화 · 메시지는 그대로 볼 수 있다. (신고 증거로도 쓰인다)
  */
 @Service
 @RequiredArgsConstructor
@@ -52,6 +57,7 @@ public class ConversationService {
     private final SpaceRepository spaceRepository;
     private final MemberRepository memberRepository;
     private final ApplicationRepository applicationRepository;
+    private final MemberBlockRepository memberBlockRepository;
     private final SpaceResponseMapper spaceResponseMapper;
     private final ProfileImageResolver profileImageResolver;
     private final ApplicationEventPublisher eventPublisher;
@@ -60,13 +66,12 @@ public class ConversationService {
     /**
      * 이용자가 공간 제공자에게 대화를 연다. 이미 있으면 그 대화를 돌려준다(멱등).
      *
-     * @throws BusinessException 새로 열 때 공개 공간이 아니면 SPACE_NOT_FOUND
+     * @throws BusinessException 새로 열 때 공개 공간이 아니면 SPACE_NOT_FOUND, 차단 관계면 BLOCKED_MEMBER
      */
     @Transactional
     public ConversationResponse open(Long userId, Long spaceId) {
         Conversation conversation = conversationRepository.findBySpace_IdAndUser_Id(spaceId, userId)
-                .orElseGet(() -> conversationRepository.save(new Conversation(getPublishedSpace(spaceId),
-                        memberRepository.getReferenceById(userId))));
+                .orElseGet(() -> start(getPublishedSpace(spaceId), memberRepository.getReferenceById(userId)));
         return toResponse(conversation, userId, 0);
     }
 
@@ -75,7 +80,8 @@ public class ConversationService {
      * 대화는 공간 · 이용자 한 쌍에 하나라, 같은 공간에 여러 번 신청해도 같은 대화로 이어진다.
      * 신청이 있는 공간이면 공개 상태와 관계없이 열 수 있다. (일시 중단 중에도 예약 관련 연락은 필요)
      *
-     * @throws BusinessException 신청이 없으면 APPLICATION_NOT_FOUND, 참여자가 아니면 NOT_APPLICATION_PARTICIPANT
+     * @throws BusinessException 신청이 없으면 APPLICATION_NOT_FOUND, 참여자가 아니면 NOT_APPLICATION_PARTICIPANT,
+     *                           새로 열 때 차단 관계면 BLOCKED_MEMBER
      */
     @Transactional
     public ConversationResponse openForApplication(Long memberId, Long applicationId) {
@@ -83,8 +89,7 @@ public class ConversationService {
         application.validateParticipant(memberId);
         Conversation conversation = conversationRepository
                 .findBySpace_IdAndUser_Id(application.getSpace().getId(), application.getApplicant().getId())
-                .orElseGet(() -> conversationRepository.save(
-                        new Conversation(application.getSpace(), application.getApplicant())));
+                .orElseGet(() -> start(application.getSpace(), application.getApplicant()));
         return toResponse(conversation, memberId, unreadCount(conversation, memberId));
     }
 
@@ -94,8 +99,13 @@ public class ConversationService {
         Map<Long, Long> unread = ids.isEmpty() ? Map.of()
                 : messageRepository.countUnreadByConversation(ids, memberId).stream()
                         .collect(Collectors.toMap(IdCount::id, IdCount::count));
-        return PageResponse.from(conversations,
-                conversation -> toResponse(conversation, memberId, unread.getOrDefault(conversation.getId(), 0L)));
+        List<Long> counterpartIds = conversations.map(conversation -> conversation.counterpartOf(memberId).getId())
+                .getContent();
+        Set<Long> blockedByMe = counterpartIds.isEmpty() ? Set.of()
+                : Set.copyOf(memberBlockRepository.findBlockedIdsAmong(memberId, counterpartIds));
+        return PageResponse.from(conversations, conversation -> toResponse(conversation, memberId,
+                unread.getOrDefault(conversation.getId(), 0L),
+                blockedByMe.contains(conversation.counterpartOf(memberId).getId())));
     }
 
     /**
@@ -130,9 +140,12 @@ public class ConversationService {
         return messages.stream().map(message -> MessageResponse.of(message, memberId)).toList();
     }
 
+    /** @throws BusinessException 참여자가 아니면 NOT_CONVERSATION_MEMBER, 차단 관계면 BLOCKED_MEMBER */
     @Transactional
     public MessageResponse send(Long memberId, Long conversationId, String content) {
         Conversation conversation = getParticipatingConversation(memberId, conversationId);
+        Long recipientId = conversation.counterpartOf(memberId).getId();
+        memberBlockRepository.validateNotBlocked(memberId, recipientId);
         Member sender = memberRepository.findById(memberId)
                 .filter(Member::isActive)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
@@ -140,7 +153,7 @@ public class ConversationService {
                 new Message(conversation, sender, content, LocalDateTime.now(clock)));
         conversation.onMessageSent(message);
         eventPublisher.publishEvent(new ChatMessageSentEvent(conversationId, message.getId(), memberId,
-                sender.getName(), conversation.counterpartOf(memberId).getId(), content));
+                sender.getName(), recipientId, content));
         return MessageResponse.of(message, memberId);
     }
 
@@ -170,14 +183,28 @@ public class ConversationService {
                 .mapToLong(IdCount::count).sum();
     }
 
+    /** @throws BusinessException 이용자 · 공간 제공자가 차단 관계면 BLOCKED_MEMBER */
+    private Conversation start(Space space, Member user) {
+        memberBlockRepository.validateNotBlocked(user.getId(), space.getProvider().getId());
+        return conversationRepository.save(new Conversation(space, user));
+    }
+
     private Space getPublishedSpace(Long spaceId) {
         return spaceRepository.findByIdAndStatus(spaceId, SpaceStatus.PUBLISHED)
                 .orElseThrow(() -> new BusinessException(ErrorCode.SPACE_NOT_FOUND));
     }
 
     private ConversationResponse toResponse(Conversation conversation, Long viewerId, long unreadCount) {
+        boolean blockedByMe = memberBlockRepository.existsByBlocker_IdAndBlocked_Id(viewerId,
+                conversation.counterpartOf(viewerId).getId());
+        return toResponse(conversation, viewerId, unreadCount, blockedByMe);
+    }
+
+    private ConversationResponse toResponse(Conversation conversation, Long viewerId, long unreadCount,
+                                            boolean blockedByMe) {
         Member counterpart = conversation.counterpartOf(viewerId);
         return ConversationResponse.of(conversation, viewerId, spaceResponseMapper.thumbnailUrl(conversation.getSpace()),
-                ConversationResponse.Counterpart.of(counterpart, profileImageResolver.urlOf(counterpart)), unreadCount);
+                ConversationResponse.Counterpart.of(counterpart, profileImageResolver.urlOf(counterpart)), unreadCount,
+                blockedByMe);
     }
 }
