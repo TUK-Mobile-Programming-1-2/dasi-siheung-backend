@@ -65,6 +65,15 @@ public class ConversationController {
         return ApiResult.ok(conversationService.getMyConversations(loginMember.id(), pageQuery));
     }
 
+    @Operation(summary = "대화 정보",
+            description = "대화방 화면용. counterpartLastReadMessageId 이하인 내 메시지에 '읽음'을 표시합니다. "
+                    + "메시지 폴링과 함께 5초마다 불러도 됩니다. (대화 목록 전체를 다시 받지 않아도 됨)")
+    @GetMapping("/api/v1/conversations/{conversationId}")
+    public ApiResult<ConversationResponse> getConversation(@LoginMember AuthMember loginMember,
+                                                           @PathVariable Long conversationId) {
+        return ApiResult.ok(conversationService.getConversation(loginMember.id(), conversationId));
+    }
+
     @Operation(summary = "메시지 조회 (폴링)",
             description = "after: 그 ID 뒤 새 메시지 (5초마다), before: 그 ID 앞 지난 메시지, 둘 다 없으면 최근 메시지. 오래된 순.")
     @GetMapping("/api/v1/conversations/{conversationId}/messages")

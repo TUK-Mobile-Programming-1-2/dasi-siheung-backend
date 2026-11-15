@@ -23,7 +23,7 @@
 | 공간 등록 · 검수 | 사진 · 권한 증빙 업로드(비공개 버킷), 좌표로 지역 판정(PostGIS), 관리자 5항목 검수 · 이력, 중요 항목 수정 시 재검수 |
 | 둘러보기 | 지역 · 활동 · 목적(상권 테마) · 기간 · 예산 · 시설 검색, 지도 영역 마커, 설명 가능한 추천, 찜 |
 | 신청 · 협의 · 확정 | 가격 제안 · 역제안, **승인 시점에만 확정**(공간 행 잠금 + DB 배타 제약), 겹치는 대기 신청 자동 마감, 활동 전후 사진 |
-| 후기 · 커뮤니티 · 소통 | 이용 후 후기 · 평점 · 답글, 게시판 5종 · 댓글, 공간별 1:1 대화(폴링) |
+| 후기 · 커뮤니티 · 소통 | 이용 후 후기 · 평점 · 답글, 게시판 5종 · 댓글, 공간별 1:1 대화(폴링) · 읽음 표시 · 사용자 차단 |
 | 운영 | 관리자 대시보드, 신고 처리(숨김 · 이용 정지), 테마 보정, 개인정보 자동 파기 · 월별 통계, DB 주간 백업 |
 
 | 문서 | 내용 |
@@ -103,7 +103,7 @@ src/main/resources
 ├── application-local.yml    로컬 (기본 프로필)
 ├── application-prod.yml     운영 (Cloudtype + Supabase)
 ├── application-demo.yml     시연 데이터 (local 과 함께: local,demo)
-├── db/migration             Flyway 마이그레이션 V1 ~ V16 (PostGIS → 회원 → … → 개인정보 파기 · 통계)
+├── db/migration             Flyway 마이그레이션 V1 ~ V25 (PostGIS → 회원 → … → 댓글 수정 · 사용자 차단)
 └── static/docs/openapi3.yaml   테스트로 검증된 API 명세
 
 http/                        IntelliJ HTTP Client 요청 + 기대값 검증 (CI 가 http/*.http 실행)

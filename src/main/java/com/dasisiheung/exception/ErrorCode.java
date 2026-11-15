@@ -96,7 +96,7 @@ public enum ErrorCode {
     POST_NOT_FOUND(HttpStatus.NOT_FOUND, "게시글을 찾을 수 없습니다."),
     COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "댓글을 찾을 수 없습니다."),
     NOT_POST_AUTHOR(HttpStatus.FORBIDDEN, "본인이 쓴 글만 고치거나 지울 수 있습니다."),
-    NOT_COMMENT_AUTHOR(HttpStatus.FORBIDDEN, "본인이 쓴 댓글만 지울 수 있습니다."),
+    NOT_COMMENT_AUTHOR(HttpStatus.FORBIDDEN, "본인이 쓴 댓글만 고치거나 지울 수 있습니다."),
     POST_PHOTO_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "게시글 사진은 최대 5장까지 올릴 수 있습니다."),
     POST_PHOTO_NOT_FOUND(HttpStatus.NOT_FOUND, "게시글 사진을 찾을 수 없습니다."),
     NOTICE_ADMIN_ONLY(HttpStatus.FORBIDDEN, "공지는 관리자만 쓸 수 있습니다."),
@@ -104,6 +104,10 @@ public enum ErrorCode {
     // 1:1 소통
     CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "대화를 찾을 수 없습니다."),
     NOT_CONVERSATION_MEMBER(HttpStatus.FORBIDDEN, "본인이 참여한 대화만 볼 수 있습니다."),
+    BLOCKED_MEMBER(HttpStatus.FORBIDDEN, "차단 관계인 상대와는 메시지를 주고받을 수 없습니다."),
+
+    // 사용자 차단
+    CANNOT_BLOCK_SELF(HttpStatus.BAD_REQUEST, "본인은 차단할 수 없습니다."),
 
     // 자주 묻는 질문
     FAQ_NOT_FOUND(HttpStatus.NOT_FOUND, "자주 묻는 질문을 찾을 수 없습니다."),

@@ -13,11 +13,14 @@ import com.dasisiheung.entity.community.Post;
 import com.dasisiheung.entity.community.PostCategory;
 import com.dasisiheung.entity.member.Member;
 import com.dasisiheung.entity.member.Role;
+import com.dasisiheung.exception.BusinessException;
 import com.dasisiheung.repository.CommentRepository;
 import com.dasisiheung.repository.MemberRepository;
 import com.dasisiheung.repository.PostPhotoRepository;
 import com.dasisiheung.repository.PostRepository;
 import com.dasisiheung.util.LikePatterns;
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
@@ -42,6 +45,7 @@ public class CommunityService {
     private final PostPhotoRepository postPhotoRepository;
     private final FileUploadService fileUploadService;
     private final CommunityResponseMapper responseMapper;
+    private final Clock clock;
 
     /**
      * @param category null 이면 전체
@@ -100,6 +104,20 @@ public class CommunityService {
         CommentResponse response = responseMapper.comment(comment);
         postRepository.addCommentCount(postId, 1);
         return response;
+    }
+
+    /**
+     * 작성자만 고칠 수 있다. (관리자도 남의 댓글은 고치지 못한다) 숨김 처리된 댓글 · 글은 없는 것으로 본다.
+     *
+     * @throws BusinessException 댓글이 없거나 숨겨졌으면 COMMENT_NOT_FOUND, 글이 숨겨졌으면 POST_NOT_FOUND,
+     *                           작성자가 아니면 NOT_COMMENT_AUTHOR
+     */
+    @Transactional
+    public CommentResponse editComment(Long memberId, Long commentId, CommentRequest request) {
+        Comment comment = commentRepository.getVisibleComment(commentId);
+        postRepository.getVisiblePost(comment.getPost().getId());
+        comment.edit(memberId, request.content(), LocalDateTime.now(clock));
+        return responseMapper.comment(comment);
     }
 
     /** 작성자 또는 관리자. */

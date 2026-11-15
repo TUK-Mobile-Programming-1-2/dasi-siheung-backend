@@ -2,16 +2,19 @@ package com.dasisiheung.integration;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.dasisiheung.entity.member.Role;
+import com.dasisiheung.repository.CommentRepository;
 import com.dasisiheung.support.IntegrationTest;
 import com.dasisiheung.support.TestAccounts;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.RequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
 
 @IntegrationTest
@@ -33,6 +37,9 @@ class CommunityIntegrationTest {
 
     @Autowired
     private TestAccounts testAccounts;
+
+    @Autowired
+    private CommentRepository commentRepository;
 
     @Test
     @DisplayName("글쓰기 → 검색 → 상세(조회 수) → 댓글 2개 → 남의 댓글 삭제 403 → 관리자 삭제 → 수정 → 삭제")
@@ -94,6 +101,57 @@ class CommunityIntegrationTest {
     }
 
     @Test
+    @DisplayName("댓글 수정: 남 · 관리자 403 → 작성자 수정 → 목록에 바뀐 내용 · editedAt → 빈 값 400 → 숨긴 · 없는 댓글 404")
+    void editComment() throws Exception {
+        TestAccounts.Account writer = testAccounts.create(Role.USER);
+        TestAccounts.Account other = testAccounts.create(Role.PROVIDER);
+        TestAccounts.Account admin = testAccounts.create(Role.ADMIN);
+        String body = mockMvc.perform(post("/api/v1/community/posts").header(HttpHeaders.AUTHORIZATION, writer.bearer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"category\": \"QUESTION\", \"title\": \"준비물 질문\", \"content\": \"테이블 있나요?\"}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        long postId = objectMapper.readTree(body).at("/data/id").asLong();
+        long commentId = writeComment(writer, postId, "저도 궁금해요");
+        mockMvc.perform(get("/api/v1/community/posts/{id}/comments", postId))
+                .andExpect(jsonPath("$.data.content[0].editedAt").doesNotExist());
+
+        mockMvc.perform(editCommentRequest(other, commentId, "가로채기"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("NOT_COMMENT_AUTHOR"));
+        mockMvc.perform(editCommentRequest(admin, commentId, "관리자 수정"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("NOT_COMMENT_AUTHOR"));
+
+        mockMvc.perform(editCommentRequest(writer, commentId, "  저도 궁금해요! 테이블 2개 필요해요 "))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(commentId))
+                .andExpect(jsonPath("$.data.content").value("저도 궁금해요! 테이블 2개 필요해요"))
+                .andExpect(jsonPath("$.data.author.id").value(writer.id()))
+                .andExpect(jsonPath("$.data.editedAt").isNotEmpty());
+        mockMvc.perform(get("/api/v1/community/posts/{id}/comments", postId))
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.content[0].content").value("저도 궁금해요! 테이블 2개 필요해요"))
+                .andExpect(jsonPath("$.data.content[0].editedAt").isNotEmpty());
+
+        mockMvc.perform(editCommentRequest(writer, commentId, " "))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_INPUT"));
+        mockMvc.perform(editCommentRequest(writer, commentId, "가".repeat(1001)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_INPUT"));
+
+        commentRepository.findById(commentId).orElseThrow().hide();
+        commentRepository.flush();
+        mockMvc.perform(editCommentRequest(writer, commentId, "숨긴 뒤 수정"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("COMMENT_NOT_FOUND"));
+        mockMvc.perform(editCommentRequest(writer, Long.MAX_VALUE, "없는 댓글"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("COMMENT_NOT_FOUND"));
+    }
+
+    @Test
     @DisplayName("검색어의 % 는 글자 그대로 찾는다")
     void keywordEscapesWildcards() throws Exception {
         TestAccounts.Account writer = testAccounts.create(Role.USER);
@@ -107,6 +165,14 @@ class CommunityIntegrationTest {
                 .andExpect(jsonPath("$.data.totalElements").value(1));
         mockMvc.perform(get("/api/v1/community/posts").param("keyword", token + " 5_%"))
                 .andExpect(jsonPath("$.data.totalElements").value(0));
+    }
+
+    private RequestBuilder editCommentRequest(TestAccounts.Account member, long commentId, String content)
+            throws Exception {
+        return patch("/api/v1/community/comments/{id}", commentId)
+                .header(HttpHeaders.AUTHORIZATION, member.bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("content", content)));
     }
 
     private long writeComment(TestAccounts.Account author, long postId, String content) throws Exception {

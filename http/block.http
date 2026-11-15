@@ -1,0 +1,174 @@
+# 사용자 차단 — 차단(멱등) · 차단한 사용자 목록 · 해제
+# 차단 관계에서 메시지 · 새 대화가 막히는 흐름은 conversation.http 끝부분에서 확인한다.
+
+### 준비: 차단하는 회원 가입
+POST {{baseUrl}}/api/v1/auth/signup
+Content-Type: application/json
+
+{
+  "email": "http-block-me-{{$timestamp}}-{{$randomInt}}@test.dasisiheung.com",
+  "password": "password123",
+  "name": "차단하는 회원",
+  "phone": "010-4000-0001",
+  "role": "USER"
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+    client.global.set("blockMeEmail", response.body.data.email);
+    client.global.set("blockMeId", response.body.data.id);
+%}
+
+### 준비: 차단하는 회원 로그인
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{blockMeEmail}}",
+  "password": "password123"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+    client.global.set("blockMeToken", response.body.data.accessToken);
+%}
+
+### 준비: 차단당할 회원 가입
+POST {{baseUrl}}/api/v1/auth/signup
+Content-Type: application/json
+
+{
+  "email": "http-block-target-{{$timestamp}}-{{$randomInt}}@test.dasisiheung.com",
+  "password": "password123",
+  "name": "차단당할 회원",
+  "phone": "010-4000-0002",
+  "role": "PROVIDER"
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+    client.global.set("blockTargetEmail", response.body.data.email);
+    client.global.set("blockTargetId", response.body.data.id);
+%}
+
+### 준비: 차단당할 회원 로그인
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{blockTargetEmail}}",
+  "password": "password123"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+    client.global.set("blockTargetToken", response.body.data.accessToken);
+%}
+
+### 차단하기
+# 인증: 로그인 회원
+# 기대값: 200 OK, 차단한 회원 ID · 이름 · 차단 시각
+PUT {{baseUrl}}/api/v1/members/me/blocks/{{blockTargetId}}
+Authorization: Bearer {{blockMeToken}}
+
+> {%
+    client.test("200 OK", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(String(response.body.data.id) === String(client.global.get("blockTargetId")), `실제 ${response.body.data.id}`);
+        client.assert(response.body.data.name === "차단당할 회원", `실제 ${response.body.data.name}`);
+        client.assert(response.body.data.blockedAt, "blockedAt");
+    });
+    client.global.set("blockFirstBlockedAt", response.body.data.blockedAt);
+%}
+
+### 한 번 더 차단해도 그대로 (멱등)
+# 기대값: 200 OK, 처음 차단한 시각 그대로
+PUT {{baseUrl}}/api/v1/members/me/blocks/{{blockTargetId}}
+Authorization: Bearer {{blockMeToken}}
+
+> {%
+    client.test("처음 차단 시각", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.blockedAt === client.global.get("blockFirstBlockedAt"), `실제 ${response.body.data.blockedAt}`);
+    });
+%}
+
+### 차단한 사용자 목록
+# 기대값: 200 OK, 1명 (최근 차단 순)
+GET {{baseUrl}}/api/v1/members/me/blocks
+Authorization: Bearer {{blockMeToken}}
+
+> {%
+    client.test("1명", () => {
+        client.assert(response.body.data.totalElements === 1, `실제 ${response.body.data.totalElements}`);
+        client.assert(String(response.body.data.content[0].id) === String(client.global.get("blockTargetId")), "차단한 회원");
+    });
+%}
+
+### 차단당한 쪽 목록에는 없다
+# 기대값: 200 OK, 0명 (차단당한 사실은 알려 주지 않는다)
+GET {{baseUrl}}/api/v1/members/me/blocks
+Authorization: Bearer {{blockTargetToken}}
+
+> {%
+    client.test("0명", () => client.assert(response.body.data.totalElements === 0, `실제 ${response.body.data.totalElements}`));
+%}
+
+### 자기 자신은 차단할 수 없다
+# 기대값: 400 CANNOT_BLOCK_SELF
+PUT {{baseUrl}}/api/v1/members/me/blocks/{{blockMeId}}
+Authorization: Bearer {{blockMeToken}}
+
+> {%
+    client.test("400 CANNOT_BLOCK_SELF", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "CANNOT_BLOCK_SELF", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 없는 회원
+# 기대값: 404 MEMBER_NOT_FOUND
+PUT {{baseUrl}}/api/v1/members/me/blocks/999999999
+Authorization: Bearer {{blockMeToken}}
+
+> {%
+    client.test("404 MEMBER_NOT_FOUND", () => {
+        client.assert(response.status === 404, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "MEMBER_NOT_FOUND", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 로그인 없이
+# 기대값: 401
+GET {{baseUrl}}/api/v1/members/me/blocks
+
+> {%
+    client.test("401", () => client.assert(response.status === 401, `실제 ${response.status}`));
+%}
+
+### 차단 해제
+# 기대값: 200 OK
+DELETE {{baseUrl}}/api/v1/members/me/blocks/{{blockTargetId}}
+Authorization: Bearer {{blockMeToken}}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+%}
+
+### 이미 푼 차단을 다시 해제해도 성공 (멱등)
+# 기대값: 200 OK
+DELETE {{baseUrl}}/api/v1/members/me/blocks/{{blockTargetId}}
+Authorization: Bearer {{blockMeToken}}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+%}
+
+### 해제 뒤 목록
+# 기대값: 200 OK, 0명
+GET {{baseUrl}}/api/v1/members/me/blocks
+Authorization: Bearer {{blockMeToken}}
+
+> {%
+    client.test("0명", () => client.assert(response.body.data.totalElements === 0, `실제 ${response.body.data.totalElements}`));
+%}
