@@ -113,6 +113,12 @@ public enum ErrorCode {
     FAQ_NOT_FOUND(HttpStatus.NOT_FOUND, "자주 묻는 질문을 찾을 수 없습니다."),
     INVALID_FAQ_ORDER(HttpStatus.BAD_REQUEST, "모든 자주 묻는 질문 ID 를 한 번씩 보내야 합니다. 목록을 새로 불러와 주세요."),
 
+    // 1:1 문의
+    INQUIRY_NOT_FOUND(HttpStatus.NOT_FOUND, "문의를 찾을 수 없습니다."),
+    NOT_INQUIRY_OWNER(HttpStatus.FORBIDDEN, "본인이 남긴 문의만 볼 수 있습니다."),
+    INQUIRY_PHOTO_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "문의 사진은 최대 3장까지 올릴 수 있습니다."),
+    INQUIRY_ALREADY_ANSWERED(HttpStatus.CONFLICT, "이미 답변이 등록된 문의입니다."),
+
     // 신고 · 제재
     REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "신고를 찾을 수 없습니다."),
     REPORT_TARGET_NOT_FOUND(HttpStatus.NOT_FOUND, "신고할 대상을 찾을 수 없습니다."),
