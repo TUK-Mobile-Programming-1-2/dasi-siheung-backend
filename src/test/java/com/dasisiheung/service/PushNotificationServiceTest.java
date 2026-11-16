@@ -9,6 +9,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
 
+import com.dasisiheung.entity.inquiry.InquiryCategory;
 import com.dasisiheung.entity.member.DoNotDisturb;
 import com.dasisiheung.entity.member.Member;
 import com.dasisiheung.entity.member.NotificationPreferences;
@@ -25,6 +26,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -45,6 +47,8 @@ class PushNotificationServiceTest {
     private static final ApplicationSubmittedEvent APPLICATION = new ApplicationSubmittedEvent(31L, 8L,
             "배곧 카페거리 2층 갤러리", PROVIDER_ID, "최팝업", LocalDate.of(2026, 11, 20), LocalDate.of(2026, 11, 22),
             false);
+    private static final InquiryAnsweredEvent INQUIRY_ANSWERED = new InquiryAnsweredEvent(12L, RECIPIENT_ID,
+            InquiryCategory.ACCOUNT);
     private static final ChatMessageSentEvent EVENT = chatEvent("안녕하세요\n11월 첫 주말 가능할까요?");
 
     @Mock
@@ -201,6 +205,38 @@ class PushNotificationServiceTest {
                 LocalDateTime.of(2026, 11, 13, 9, 5, 0, 123_456_789));
 
         assertThat(PushNotificationService.chatMessage(event).data()).containsEntry("createdAt", "2026-11-13T09:05:00");
+    }
+
+    @Test
+    @DisplayName("1:1 문의 답변은 문의한 회원의 모든 기기에 보낸다 (활동 알림 채널, 누르면 문의 상세)")
+    void inquiryAnswered() {
+        given(notificationSettingRepository.findById(RECIPIENT_ID)).willReturn(Optional.empty());
+        given(pushTokenRepository.findTokensByMemberId(RECIPIENT_ID)).willReturn(List.of("phone", "tablet"));
+        given(pushSender.send(anyList(), any())).willReturn(new PushResult(2, List.of()));
+
+        service(EVENING).onInquiryAnswered(INQUIRY_ANSWERED);
+
+        ArgumentCaptor<PushMessage> message = ArgumentCaptor.forClass(PushMessage.class);
+        then(pushSender).should().send(eq(List.of("phone", "tablet")), message.capture());
+        assertThat(message.getValue().isDataOnly()).isFalse();
+        assertThat(message.getValue().display().title()).isEqualTo("1:1 문의 답변");
+        assertThat(message.getValue().display().body()).isEqualTo("'계정' 문의에 답변이 등록됐어요.");
+        assertThat(message.getValue().display().channelId()).isEqualTo("activity");
+        assertThat(message.getValue().display().tag()).isEqualTo("inquiry-12");
+        assertThat(message.getValue().data()).containsExactlyInAnyOrderEntriesOf(
+                Map.of("type", "INQUIRY_ANSWERED", "inquiryId", "12"));
+    }
+
+    @Test
+    @DisplayName("활동 알림을 끈 회원에게는 문의 답변 알림을 보내지 않는다")
+    void skipInquiryAnsweredWhenActivityOff() {
+        NotificationPreferences activityOff = new NotificationPreferences(true, true, false, false, false,
+                DoNotDisturb.of(false, 22, 8));
+        given(notificationSettingRepository.findById(RECIPIENT_ID)).willReturn(Optional.of(setting(activityOff)));
+
+        service(EVENING).onInquiryAnswered(INQUIRY_ANSWERED);
+
+        then(pushSender).should(never()).send(anyList(), any());
     }
 
     private static ChatMessageSentEvent chatEvent(String content) {
