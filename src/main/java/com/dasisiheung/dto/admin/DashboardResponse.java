@@ -19,6 +19,7 @@ public record DashboardResponse(
         @Schema(description = "제공자 답변을 기다리는(검토 중) 신청 수", example = "5") long pendingApplicationCount,
         @Schema(description = "상태별 신청 수") Map<ApplicationStatus, Long> applicationsByStatus,
         @Schema(description = "처리 대기 신고 수", example = "1") long pendingReportCount,
+        @Schema(description = "답변 대기 1:1 문의 수", example = "2") long pendingInquiryCount,
         @Schema(description = "최근 등록된 공간 5개") List<RecentSpace> recentSpaces,
         @Schema(description = "집계 시각") LocalDateTime generatedAt
 ) {

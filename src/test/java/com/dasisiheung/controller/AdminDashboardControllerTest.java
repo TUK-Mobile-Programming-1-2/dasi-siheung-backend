@@ -63,6 +63,8 @@ class AdminDashboardControllerTest extends ApiDocsTestSupport {
                                         .description("상태별 신청 수 { PENDING: 5, APPROVED: 3, ... }"),
                                 fieldWithPath("data.pendingReportCount").type(JsonFieldType.NUMBER)
                                         .description("처리 대기 신고 수"),
+                                fieldWithPath("data.pendingInquiryCount").type(JsonFieldType.NUMBER)
+                                        .description("답변 대기 1:1 문의 수"),
                                 fieldWithPath("data.recentSpaces[].id").type(JsonFieldType.NUMBER).description("공간 ID"),
                                 fieldWithPath("data.recentSpaces[].title").type(JsonFieldType.STRING).description("공간 이름"),
                                 fieldWithPath("data.recentSpaces[].region").type(JsonFieldType.STRING).description("지역"),
@@ -86,7 +88,7 @@ class AdminDashboardControllerTest extends ApiDocsTestSupport {
         }
         byApplicationStatus.put(ApplicationStatus.PENDING, 5L);
         byApplicationStatus.put(ApplicationStatus.APPROVED, 3L);
-        return new DashboardResponse(2, byStatus, byRegion, byRole, 5, byApplicationStatus, 1,
+        return new DashboardResponse(2, byStatus, byRegion, byRole, 5, byApplicationStatus, 1, 2,
                 List.of(new DashboardResponse.RecentSpace(10L, "정왕역 앞 1층 상가", Region.JEONGWANG,
                         SpaceStatus.PENDING_REVIEW, FixedClockConfig.FIXED_LOCAL_NOW)),
                 FixedClockConfig.FIXED_LOCAL_NOW);

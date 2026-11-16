@@ -30,6 +30,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * <ul>
  *   <li>채팅 메시지 → 대화 상대 (대화 알림). data-only 로 보내 앱이 메시지를 쌓고 읽음 · 답장 버튼을 단다.</li>
  *   <li>새 이용 신청 → 공간 제공자 (활동 알림). 시스템이 바로 그린다.</li>
+ *   <li>1:1 문의 답변 → 문의한 회원 (활동 알림). 시스템이 바로 그린다.</li>
  * </ul>
  */
 @Slf4j
@@ -40,6 +41,7 @@ public class PushNotificationService {
     static final String ACTIVITY_CHANNEL = "activity";
     static final String TYPE_CHAT_MESSAGE = "CHAT_MESSAGE";
     static final String TYPE_APPLICATION_SUBMITTED = "APPLICATION_SUBMITTED";
+    static final String TYPE_INQUIRY_ANSWERED = "INQUIRY_ANSWERED";
     private static final DateTimeFormatter SHORT_DATE = DateTimeFormatter.ofPattern("M/d");
     /** 푸시 data 의 시각 형식 — API 응답의 LocalDateTime 과 같다 (예: 2026-11-13T11:30:00). */
     private static final DateTimeFormatter DATA_TIME = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
@@ -63,6 +65,13 @@ public class PushNotificationService {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onApplicationSubmitted(ApplicationSubmittedEvent event) {
         send(event.providerId(), NotificationCategory.ACTIVITY, applicationSubmitted(event));
+    }
+
+    /** 문의한 회원에게 1:1 문의 답변을 알린다. (알림 설정의 활동 알림) */
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onInquiryAnswered(InquiryAnsweredEvent event) {
+        send(event.memberId(), NotificationCategory.ACTIVITY, inquiryAnswered(event));
     }
 
     private void send(Long recipientId, NotificationCategory category, PushMessage message) {
@@ -110,6 +119,15 @@ public class PushNotificationService {
                 "spaceId", String.valueOf(event.spaceId()));
         return PushMessage.notification("새 이용 신청", body, data, ACTIVITY_CHANNEL,
                 "application-" + event.applicationId());
+    }
+
+    /** 제목: 1:1 문의 답변 / 본문: 어느 분류의 문의인지 / 문의마다 알림 하나. 누르면 문의 상세로 간다. */
+    static PushMessage inquiryAnswered(InquiryAnsweredEvent event) {
+        String body = "'%s' 문의에 답변이 등록됐어요.".formatted(event.category().getLabel());
+        Map<String, String> data = Map.of(
+                "type", TYPE_INQUIRY_ANSWERED,
+                "inquiryId", String.valueOf(event.inquiryId()));
+        return PushMessage.notification("1:1 문의 답변", body, data, ACTIVITY_CHANNEL, "inquiry-" + event.inquiryId());
     }
 
     /** 11/20 또는 11/20~11/22 */

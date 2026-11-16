@@ -9,6 +9,8 @@ import com.dasisiheung.entity.application.PhotoPhase;
 import com.dasisiheung.entity.application.PriceNegotiationStatus;
 import com.dasisiheung.entity.community.PostCategory;
 import com.dasisiheung.entity.faq.FaqCategory;
+import com.dasisiheung.entity.inquiry.InquiryCategory;
+import com.dasisiheung.entity.inquiry.InquiryStatus;
 import com.dasisiheung.entity.member.Role;
 import com.dasisiheung.entity.report.ReportAction;
 import com.dasisiheung.entity.report.ReportReason;
@@ -50,7 +52,9 @@ public class OptionService {
             OptionItem.listOf(ReportReason.class),
             OptionItem.listOf(ReportStatus.class),
             OptionItem.listOf(ReportAction.class),
-            OptionItem.listOf(FaqCategory.class)
+            OptionItem.listOf(FaqCategory.class),
+            OptionItem.listOf(InquiryCategory.class),
+            OptionItem.listOf(InquiryStatus.class)
     );
 
     public OptionsResponse getOptions() {

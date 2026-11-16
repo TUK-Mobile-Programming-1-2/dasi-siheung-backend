@@ -47,7 +47,9 @@ class OptionControllerTest extends ApiDocsTestSupport {
             {"reportReasons", "신고 사유"},
             {"reportStatuses", "신고 처리 상태"},
             {"reportActions", "신고 처리 방법"},
-            {"faqCategories", "자주 묻는 질문 분류"}
+            {"faqCategories", "자주 묻는 질문 분류"},
+            {"inquiryCategories", "1:1 문의 분류"},
+            {"inquiryStatuses", "1:1 문의 상태"}
     };
 
     @MockitoBean

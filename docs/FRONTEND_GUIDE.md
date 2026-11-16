@@ -288,6 +288,15 @@ flowchart LR
 | `INVALID_REPORT_ACTION` | 400 | 회원 신고를 숨김 처리 | 정지 · 기각만 보여주기 |
 | `CANNOT_SUSPEND_MEMBER` | 409 | 관리자 · 탈퇴 회원 정지 | 버튼 숨기기 |
 
+**1:1 문의**
+
+| `error.code` | HTTP 상태 | 언제 | 화면 처리 예시 |
+| --- | --- | --- | --- |
+| `INQUIRY_NOT_FOUND` | 404 | 없는 문의 | 내역 새로고침 |
+| `NOT_INQUIRY_OWNER` | 403 | 남의 문의를 조회하거나 사진을 올림 | 내역으로 돌아가기 |
+| `INQUIRY_PHOTO_LIMIT_EXCEEDED` | 400 | 이미 올린 사진과 합쳐 3장 초과 | 사진 선택을 3장으로 제한 |
+| `INQUIRY_ALREADY_ANSWERED` | 409 | 답변이 끝난 문의에 사진을 올림 · 관리자가 다시 답변 | 상세 새로고침 |
+
 **자주 묻는 질문 (관리자)**
 
 | `error.code` | HTTP 상태 | 언제 | 화면 처리 예시 |
@@ -329,6 +338,7 @@ flowchart LR
 | 권한 증빙 | PDF · JPG · PNG | 20MB | **10분짜리 임시 주소** — 만료되면 목록을 다시 조회 |
 | 활동 전후 사진 | JPG · PNG · WEBP | 10MB | 10분짜리 임시 주소 |
 | 신고 증거 사진 | JPG · PNG · WEBP | 10MB (최대 5장) | 10분짜리 임시 주소 — **관리자만** 열람 |
+| 1:1 문의 사진 | JPG · PNG · WEBP | 10MB (문의당 최대 3장) | 10분짜리 임시 주소 — 문의한 회원 · 관리자만 열람 |
 | 프로필 사진 | JPG · PNG · WEBP | 5MB (1장) | 고정 주소 — 내 정보 · 글쓴이 · 대화 상대에 같은 주소 |
 | 게시글 사진 | JPG · PNG · WEBP | 10MB (글당 최대 5장) | 고정 주소 — 첫 사진이 목록 썸네일 |
 
@@ -484,7 +494,7 @@ HIDDEN(숨김): 신고 처리로 관리자가 내린 공간 — 수정 불가
 | 항목 | 뜻 |
 | --- | --- |
 | `push` | 푸시 전체 스위치. `false` 면 아래 분류와 관계없이 보내지 않음 |
-| `chat` · `activity` · `favoriteSpace` | 1:1 대화 · 활동(신청 · 가격 협의 · 승인 · 거절) · 찜한 공간 소식 |
+| `chat` · `activity` · `favoriteSpace` | 1:1 대화 · 활동(신청 · 가격 협의 · 승인 · 거절 · 1:1 문의 답변) · 찜한 공간 소식 |
 | `marketing` | 광고성 정보 수신 동의 |
 | `dndStartHour` · `dndEndHour` | 0~23 정수. **시작은 포함, 끝은 포함하지 않음.** 시작 > 끝이면 자정을 넘는 구간 (22 → 8 = 22:00 ~ 07:59) |
 
@@ -508,6 +518,7 @@ HIDDEN(숨김): 신고 처리로 관리자가 내린 공간 — 수정 불가
 | --- | --- | --- | --- | --- |
 | 1:1 메시지가 옴 | 대화 상대 | `CHAT_MESSAGE` | `chat` (대화 알림) | **data-only** — 앱이 직접 그림 (채널 · tag 도 앱이 정함) |
 | 이용 신청이 들어옴 | 공간 제공자 | `APPLICATION_SUBMITTED` | `activity` (활동 알림) | notification — 시스템이 그림 (채널 `activity`) |
+| 1:1 문의에 답변이 달림 | 문의한 회원 | `INQUIRY_ANSWERED` | `activity` (활동 알림) | notification — 시스템이 그림 (채널 `activity`) |
 
 **토큰 등록 · 해제**
 
@@ -563,6 +574,19 @@ override fun onNewToken(token: String) { /* 로그인 상태면 registerPushToke
 
 - 하루짜리 신청은 `11/20`, 희망 가격을 함께 보냈으면 본문 끝에 ` (희망 가격 제안 있음)` 이 붙습니다.
 - 누르면 받은 신청 상세(`GET /api/v1/applications/{applicationId}`) 화면으로 이동하세요.
+
+**받는 알림 — 1:1 문의 답변 (문의한 회원)**
+
+```json
+{
+  "notification": { "title": "1:1 문의 답변", "body": "'계정' 문의에 답변이 등록됐어요." },
+  "data": { "type": "INQUIRY_ANSWERED", "inquiryId": "12" },
+  "android": { "priority": "HIGH", "notification": { "channel_id": "activity", "tag": "inquiry-12" } }
+}
+```
+
+- 본문의 `'계정'` 자리에는 문의 분류의 화면 이름(선택지 `inquiryCategories` 의 label)이 들어갑니다.
+- 누르면 문의 상세(`GET /api/v1/inquiries/{inquiryId}`) 화면으로 이동하세요.
 
 **공통**
 
@@ -1019,7 +1043,7 @@ try {
 
 | 메서드 | 경로 | 인증 | 설명 |
 | --- | --- | --- | --- |
-| GET | `/api/v1/admin/dashboard` | ADMIN | 검수 대기 · 상태/지역별 공간 · 역할별 회원 · 최근 등록 공간 |
+| GET | `/api/v1/admin/dashboard` | ADMIN | 검수 대기 · 상태/지역별 공간 · 역할별 회원 · 최근 등록 공간 · 처리 대기 신고 · 답변 대기 1:1 문의 |
 
 ### 공간 둘러보기 (`http/space.http`)
 
@@ -1130,6 +1154,24 @@ try {
 - `memberId` · `id` 는 회원 번호로, 대화의 `counterpart.id` · 글 · 댓글의 `author.id` 와 같은 값입니다.
 - 탈퇴한 회원은 이름이 `"탈퇴한 회원"` 으로 보입니다.
 - 차단하면 막히는 것 · 그대로인 것은 [3-3-7](#3-3-7-11-소통-폴링) 의 '차단'을 보세요.
+
+### 1:1 문의 (`http/inquiry.http`)
+
+이용자 · 공간 제공자가 같은 API 를 씁니다. **문의를 먼저 등록하고, 사진은 응답의 `id` 로 따로 올립니다.**
+
+| 메서드 | 경로 | 인증 | 설명 |
+| --- | --- | --- | --- |
+| POST | `/api/v1/inquiries` | 로그인 | 문의 등록 (JSON: category · content 최대 1000자) → 201, `WAITING` |
+| POST | `/api/v1/inquiries/{inquiryId}/photos` | 로그인 | 사진 올리기 (multipart 파트 `files`, 문의당 최대 3장, 답변 전까지만) → 201, 전체 사진 |
+| GET | `/api/v1/members/me/inquiries` | 로그인 | 내 문의 내역 (최근 순, 답변 포함, 사진은 photoCount 만) |
+| GET | `/api/v1/inquiries/{inquiryId}` | 로그인 | 문의 상세 (본인만, 사진 임시 주소) |
+| GET | `/api/v1/admin/inquiries` | ADMIN | 문의 목록 (status=WAITING 이면 오래된 순, 사진은 photoCount 만) |
+| GET | `/api/v1/admin/inquiries/{inquiryId}` | ADMIN | 문의 상세 (문의한 회원 · 사진 임시 주소) |
+| POST | `/api/v1/admin/inquiries/{inquiryId}/answer` | ADMIN | 답변 등록 (한 번만, 최대 2000자) → 문의한 회원에게 `INQUIRY_ANSWERED` 푸시 |
+
+- 분류 코드 · 상태 이름은 `GET /api/v1/options` 의 `inquiryCategories` · `inquiryStatuses` 를 쓰세요.
+- 응답의 `photos` 는 `[{ "id": 1, "url": "https://..." }]` 형태이고, `url` 은 **10분 뒤 만료되는 전체 주소**입니다. 화면을 열 때마다 상세를 다시 조회하세요.
+- 사진 여러 장 중 하나라도 실패하면(형식 · 크기) 그 요청의 사진은 하나도 저장되지 않습니다. 문의 자체는 그대로 남으니 사진만 다시 올리면 됩니다.
 
 ### 신고 · 제재 (`http/report.http`)
 
