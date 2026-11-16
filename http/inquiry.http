@@ -1,0 +1,457 @@
+# 1:1 문의 — 등록 → 사진 올리기(최대 3장) → 내 문의 내역 · 상세 → 관리자 답변 → 답변 확인
+# 관리자 계정: http-client.private.env.json
+# 사진은 문의를 등록한 뒤 POST /api/v1/inquiries/{inquiryId}/photos 로 따로 올린다. (파트 이름 files)
+
+### 준비: 이용자 가입
+POST {{baseUrl}}/api/v1/auth/signup
+Content-Type: application/json
+
+{
+  "email": "http-inq-user-{{$timestamp}}-{{$randomInt}}@test.dasisiheung.com",
+  "password": "password123",
+  "name": "inq 이용자",
+  "phone": "010-3000-0001",
+  "role": "USER"
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+    client.global.set("inqUserEmail", response.body.data.email);
+%}
+
+### 준비: 이용자 로그인
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{inqUserEmail}}",
+  "password": "password123"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+    client.global.set("inqUserToken", response.body.data.accessToken);
+%}
+
+### 준비: 공간 제공자 가입 (남의 문의 확인용)
+POST {{baseUrl}}/api/v1/auth/signup
+Content-Type: application/json
+
+{
+  "email": "http-inq-provider-{{$timestamp}}-{{$randomInt}}@test.dasisiheung.com",
+  "password": "password123",
+  "name": "inq 제공자",
+  "phone": "010-3000-0002",
+  "role": "PROVIDER"
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+    client.global.set("inqProviderEmail", response.body.data.email);
+%}
+
+### 준비: 공간 제공자 로그인
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{inqProviderEmail}}",
+  "password": "password123"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+    client.global.set("inqProviderToken", response.body.data.accessToken);
+%}
+
+
+### 선택지: 문의 분류 · 상태
+# 기대값: inquiryCategories 5개 (신청 · 예약 / 결제 · 환불 / 계정 / 공간 정보 / 기타), inquiryStatuses 2개
+GET {{baseUrl}}/api/v1/options
+
+> {%
+    client.test("문의 선택지", () => {
+        const codes = response.body.data.inquiryCategories.map(o => o.code).join(",");
+        client.assert(codes === "APPLICATION,PAYMENT,ACCOUNT,SPACE,ETC", `실제 ${codes}`);
+        const statuses = response.body.data.inquiryStatuses.map(o => o.code).join(",");
+        client.assert(statuses === "WAITING,ANSWERED", `실제 ${statuses}`);
+    });
+%}
+
+### 문의 등록
+# 인증: 로그인 회원 (이용자 · 공간 제공자)
+# 요청: JSON — category(선택지 inquiryCategories) · content(최대 1000자)
+# 기대값: 201 Created, WAITING, answer · answeredAt null, photos 빈 배열
+POST {{baseUrl}}/api/v1/inquiries
+Authorization: Bearer {{inqUserToken}}
+Content-Type: application/json
+
+{
+  "category": "ACCOUNT",
+  "content": "비밀번호를 바꿨는데 로그인이 안 돼요."
+}
+
+> {%
+    client.test("201 Created + WAITING", () => {
+        client.assert(response.status === 201, `실제 ${response.status}`);
+        const d = response.body.data;
+        client.assert(d.status === "WAITING", `실제 ${d.status}`);
+        client.assert(d.category === "ACCOUNT", `실제 ${d.category}`);
+        client.assert(d.answer === null && d.answeredAt === null, "답변 전에는 null");
+        client.assert(d.photoCount === 0 && d.photos.length === 0, "사진 없음");
+    });
+    client.global.set("inqId", response.body.data.id);
+%}
+
+### 문의 등록: 1001자
+# 기대값: 400 INVALID_INPUT, fieldErrors[0].field = content
+POST {{baseUrl}}/api/v1/inquiries
+Authorization: Bearer {{inqUserToken}}
+Content-Type: application/json
+
+{
+  "category": "ACCOUNT",
+  "content": "{{$random.alphabetic(1001)}}"
+}
+
+> {%
+    client.test("400 INVALID_INPUT (content)", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "INVALID_INPUT", `실제 ${response.body.error.code}`);
+        client.assert(response.body.error.fieldErrors[0].field === "content", JSON.stringify(response.body.error.fieldErrors));
+    });
+%}
+
+### 문의 등록: 빈 내용 · 분류 없음
+# 기대값: 400 INVALID_INPUT, 필드 오류 2개
+POST {{baseUrl}}/api/v1/inquiries
+Authorization: Bearer {{inqUserToken}}
+Content-Type: application/json
+
+{
+  "content": "   "
+}
+
+> {%
+    client.test("400 INVALID_INPUT (category · content)", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.fieldErrors.length === 2, JSON.stringify(response.body.error.fieldErrors));
+    });
+%}
+
+### 문의 사진 올리기 — 2장
+# 요청: multipart/form-data — files (같은 이름으로 여러 개, 문의당 최대 3장, JPG·PNG·WEBP 10MB)
+# 기대값: 201 Created, 이 문의의 전체 사진 2장 · 임시 주소(10분)
+POST {{baseUrl}}/api/v1/inquiries/{{inqId}}/photos
+Authorization: Bearer {{inqUserToken}}
+Content-Type: multipart/form-data; boundary=dasi-boundary
+
+--dasi-boundary
+Content-Disposition: form-data; name="files"; filename="space-photo.jpg"
+Content-Type: image/jpeg
+
+< ./fixtures/space-photo.jpg
+--dasi-boundary
+Content-Disposition: form-data; name="files"; filename="space-photo.png"
+Content-Type: image/png
+
+< ./fixtures/space-photo.png
+--dasi-boundary--
+
+> {%
+    client.test("201 Created + 사진 2장", () => {
+        client.assert(response.status === 201, `실제 ${response.status}`);
+        const d = response.body.data;
+        client.assert(d.photoCount === 2 && d.photos.length === 2, JSON.stringify(d.photos));
+        client.assert(d.photos.every(p => p.url.startsWith("http")), "전체 URL 임시 주소");
+    });
+%}
+
+### 문의 사진 올리기 — 2장 더 (합쳐 4장)
+# 기대값: 400 INQUIRY_PHOTO_LIMIT_EXCEEDED (파일을 올리기 전에 막힘)
+POST {{baseUrl}}/api/v1/inquiries/{{inqId}}/photos
+Authorization: Bearer {{inqUserToken}}
+Content-Type: multipart/form-data; boundary=dasi-boundary
+
+--dasi-boundary
+Content-Disposition: form-data; name="files"; filename="space-photo.jpg"
+Content-Type: image/jpeg
+
+< ./fixtures/space-photo.jpg
+--dasi-boundary
+Content-Disposition: form-data; name="files"; filename="space-photo.jpg"
+Content-Type: image/jpeg
+
+< ./fixtures/space-photo.jpg
+--dasi-boundary--
+
+> {%
+    client.test("400 INQUIRY_PHOTO_LIMIT_EXCEEDED", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "INQUIRY_PHOTO_LIMIT_EXCEEDED", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 문의 사진 올리기 — 이미지가 아닌 파일
+# 기대값: 400 UNSUPPORTED_FILE_TYPE
+POST {{baseUrl}}/api/v1/inquiries/{{inqId}}/photos
+Authorization: Bearer {{inqUserToken}}
+Content-Type: multipart/form-data; boundary=dasi-boundary
+
+--dasi-boundary
+Content-Disposition: form-data; name="files"; filename="not-an-image.jpg"
+Content-Type: image/jpeg
+
+< ./fixtures/not-an-image.jpg
+--dasi-boundary--
+
+> {%
+    client.test("400 UNSUPPORTED_FILE_TYPE", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "UNSUPPORTED_FILE_TYPE", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 남의 문의에 사진 올리기
+# 기대값: 403 NOT_INQUIRY_OWNER
+POST {{baseUrl}}/api/v1/inquiries/{{inqId}}/photos
+Authorization: Bearer {{inqProviderToken}}
+Content-Type: multipart/form-data; boundary=dasi-boundary
+
+--dasi-boundary
+Content-Disposition: form-data; name="files"; filename="space-photo.jpg"
+Content-Type: image/jpeg
+
+< ./fixtures/space-photo.jpg
+--dasi-boundary--
+
+> {%
+    client.test("403 NOT_INQUIRY_OWNER", () => {
+        client.assert(response.status === 403, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "NOT_INQUIRY_OWNER", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 내 문의 내역
+# 기대값: 200 OK, 1건 WAITING, 사진은 photoCount 만 (photos null)
+GET {{baseUrl}}/api/v1/members/me/inquiries
+Authorization: Bearer {{inqUserToken}}
+
+> {%
+    client.test("200 OK + 1건 답변 대기", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        const items = response.body.data.content;
+        client.assert(items.length === 1, `실제 ${items.length}건`);
+        client.assert(items[0].status === "WAITING", `실제 ${items[0].status}`);
+        client.assert(items[0].photoCount === 2 && items[0].photos === null, "목록에는 photoCount 만");
+    });
+%}
+
+### 공간 제공자의 내 문의 내역 (남의 문의는 안 보임)
+# 기대값: 200 OK, 0건
+GET {{baseUrl}}/api/v1/members/me/inquiries
+Authorization: Bearer {{inqProviderToken}}
+
+> {%
+    client.test("200 OK + 0건", () => client.assert(response.body.data.totalElements === 0, `실제 ${response.body.data.totalElements}`));
+%}
+
+### 문의 상세
+# 기대값: 200 OK, WAITING, 사진 2장 · 임시 주소
+GET {{baseUrl}}/api/v1/inquiries/{{inqId}}
+Authorization: Bearer {{inqUserToken}}
+
+> {%
+    client.test("200 OK + 사진 2장", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.photos.length === 2, JSON.stringify(response.body.data.photos));
+    });
+%}
+
+### 남의 문의 상세
+# 기대값: 403 NOT_INQUIRY_OWNER
+GET {{baseUrl}}/api/v1/inquiries/{{inqId}}
+Authorization: Bearer {{inqProviderToken}}
+
+> {%
+    client.test("403 NOT_INQUIRY_OWNER", () => {
+        client.assert(response.status === 403, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "NOT_INQUIRY_OWNER", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 없는 문의 상세
+# 기대값: 404 INQUIRY_NOT_FOUND
+GET {{baseUrl}}/api/v1/inquiries/999999999
+Authorization: Bearer {{inqUserToken}}
+
+> {%
+    client.test("404 INQUIRY_NOT_FOUND", () => {
+        client.assert(response.status === 404, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "INQUIRY_NOT_FOUND", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 이용자가 관리자 문의 목록 호출
+# 기대값: 403 FORBIDDEN
+GET {{baseUrl}}/api/v1/admin/inquiries
+Authorization: Bearer {{inqUserToken}}
+
+> {%
+    client.test("403 FORBIDDEN", () => client.assert(response.status === 403, `실제 ${response.status}`));
+%}
+
+
+### 준비: 관리자 로그인
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+> {%
+    client.test("200 OK + ADMIN", () => {
+        client.assert(response.status === 200, `실제 ${response.status} — http-client.private.env.json 의 관리자 계정 확인`);
+        client.assert(response.body.data.member.role === "ADMIN", `실제 ${response.body.data.member.role}`);
+    });
+    client.global.set("adminToken", response.body.data.accessToken);
+%}
+
+### 관리자: 답변 대기 문의 목록
+# 기대값: 200 OK, WAITING 만 (오래된 순), 사진은 photoCount 만, 방금 등록한 문의 포함
+GET {{baseUrl}}/api/v1/admin/inquiries?status=WAITING&size=100
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("200 OK + WAITING 만 + 사진은 장수만", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        const items = response.body.data.content;
+        client.assert(items.every(i => i.status === "WAITING"), "WAITING 만");
+        client.assert(items.every(i => i.photos === null), "목록에는 photos null");
+        const mine = items.find(i => i.id === client.global.get("inqId"));
+        client.assert(mine !== undefined, "방금 등록한 문의가 보여야 합니다");
+        client.assert(mine.memberRole === "USER" && mine.photoCount === 2, JSON.stringify(mine));
+    });
+%}
+
+### 관리자: 대시보드 답변 대기 문의 수
+# 기대값: pendingInquiryCount >= 1
+GET {{baseUrl}}/api/v1/admin/dashboard
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("pendingInquiryCount", () => {
+        client.assert(response.body.data.pendingInquiryCount >= 1, `실제 ${response.body.data.pendingInquiryCount}`);
+    });
+%}
+
+### 관리자: 문의 상세 — 사진
+# 기대값: 200 OK, 사진 2장 · 임시 주소
+GET {{baseUrl}}/api/v1/admin/inquiries/{{inqId}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("200 OK + 사진 2장", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.photos.length === 2, JSON.stringify(response.body.data.photos));
+    });
+%}
+
+### 관리자: 빈 답변
+# 기대값: 400 INVALID_INPUT
+POST {{baseUrl}}/api/v1/admin/inquiries/{{inqId}}/answer
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "answer": " "
+}
+
+> {%
+    client.test("400 INVALID_INPUT", () => client.assert(response.status === 400, `실제 ${response.status}`));
+%}
+
+### 관리자: 답변 등록
+# 기대값: 200 OK, ANSWERED, answer · answeredAt 채워짐 (문의한 회원에게 INQUIRY_ANSWERED 푸시)
+POST {{baseUrl}}/api/v1/admin/inquiries/{{inqId}}/answer
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "answer": "확인해 보니 예전 비밀번호로 저장된 자동 로그인 정보 때문이었어요. 앱을 다시 실행해 주세요."
+}
+
+> {%
+    client.test("200 OK + ANSWERED", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        const d = response.body.data;
+        client.assert(d.status === "ANSWERED", `실제 ${d.status}`);
+        client.assert(d.answer.length > 0 && d.answeredAt !== null, "답변 · 답변 시각");
+    });
+%}
+
+### 관리자: 다시 답변
+# 기대값: 409 INQUIRY_ALREADY_ANSWERED
+POST {{baseUrl}}/api/v1/admin/inquiries/{{inqId}}/answer
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "answer": "두 번째 답변"
+}
+
+> {%
+    client.test("409 INQUIRY_ALREADY_ANSWERED", () => {
+        client.assert(response.status === 409, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "INQUIRY_ALREADY_ANSWERED", `실제 ${response.body.error.code}`);
+    });
+%}
+
+
+### 이용자: 답변 확인 (상세)
+# 기대값: 200 OK, ANSWERED, 답변 · 답변 시각
+GET {{baseUrl}}/api/v1/inquiries/{{inqId}}
+Authorization: Bearer {{inqUserToken}}
+
+> {%
+    client.test("ANSWERED + 답변", () => {
+        const d = response.body.data;
+        client.assert(d.status === "ANSWERED", `실제 ${d.status}`);
+        client.assert(d.answer.startsWith("확인해 보니"), `실제 ${d.answer}`);
+        client.assert(d.answeredAt !== null, "answeredAt");
+    });
+%}
+
+### 이용자: 답변 확인 (내역)
+# 기대값: 목록에도 ANSWERED · 답변
+GET {{baseUrl}}/api/v1/members/me/inquiries
+Authorization: Bearer {{inqUserToken}}
+
+> {%
+    client.test("목록 ANSWERED", () => {
+        const item = response.body.data.content[0];
+        client.assert(item.status === "ANSWERED" && item.answer !== null, JSON.stringify(item));
+    });
+%}
+
+### 이용자: 답변 끝난 문의에 사진 올리기
+# 기대값: 409 INQUIRY_ALREADY_ANSWERED
+POST {{baseUrl}}/api/v1/inquiries/{{inqId}}/photos
+Authorization: Bearer {{inqUserToken}}
+Content-Type: multipart/form-data; boundary=dasi-boundary
+
+--dasi-boundary
+Content-Disposition: form-data; name="files"; filename="space-photo.jpg"
+Content-Type: image/jpeg
+
+< ./fixtures/space-photo.jpg
+--dasi-boundary--
+
+> {%
+    client.test("409 INQUIRY_ALREADY_ANSWERED", () => {
+        client.assert(response.status === 409, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "INQUIRY_ALREADY_ANSWERED", `실제 ${response.body.error.code}`);
+    });
+%}
