@@ -1,6 +1,7 @@
 package com.dasisiheung.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
@@ -22,6 +23,7 @@ import com.dasisiheung.support.FixedClockConfig;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -43,8 +45,7 @@ class PushNotificationServiceTest {
     private static final ApplicationSubmittedEvent APPLICATION = new ApplicationSubmittedEvent(31L, 8L,
             "배곧 카페거리 2층 갤러리", PROVIDER_ID, "최팝업", LocalDate.of(2026, 11, 20), LocalDate.of(2026, 11, 22),
             false);
-    private static final ChatMessageSentEvent EVENT =
-            new ChatMessageSentEvent(5L, 40L, 1L, "김시흥", RECIPIENT_ID, "  안녕하세요\n11월 첫 주말 가능할까요?  ");
+    private static final ChatMessageSentEvent EVENT = chatEvent("안녕하세요\n11월 첫 주말 가능할까요?");
 
     @Mock
     private NotificationSettingRepository notificationSettingRepository;
@@ -59,7 +60,7 @@ class PushNotificationServiceTest {
     private PushSender pushSender;
 
     @Test
-    @DisplayName("설정을 저장한 적 없으면 기본값으로 보고, 대화 상대의 모든 기기에 보낸다")
+    @DisplayName("설정을 저장한 적 없으면 기본값으로 보고, 대화 상대의 모든 기기에 data-only 로 보낸다 (앱이 직접 그림)")
     void sendWithDefaults() {
         given(notificationSettingRepository.findById(RECIPIENT_ID)).willReturn(Optional.empty());
         given(pushTokenRepository.findTokensByMemberId(RECIPIENT_ID)).willReturn(List.of("phone", "tablet"));
@@ -69,14 +70,14 @@ class PushNotificationServiceTest {
 
         ArgumentCaptor<PushMessage> message = ArgumentCaptor.forClass(PushMessage.class);
         then(pushSender).should().send(eq(List.of("phone", "tablet")), message.capture());
-        assertThat(message.getValue().title()).isEqualTo("김시흥");
-        assertThat(message.getValue().body()).isEqualTo("안녕하세요 11월 첫 주말 가능할까요?");
-        assertThat(message.getValue().data())
-                .containsEntry("type", "CHAT_MESSAGE")
-                .containsEntry("conversationId", "5")
-                .containsEntry("messageId", "40");
-        assertThat(message.getValue().channelId()).isEqualTo("chat");
-        assertThat(message.getValue().tag()).isEqualTo("conversation-5");
+        assertThat(message.getValue().isDataOnly()).isTrue();
+        assertThat(message.getValue().data()).containsOnly(
+                entry("type", "CHAT_MESSAGE"),
+                entry("conversationId", "5"),
+                entry("messageId", "40"),
+                entry("senderName", "김시흥"),
+                entry("content", "안녕하세요\n11월 첫 주말 가능할까요?"),
+                entry("createdAt", "2026-11-13T11:30:00"));
         then(pushTokenService).should(never()).deleteInvalid(anyList());
     }
 
@@ -137,14 +138,15 @@ class PushNotificationServiceTest {
 
         ArgumentCaptor<PushMessage> message = ArgumentCaptor.forClass(PushMessage.class);
         then(pushSender).should().send(eq(List.of("provider-phone")), message.capture());
-        assertThat(message.getValue().title()).isEqualTo("새 이용 신청");
-        assertThat(message.getValue().body()).isEqualTo("최팝업님이 '배곧 카페거리 2층 갤러리' 11/20~11/22 이용을 신청했어요.");
+        assertThat(message.getValue().isDataOnly()).isFalse();
+        assertThat(message.getValue().display().title()).isEqualTo("새 이용 신청");
+        assertThat(message.getValue().display().body()).isEqualTo("최팝업님이 '배곧 카페거리 2층 갤러리' 11/20~11/22 이용을 신청했어요.");
         assertThat(message.getValue().data())
                 .containsEntry("type", "APPLICATION_SUBMITTED")
                 .containsEntry("applicationId", "31")
                 .containsEntry("spaceId", "8");
-        assertThat(message.getValue().channelId()).isEqualTo("activity");
-        assertThat(message.getValue().tag()).isEqualTo("application-31");
+        assertThat(message.getValue().display().channelId()).isEqualTo("activity");
+        assertThat(message.getValue().display().tag()).isEqualTo("application-31");
     }
 
     @Test
@@ -154,7 +156,7 @@ class PushNotificationServiceTest {
                 "배곧 카페거리 2층 갤러리", PROVIDER_ID, "최팝업", LocalDate.of(2026, 11, 20), LocalDate.of(2026, 11, 20),
                 true));
 
-        assertThat(message.body()).isEqualTo("최팝업님이 '배곧 카페거리 2층 갤러리' 11/20 이용을 신청했어요. (희망 가격 제안 있음)");
+        assertThat(message.display().body()).isEqualTo("최팝업님이 '배곧 카페거리 2층 갤러리' 11/20 이용을 신청했어요. (희망 가격 제안 있음)");
     }
 
     @Test
@@ -180,14 +182,29 @@ class PushNotificationServiceTest {
     }
 
     @Test
-    @DisplayName("본문은 100자까지 자르고 말줄임표를 붙인다")
-    void longMessagePreview() {
-        String content = "가".repeat(150);
+    @DisplayName("채팅 내용은 500자까지 보내고 넘으면 자른 뒤 말줄임표를 붙인다 (이모지를 반으로 자르지 않음)")
+    void longChatContent() {
+        String exact = "가".repeat(PushNotificationService.MAX_CHAT_CONTENT_LENGTH);
+        String emojiAtEdge = "가".repeat(PushNotificationService.MAX_CHAT_CONTENT_LENGTH - 1) + "😀" + "나머지";
 
-        PushMessage message = PushNotificationService.chatMessage(
-                new ChatMessageSentEvent(5L, 40L, 1L, "김시흥", RECIPIENT_ID, content));
+        assertThat(PushNotificationService.chatMessage(chatEvent(exact)).data().get("content")).isEqualTo(exact);
+        assertThat(PushNotificationService.chatMessage(chatEvent(exact + "더")).data().get("content"))
+                .isEqualTo(exact + "…");
+        assertThat(PushNotificationService.chatMessage(chatEvent(emojiAtEdge)).data().get("content"))
+                .isEqualTo("가".repeat(PushNotificationService.MAX_CHAT_CONTENT_LENGTH - 1) + "😀…");
+    }
 
-        assertThat(message.body()).hasSize(101).endsWith("…");
+    @Test
+    @DisplayName("보낸 시각은 초 단위로 보낸다 (API 응답과 같은 형식)")
+    void createdAtInSeconds() {
+        ChatMessageSentEvent event = new ChatMessageSentEvent(5L, 40L, 1L, "김시흥", RECIPIENT_ID, "안녕하세요",
+                LocalDateTime.of(2026, 11, 13, 9, 5, 0, 123_456_789));
+
+        assertThat(PushNotificationService.chatMessage(event).data()).containsEntry("createdAt", "2026-11-13T09:05:00");
+    }
+
+    private static ChatMessageSentEvent chatEvent(String content) {
+        return new ChatMessageSentEvent(5L, 40L, 1L, "김시흥", RECIPIENT_ID, content, LocalDateTime.of(2026, 11, 13, 11, 30));
     }
 
     private PushNotificationService service(Clock clock) {

@@ -9,7 +9,12 @@ public class LoggingPushSender implements PushSender {
 
     @Override
     public PushResult send(List<String> tokens, PushMessage message) {
-        log.info("푸시(로그만) 기기 {}대: {} — {} {}", tokens.size(), message.title(), message.body(), message.data());
+        if (message.isDataOnly()) {
+            log.info("푸시(로그만, data-only) 기기 {}대: {}", tokens.size(), message.data());
+        } else {
+            log.info("푸시(로그만) 기기 {}대: {} — {} {}", tokens.size(), message.display().title(),
+                    message.display().body(), message.data());
+        }
         return new PushResult(tokens.size(), List.of());
     }
 }

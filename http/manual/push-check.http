@@ -3,7 +3,8 @@
 #   1) 서버: set -a; source .env; set +a; ./gradlew bootRun --args='--spring.profiles.active=local,demo'
 #      시작 로그에 "FCM 푸시 사용: 프로젝트 dasi-siheung-326b1" 이 보여야 한다.
 #   2) 아래 deviceToken 에 휴대폰 앱의 FCM 토큰을 붙여 넣는다. (Logcat 에서 복사)
-#   3) 휴대폰 앱은 홈 화면으로 내려 둔다. (앱이 떠 있으면 시스템 알림이 뜨지 않고 onMessageReceived 로만 온다)
+#   3) 채팅 푸시는 data-only 라 앱이 떠 있든 꺼져 있든 onMessageReceived 로 받아 앱이 직접 알림을 그린다.
+#      앱을 완전히 종료한 상태에서도 확인한다. (notification 블록을 받던 옛 앱 버전은 알림이 뜨지 않는다)
 # 흐름: provider3(이거북) 기기 등록 → user4(오체험)가 기존 대화에 메시지 → provider3 휴대폰에 알림
 
 @deviceToken = 여기에_휴대폰_FCM_토큰_붙여넣기
@@ -85,6 +86,7 @@ Authorization: Bearer {{senderToken}}
 %}
 
 ### 6. 메시지 보내기 → 휴대폰에 "오체험 / 푸시 테스트 …" 알림이 와야 한다
+# 한 번 더 보내면 같은 대화방 알림에 메시지가 쌓이고, 알림의 읽음 · 답장 버튼이 보여야 한다
 POST {{baseUrl}}/api/v1/conversations/{{pushConversationId}}/messages
 Authorization: Bearer {{senderToken}}
 Content-Type: application/json

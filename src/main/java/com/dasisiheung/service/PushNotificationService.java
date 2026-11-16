@@ -12,6 +12,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -27,8 +28,8 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * 회원의 알림 설정(전체 스위치 · 분류 · 방해금지)을 지킨다. 방해금지 시간의 알림은 미루지 않고 버린다.
  * (앱은 폴링 · 목록 조회로 새 메시지 · 신청을 그대로 볼 수 있다)
  * <ul>
- *   <li>채팅 메시지 → 대화 상대 (대화 알림)</li>
- *   <li>새 이용 신청 → 공간 제공자 (활동 알림)</li>
+ *   <li>채팅 메시지 → 대화 상대 (대화 알림). data-only 로 보내 앱이 메시지를 쌓고 읽음 · 답장 버튼을 단다.</li>
+ *   <li>새 이용 신청 → 공간 제공자 (활동 알림). 시스템이 바로 그린다.</li>
  * </ul>
  */
 @Slf4j
@@ -36,12 +37,14 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @RequiredArgsConstructor
 public class PushNotificationService {
 
-    static final String CHAT_CHANNEL = "chat";
     static final String ACTIVITY_CHANNEL = "activity";
     static final String TYPE_CHAT_MESSAGE = "CHAT_MESSAGE";
     static final String TYPE_APPLICATION_SUBMITTED = "APPLICATION_SUBMITTED";
     private static final DateTimeFormatter SHORT_DATE = DateTimeFormatter.ofPattern("M/d");
-    static final int MAX_BODY_LENGTH = 100;
+    /** 푸시 data 의 시각 형식 — API 응답의 LocalDateTime 과 같다 (예: 2026-11-13T11:30:00). */
+    private static final DateTimeFormatter DATA_TIME = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+    /** 채팅 푸시에 담는 내용 길이 (글자 수). 앱이 알림 크기에 맞게 다시 줄인다. */
+    static final int MAX_CHAT_CONTENT_LENGTH = 500;
 
     private final NotificationSettingRepository notificationSettingRepository;
     private final PushTokenRepository pushTokenRepository;
@@ -84,14 +87,17 @@ public class PushNotificationService {
                 .orElse(NotificationPreferences.DEFAULT);
     }
 
-    /** 제목: 보낸 사람 / 본문: 메시지 앞부분 / 대화방마다 알림 하나만 보이게 tag 를 붙인다. */
+    /**
+     * data-only: 앱이 onMessageReceived 로 받아 대화방별로 메시지를 쌓고 읽음 · 답장 버튼을 단다. (채널 · tag 도 앱이 정함)
+     */
     static PushMessage chatMessage(ChatMessageSentEvent event) {
-        Map<String, String> data = Map.of(
+        return PushMessage.dataOnly(Map.of(
                 "type", TYPE_CHAT_MESSAGE,
                 "conversationId", String.valueOf(event.conversationId()),
-                "messageId", String.valueOf(event.messageId()));
-        return new PushMessage(event.senderName(), preview(event.content()), data, CHAT_CHANNEL,
-                "conversation-" + event.conversationId());
+                "messageId", String.valueOf(event.messageId()),
+                "senderName", event.senderName(),
+                "content", truncate(event.content(), MAX_CHAT_CONTENT_LENGTH),
+                "createdAt", DATA_TIME.format(event.createdAt().truncatedTo(ChronoUnit.SECONDS))));
     }
 
     /** 제목: 새 이용 신청 / 본문: 누가 · 어느 공간 · 언제 (+ 가격 제안) / 신청마다 알림 하나. */
@@ -102,7 +108,8 @@ public class PushNotificationService {
                 "type", TYPE_APPLICATION_SUBMITTED,
                 "applicationId", String.valueOf(event.applicationId()),
                 "spaceId", String.valueOf(event.spaceId()));
-        return new PushMessage("새 이용 신청", body, data, ACTIVITY_CHANNEL, "application-" + event.applicationId());
+        return PushMessage.notification("새 이용 신청", body, data, ACTIVITY_CHANNEL,
+                "application-" + event.applicationId());
     }
 
     /** 11/20 또는 11/20~11/22 */
@@ -110,8 +117,11 @@ public class PushNotificationService {
         return start.equals(end) ? SHORT_DATE.format(start) : SHORT_DATE.format(start) + "~" + SHORT_DATE.format(end);
     }
 
-    private static String preview(String content) {
-        String flat = content.strip().replaceAll("\\s+", " ");
-        return flat.length() <= MAX_BODY_LENGTH ? flat : flat.substring(0, MAX_BODY_LENGTH) + "…";
+    /** 글자(코드 포인트) 단위로 잘라 이모지를 반으로 자르지 않는다. 잘랐으면 말줄임표를 붙인다. */
+    private static String truncate(String content, int maxLength) {
+        if (content.codePointCount(0, content.length()) <= maxLength) {
+            return content;
+        }
+        return content.substring(0, content.offsetByCodePoints(0, maxLength)) + "…";
     }
 }

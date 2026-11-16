@@ -504,10 +504,10 @@ HIDDEN(숨김): 신고 처리로 관리자가 내린 공간 — 수정 불가
 
 아래 일이 생기면 서버가 **받는 사람의 모든 기기**에 FCM 푸시를 보냅니다. 폴링([3-3-7](#3-3-7-11-소통-폴링)) · 목록 조회는 그대로 두고, 푸시는 앱이 꺼져 있을 때 알려 주는 용도입니다.
 
-| 언제 | 누구에게 | `data.type` | 알림 설정 | 채널 |
+| 언제 | 누구에게 | `data.type` | 알림 설정 | 보내는 방식 |
 | --- | --- | --- | --- | --- |
-| 1:1 메시지가 옴 | 대화 상대 | `CHAT_MESSAGE` | `chat` (대화 알림) | `chat` |
-| 이용 신청이 들어옴 | 공간 제공자 | `APPLICATION_SUBMITTED` | `activity` (활동 알림) | `activity` |
+| 1:1 메시지가 옴 | 대화 상대 | `CHAT_MESSAGE` | `chat` (대화 알림) | **data-only** — 앱이 직접 그림 (채널 · tag 도 앱이 정함) |
+| 이용 신청이 들어옴 | 공간 제공자 | `APPLICATION_SUBMITTED` | `activity` (활동 알림) | notification — 시스템이 그림 (채널 `activity`) |
 
 **토큰 등록 · 해제**
 
@@ -528,19 +528,28 @@ override fun onNewToken(token: String) { /* 로그인 상태면 registerPushToke
 - 같은 토큰을 여러 번 보내도 됩니다. 같은 기기에서 다른 계정으로 로그인하면 토큰이 새 계정으로 옮겨집니다. (한 기기 = 마지막 로그인 계정)
 - 60일 넘게 다시 등록되지 않은 토큰, 앱 삭제 등으로 FCM 이 거절한 토큰은 서버가 지웁니다. 탈퇴하면 모두 지웁니다.
 
-**받는 알림 — 1:1 메시지**
+**받는 알림 — 1:1 메시지 (data-only)**
 
 ```json
 {
-  "notification": { "title": "김시흥", "body": "11월 첫 주말 가능할까요?" },
-  "data": { "type": "CHAT_MESSAGE", "conversationId": "5", "messageId": "40" },
-  "android": { "priority": "HIGH", "notification": { "channel_id": "chat", "tag": "conversation-5" } }
+  "data": {
+    "type": "CHAT_MESSAGE",
+    "conversationId": "5",
+    "messageId": "40",
+    "senderName": "김시흥",
+    "content": "11월 첫 주말 가능할까요?",
+    "createdAt": "2026-11-13T11:30:00"
+  },
+  "android": { "priority": "HIGH" }
 }
 ```
 
-- 제목은 보낸 사람 이름, 본문은 메시지 앞 100자입니다.
-- 같은 대화방 알림은 `tag` 로 하나만 보이고 새 메시지로 바뀝니다.
+- `notification` 블록이 없어서 앱이 꺼져 있어도 **항상 `onMessageReceived` 로 옵니다.** 앱이 대화방별로 메시지를 쌓고 읽음 · 답장 버튼을 답니다.
+  알림 버튼은 기존 API(`POST /conversations/{id}/read`, `POST /conversations/{id}/messages`)를 그대로 씁니다.
+- `content` 는 메시지 내용 **최대 500자** (넘으면 잘라서 끝에 `…`), 줄바꿈은 그대로입니다. 알림에 맞게 앱이 다시 줄이세요.
+- `createdAt` 은 API 응답과 같은 형식(초 단위)입니다.
 - 누르면 `conversationId` 대화방으로 이동하세요.
+- `notification` 블록을 받던 **옛 앱 버전은 채팅 알림이 뜨지 않습니다.** 모두 새 앱으로 업데이트해 주세요.
 
 **받는 알림 — 새 이용 신청 (공간 제공자)**
 
@@ -557,9 +566,9 @@ override fun onNewToken(token: String) { /* 로그인 상태면 registerPushToke
 
 **공통**
 
-- **알림 채널 `chat` · `activity`** 를 앱에서 만들어 주세요. (없으면 FCM 기본 채널로 표시됩니다)
+- **알림 채널 `chat` · `activity`** 를 앱에서 만들어 주세요. (`activity` 가 없으면 FCM 기본 채널로 표시됩니다)
 - `data.type` 으로 화면을 나누세요. `data` 값은 모두 **문자열**입니다. 모르는 `type` 은 무시하세요 (나중에 종류가 늘어납니다).
-- 앱이 화면에 떠 있을 때(포그라운드)는 시스템이 알림을 띄우지 않고 `onMessageReceived` 로 옵니다. 보고 있는 화면의 알림이면 무시하고, 아니면 직접 알림을 띄우면 됩니다.
+- 이용 신청 알림은 앱이 화면에 떠 있을 때(포그라운드)는 시스템이 알림을 띄우지 않고 `onMessageReceived` 로 옵니다. 보고 있는 화면의 알림이면 무시하고, 아니면 직접 알림을 띄우면 됩니다.
 - **알림 설정([3-3-8](#3-3-8-알림-설정))을 서버가 지킵니다.** 푸시 전체를 껐거나, 해당 알림(대화 · 활동)을 껐거나, 방해금지 시간이면 보내지 않습니다. 방해금지 중의 알림은 나중에 다시 보내지 않습니다.
 
 ### 3-4. 인증 (JWT)

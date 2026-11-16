@@ -39,8 +39,10 @@ class FcmPushSenderTest {
     private static final KeyPair KEY_PAIR = TestServiceAccounts.keyPair();
     private static final String SEND_URL =
             "https://fcm.googleapis.com/v1/projects/" + TestServiceAccounts.PROJECT_ID + "/messages:send";
-    private static final PushMessage MESSAGE = new PushMessage("김시흥", "안녕하세요",
+    private static final PushMessage MESSAGE = PushMessage.notification("김시흥", "안녕하세요",
             Map.of("type", "CHAT_MESSAGE", "conversationId", "5"), "chat", "conversation-5");
+    private static final PushMessage DATA_ONLY = PushMessage.dataOnly(
+            Map.of("type", "CHAT_MESSAGE", "conversationId", "5", "senderName", "김시흥", "content", "안녕하세요"));
     private static final String UNREGISTERED = """
             {"error": {"code": 404, "status": "NOT_FOUND", "message": "Requested entity was not found.",
               "details": [{"@type": "type.googleapis.com/google.firebase.fcm.v1.FcmError", "errorCode": "UNREGISTERED"}]}}
@@ -73,6 +75,25 @@ class FcmPushSenderTest {
 
         assertThat(result.sentCount()).isEqualTo(2);
         assertThat(result.invalidTokens()).isEmpty();
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("data-only 는 notification 블록 없이 data 와 우선순위(HIGH)만 보낸다 — 앱이 onMessageReceived 로 직접 그린다")
+    void sendDataOnly() {
+        expectAccessToken("ya29.first");
+        server.expect(once(), requestTo(SEND_URL))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(jsonPath("$.message.token").value("phone"))
+                .andExpect(jsonPath("$.message.notification").doesNotExist())
+                .andExpect(jsonPath("$.message.data.type").value("CHAT_MESSAGE"))
+                .andExpect(jsonPath("$.message.data.senderName").value("김시흥"))
+                .andExpect(jsonPath("$.message.data.content").value("안녕하세요"))
+                .andExpect(jsonPath("$.message.android.priority").value("HIGH"))
+                .andExpect(jsonPath("$.message.android.notification").doesNotExist())
+                .andRespond(withSuccess());
+
+        assertThat(sender.send(List.of("phone"), DATA_ONLY).sentCount()).isEqualTo(1);
         server.verify();
     }
 

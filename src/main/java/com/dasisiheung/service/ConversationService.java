@@ -153,7 +153,7 @@ public class ConversationService {
                 new Message(conversation, sender, content, LocalDateTime.now(clock)));
         conversation.onMessageSent(message);
         eventPublisher.publishEvent(new ChatMessageSentEvent(conversationId, message.getId(), memberId,
-                sender.getName(), recipientId, content));
+                sender.getName(), recipientId, message.getContent(), message.getCreatedAt()));
         return MessageResponse.of(message, memberId);
     }
 
