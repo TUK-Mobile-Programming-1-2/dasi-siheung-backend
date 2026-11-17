@@ -27,3 +27,40 @@ Accept: application/json
             `실제 ${response.body.data.serverTime}`);
     });
 %}
+
+### CORS 사전 요청 — 허용된 출처 (관리자 웹)
+# 인증: 불필요
+# allowedOrigin: local = http://localhost:5173, prod = https://dasi-siheung-web-develop.vercel.app
+# 기대값: 200 OK, Access-Control-Allow-Origin = 요청한 Origin 그대로
+OPTIONS {{baseUrl}}/api/v1/system/ping
+Origin: {{allowedOrigin}}
+Access-Control-Request-Method: POST
+Access-Control-Request-Headers: authorization, content-type
+
+> {%
+    client.test("200 OK", () => {
+        client.assert(response.status === 200, `기대 200, 실제 ${response.status}`);
+    });
+    client.test("Access-Control-Allow-Origin = 요청 Origin", () => {
+        const allowOrigin = response.headers.valueOf("Access-Control-Allow-Origin");
+        client.assert(allowOrigin === request.environment.get("allowedOrigin"),
+            `기대 ${request.environment.get("allowedOrigin")}, 실제 ${allowOrigin}`);
+    });
+%}
+
+### CORS 사전 요청 — 허용되지 않은 출처
+# 인증: 불필요
+# 기대값: 403 Forbidden, Access-Control-Allow-Origin 헤더 없음
+OPTIONS {{baseUrl}}/api/v1/system/ping
+Origin: https://unknown.example.com
+Access-Control-Request-Method: POST
+
+> {%
+    client.test("403 Forbidden", () => {
+        client.assert(response.status === 403, `기대 403, 실제 ${response.status}`);
+    });
+    client.test("Access-Control-Allow-Origin 없음", () => {
+        const allowOrigin = response.headers.valueOf("Access-Control-Allow-Origin");
+        client.assert(allowOrigin === null || allowOrigin === undefined, `실제 ${allowOrigin}`);
+    });
+%}

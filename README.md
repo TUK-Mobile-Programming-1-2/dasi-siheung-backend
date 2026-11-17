@@ -288,6 +288,7 @@ CI 는 러너에 기본 설치된 PostgreSQL 에 PostGIS 를 apt 로 추가해 �
 
 배포 대상(`wonjongwoo01/dasi-siheung-backend`, 스테이지 `main`)과 실행 옵션은 `cd.yml` 에 적혀 있습니다.
 CD 는 배포할 때마다 Cloudtype 설정을 `cd.yml` 내용으로 덮어쓰므로, 설정 변경은 대시보드가 아니라 `cd.yml` 에서 합니다.
+관리자 웹 허용 출처(`CORS_ALLOWED_ORIGINS`)는 비밀값이 아니므로 Secret 이 아니라 `cd.yml` 의 env 에 평문으로 둡니다. 관리자 웹 주소가 바뀌면 여기를 고칩니다.
 
 ## 배포 준비 (Supabase · Cloudtype)
 
