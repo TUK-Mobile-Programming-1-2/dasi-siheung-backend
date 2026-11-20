@@ -44,7 +44,7 @@ public final class SpaceFixtures {
                                        Integer maxCapacity, boolean priceNegotiable) {
         return new SpaceRequest("정왕역 앞 1층 상가", "유동 인구가 많은 역 앞 코너 상가입니다.", "21시 이후 소음 금지",
                 "경기도 시흥시 마유로 418", "정왕프라자", "101호", latitude, longitude, new BigDecimal("33.06"),
-                BuildingUse.NEIGHBORHOOD_1, CommercialTheme.FOOD_ALLEY, 50_000,
+                BuildingUse.NEIGHBORHOOD_1, null, CommercialTheme.FOOD_ALLEY, 50_000,
                 Set.of(Facility.WIFI, Facility.ELECTRICITY), Set.of(ActivityType.POPUP_STORE, ActivityType.EXHIBITION),
                 availableDates, maxCapacity, equipment(), priceNegotiable);
     }
@@ -54,8 +54,16 @@ public final class SpaceFixtures {
                                           List<EquipmentItem> equipment, Boolean priceNegotiable) {
         return new SpaceRequest(title, base.description(), base.rules(), base.address(), base.buildingName(),
                 base.unitNumber(), base.latitude(), base.longitude(), base.areaSqm(), base.buildingUse(),
+                base.buildingUseEtc(), base.commercialTheme(), base.dailyPrice(), base.facilities(),
+                base.activityTypes(), base.availableDates(), maxCapacity, equipment, priceNegotiable);
+    }
+
+    /** 같은 요청에 건축물 용도 · 기타 용도 직접 입력만 바꾼다. */
+    public static SpaceRequest withBuildingUse(SpaceRequest base, BuildingUse buildingUse, String buildingUseEtc) {
+        return new SpaceRequest(base.title(), base.description(), base.rules(), base.address(), base.buildingName(),
+                base.unitNumber(), base.latitude(), base.longitude(), base.areaSqm(), buildingUse, buildingUseEtc,
                 base.commercialTheme(), base.dailyPrice(), base.facilities(), base.activityTypes(),
-                base.availableDates(), maxCapacity, equipment, priceNegotiable);
+                base.availableDates(), base.maxCapacity(), base.equipment(), base.priceNegotiable());
     }
 
     public static List<EquipmentItem> equipment() {
@@ -67,7 +75,7 @@ public final class SpaceFixtures {
                                        int dailyPrice, Set<Facility> facilities, Set<ActivityType> activityTypes,
                                        Set<LocalDate> availableDates) {
         return new SpaceRequest(title, "검색 테스트 공간", null, "경기도 시흥시 테스트로 1", null, null,
-                latitude, longitude, new BigDecimal("30.00"), BuildingUse.NEIGHBORHOOD_1, theme, dailyPrice,
+                latitude, longitude, new BigDecimal("30.00"), BuildingUse.NEIGHBORHOOD_1, null, theme, dailyPrice,
                 facilities, activityTypes, availableDates, null, null, null);
     }
 

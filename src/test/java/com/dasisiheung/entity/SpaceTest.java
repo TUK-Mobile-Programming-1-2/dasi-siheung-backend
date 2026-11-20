@@ -3,6 +3,7 @@ package com.dasisiheung.entity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.dasisiheung.dto.space.SpaceRequest;
 import com.dasisiheung.entity.member.Member;
 import com.dasisiheung.entity.space.BuildingUse;
 import com.dasisiheung.entity.space.Equipment;
@@ -205,8 +206,8 @@ class SpaceTest {
         SpaceDetails base = SpaceFixtures.request(Set.of()).toDetails();
         space.update(space.getRegion(), new SpaceDetails(base.title(), base.description(), base.rules(),
                 base.address(), base.buildingName(), base.unitNumber(), base.location(), base.areaSqm(),
-                base.buildingUse(), base.commercialTheme(), base.dailyPrice(), base.facilities(), base.activityTypes(),
-                30, List.of(new Equipment(" 빔프로젝터 ", 1)), false), null, TODAY);
+                base.buildingUse(), null, base.commercialTheme(), base.dailyPrice(), base.facilities(),
+                base.activityTypes(), 30, List.of(new Equipment(" 빔프로젝터 ", 1)), false), null, TODAY);
 
         assertThat(space.getStatus()).isEqualTo(SpaceStatus.PUBLISHED);
         assertThat(space.getMaxCapacity()).isEqualTo(30);
@@ -229,6 +230,34 @@ class SpaceTest {
         assertThat(space.canAccommodate(500)).isTrue();
         assertThat(space.getEquipment()).isEmpty();
         assertThat(space.isPriceNegotiable()).isTrue();
+    }
+
+    @Test
+    @DisplayName("기타 용도 직접 입력을 저장하고, 공개 중에 바꾸면 다시 검수 대기 · 다른 용도로 바꾸면 지운다")
+    void buildingUseEtc() {
+        Space space = published();
+        SpaceRequest base = SpaceFixtures.request(Set.of());
+
+        space.update(space.getRegion(),
+                SpaceFixtures.withBuildingUse(base, BuildingUse.ETC, " 복합 문화 공간 ").toDetails(), null, TODAY);
+        assertThat(space.getBuildingUse()).isEqualTo(BuildingUse.ETC);
+        assertThat(space.getBuildingUseEtc()).isEqualTo("복합 문화 공간");
+        assertThat(space.getStatus()).isEqualTo(SpaceStatus.PENDING_REVIEW);
+
+        ReflectionTestUtils.setField(space, "status", SpaceStatus.PUBLISHED);
+        space.update(space.getRegion(),
+                SpaceFixtures.withBuildingUse(base, BuildingUse.ETC, "복합 문화 공간").toDetails(), null, TODAY);
+        assertThat(space.getStatus()).isEqualTo(SpaceStatus.PUBLISHED);
+
+        space.update(space.getRegion(),
+                SpaceFixtures.withBuildingUse(base, BuildingUse.ETC, "공방").toDetails(), null, TODAY);
+        assertThat(space.getBuildingUseEtc()).isEqualTo("공방");
+        assertThat(space.getStatus()).isEqualTo(SpaceStatus.PENDING_REVIEW);
+
+        space.update(space.getRegion(),
+                SpaceFixtures.withBuildingUse(base, BuildingUse.SALES, "공방").toDetails(), null, TODAY);
+        assertThat(space.getBuildingUse()).isEqualTo(BuildingUse.SALES);
+        assertThat(space.getBuildingUseEtc()).isNull();
     }
 
     @Test

@@ -411,3 +411,152 @@ Authorization: Bearer {{providerToken}}
         client.assert(response.status === 409, `실제 ${response.status}`);
     });
 %}
+
+### 기타 용도 공간 등록 (buildingUse = ETC + 직접 입력)
+# 인증: PROVIDER
+# 기대값: 201 Created, buildingUse = ETC, buildingUseEtc = "복합 문화 공간" (앞뒤 공백은 떼고 저장), 소개는 보낸 그대로
+POST {{baseUrl}}/api/v1/provider/spaces
+Authorization: Bearer {{providerToken}}
+Content-Type: application/json
+
+{
+  "title": "배곧 복합 문화 공간",
+  "description": "공연 · 전시 · 모임을 함께 여는 다목적 공간입니다.",
+  "address": "경기도 시흥시 배곧4로 32",
+  "latitude": 37.3773,
+  "longitude": 126.7302,
+  "areaSqm": 80,
+  "buildingUse": "ETC",
+  "buildingUseEtc": "  복합 문화 공간 ",
+  "dailyPrice": 90000,
+  "activityTypes": ["EXHIBITION", "MEETING"]
+}
+
+> {%
+    client.test("201 Created + 기타 용도 직접 입력", () => {
+        const data = response.body.data;
+        client.assert(response.status === 201, `실제 ${response.status}`);
+        client.assert(data.buildingUse === "ETC", `실제 ${data.buildingUse}`);
+        client.assert(data.buildingUseEtc === "복합 문화 공간", `실제 ${data.buildingUseEtc}`);
+        client.assert(data.description === "공연 · 전시 · 모임을 함께 여는 다목적 공간입니다.", `실제 ${data.description}`);
+    });
+    client.global.set("etcSpaceId", response.body.data.id);
+%}
+
+### 기타 용도인데 직접 입력이 없음 → 400
+# 기대값: 400 INVALID_INPUT, fieldErrors[0].field = buildingUseEtcFilled
+POST {{baseUrl}}/api/v1/provider/spaces
+Authorization: Bearer {{providerToken}}
+Content-Type: application/json
+
+{
+  "title": "기타 용도 빈 입력",
+  "description": "직접 입력 없이 기타를 고른 예",
+  "address": "경기도 시흥시 배곧4로 32",
+  "latitude": 37.3773,
+  "longitude": 126.7302,
+  "areaSqm": 30,
+  "buildingUse": "ETC",
+  "buildingUseEtc": "   ",
+  "dailyPrice": 50000,
+  "activityTypes": ["POPUP_STORE"]
+}
+
+> {%
+    client.test("400 buildingUseEtcFilled", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "INVALID_INPUT", `실제 ${response.body.error.code}`);
+        client.assert(response.body.error.fieldErrors[0].field === "buildingUseEtcFilled", `실제 ${response.body.error.fieldErrors[0].field}`);
+    });
+%}
+
+### 기타 용도 직접 입력 50자 초과 → 400
+# 기대값: 400 INVALID_INPUT, fieldErrors[0].field = buildingUseEtc
+POST {{baseUrl}}/api/v1/provider/spaces
+Authorization: Bearer {{providerToken}}
+Content-Type: application/json
+
+{
+  "title": "기타 용도 긴 입력",
+  "description": "직접 입력이 51자인 예",
+  "address": "경기도 시흥시 배곧4로 32",
+  "latitude": 37.3773,
+  "longitude": 126.7302,
+  "areaSqm": 30,
+  "buildingUse": "ETC",
+  "buildingUseEtc": "{{$random.alphabetic(51)}}",
+  "dailyPrice": 50000,
+  "activityTypes": ["POPUP_STORE"]
+}
+
+> {%
+    client.test("400 buildingUseEtc", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.fieldErrors[0].field === "buildingUseEtc", `실제 ${response.body.error.fieldErrors[0].field}`);
+    });
+%}
+
+### 기타 용도 공간 상세
+# 기대값: 200 OK, buildingUseEtc = "복합 문화 공간"
+GET {{baseUrl}}/api/v1/provider/spaces/{{etcSpaceId}}
+Authorization: Bearer {{providerToken}}
+
+> {%
+    client.test("200 OK + 같은 값", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.buildingUseEtc === "복합 문화 공간", `실제 ${response.body.data.buildingUseEtc}`);
+    });
+%}
+
+### 기타 용도 직접 입력 수정
+# 기대값: 200 OK, buildingUseEtc = "공연장 겸 갤러리"
+PUT {{baseUrl}}/api/v1/provider/spaces/{{etcSpaceId}}
+Authorization: Bearer {{providerToken}}
+Content-Type: application/json
+
+{
+  "title": "배곧 복합 문화 공간",
+  "description": "공연 · 전시 · 모임을 함께 여는 다목적 공간입니다.",
+  "address": "경기도 시흥시 배곧4로 32",
+  "latitude": 37.3773,
+  "longitude": 126.7302,
+  "areaSqm": 80,
+  "buildingUse": "ETC",
+  "buildingUseEtc": "공연장 겸 갤러리",
+  "dailyPrice": 90000,
+  "activityTypes": ["EXHIBITION", "MEETING"]
+}
+
+> {%
+    client.test("200 OK + 새 값", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.buildingUseEtc === "공연장 겸 갤러리", `실제 ${response.body.data.buildingUseEtc}`);
+    });
+%}
+
+### 다른 용도로 수정하면 직접 입력은 지운다
+# 기대값: 200 OK, buildingUse = SALES, buildingUseEtc = null (보내도 무시)
+PUT {{baseUrl}}/api/v1/provider/spaces/{{etcSpaceId}}
+Authorization: Bearer {{providerToken}}
+Content-Type: application/json
+
+{
+  "title": "배곧 복합 문화 공간",
+  "description": "공연 · 전시 · 모임을 함께 여는 다목적 공간입니다.",
+  "address": "경기도 시흥시 배곧4로 32",
+  "latitude": 37.3773,
+  "longitude": 126.7302,
+  "areaSqm": 80,
+  "buildingUse": "SALES",
+  "buildingUseEtc": "공연장 겸 갤러리",
+  "dailyPrice": 90000,
+  "activityTypes": ["EXHIBITION", "MEETING"]
+}
+
+> {%
+    client.test("200 OK + 직접 입력 없음", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.buildingUse === "SALES", `실제 ${response.body.data.buildingUse}`);
+        client.assert(response.body.data.buildingUseEtc === null, `실제 ${response.body.data.buildingUseEtc}`);
+    });
+%}

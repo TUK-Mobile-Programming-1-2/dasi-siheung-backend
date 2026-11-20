@@ -63,6 +63,10 @@ public record SpaceRequest(
         @Schema(description = "건축물 용도 (선택지 buildingUses)", example = "NEIGHBORHOOD_1")
         @NotNull BuildingUse buildingUse,
 
+        @Schema(description = "건축물 용도가 기타(ETC)일 때 직접 입력한 용도 (ETC 면 필수, 최대 50자). "
+                + "다른 용도면 무시하고 저장하지 않는다", example = "복합 문화 공간")
+        @Size(max = Space.MAX_BUILDING_USE_ETC_LENGTH) String buildingUseEtc,
+
         @Schema(description = "상권 테마 (선택지 commercialThemes, 선택)", example = "FOOD_ALLEY")
         CommercialTheme commercialTheme,
 
@@ -92,9 +96,17 @@ public record SpaceRequest(
     public SpaceDetails toDetails() {
         List<EquipmentItem> items = equipment == null ? List.of() : equipment;
         return new SpaceDetails(title, description, rules, address, buildingName, unitNumber,
-                GeoPoints.of(latitude, longitude), areaSqm, buildingUse, commercialTheme, dailyPrice,
+                GeoPoints.of(latitude, longitude), areaSqm, buildingUse, buildingUseEtc, commercialTheme, dailyPrice,
                 facilities, activityTypes, maxCapacity, items.stream().map(EquipmentItem::toEntity).toList(),
                 priceNegotiable == null || priceNegotiable);
+    }
+
+    /** 기타(ETC) 용도면 직접 입력한 용도가 있어야 한다. 오류는 fieldErrors 의 buildingUseEtcFilled 로 내려간다. */
+    @JsonIgnore
+    @Schema(hidden = true)
+    @AssertTrue(message = "건축물 용도가 기타면 용도를 직접 입력해 주세요. (buildingUseEtc, 최대 50자)")
+    public boolean isBuildingUseEtcFilled() {
+        return buildingUse != BuildingUse.ETC || (buildingUseEtc != null && !buildingUseEtc.isBlank());
     }
 
     @JsonIgnore
