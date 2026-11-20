@@ -9,7 +9,6 @@ import com.dasisiheung.push.PushSender;
 import com.dasisiheung.repository.NotificationSettingRepository;
 import com.dasisiheung.repository.PushTokenRepository;
 import java.time.Clock;
-import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
@@ -42,7 +41,6 @@ public class PushNotificationService {
     static final String TYPE_CHAT_MESSAGE = "CHAT_MESSAGE";
     static final String TYPE_APPLICATION_SUBMITTED = "APPLICATION_SUBMITTED";
     static final String TYPE_INQUIRY_ANSWERED = "INQUIRY_ANSWERED";
-    private static final DateTimeFormatter SHORT_DATE = DateTimeFormatter.ofPattern("M/d");
     /** 푸시 data 의 시각 형식 — API 응답의 LocalDateTime 과 같다 (예: 2026-11-13T11:30:00). */
     private static final DateTimeFormatter DATA_TIME = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
     /** 채팅 푸시에 담는 내용 길이 (글자 수). 앱이 알림 크기에 맞게 다시 줄인다. */
@@ -112,7 +110,7 @@ public class PushNotificationService {
     /** 제목: 새 이용 신청 / 본문: 누가 · 어느 공간 · 언제 (+ 가격 제안) / 신청마다 알림 하나. */
     static PushMessage applicationSubmitted(ApplicationSubmittedEvent event) {
         String body = "%s님이 '%s' %s 이용을 신청했어요.%s".formatted(event.applicantName(), event.spaceTitle(),
-                period(event.startDate(), event.endDate()), event.withOffer() ? " (희망 가격 제안 있음)" : "");
+                NoticeTexts.period(event.startDate(), event.endDate()), event.withOffer() ? " (희망 가격 제안 있음)" : "");
         Map<String, String> data = Map.of(
                 "type", TYPE_APPLICATION_SUBMITTED,
                 "applicationId", String.valueOf(event.applicationId()),
@@ -128,11 +126,6 @@ public class PushNotificationService {
                 "type", TYPE_INQUIRY_ANSWERED,
                 "inquiryId", String.valueOf(event.inquiryId()));
         return PushMessage.notification("1:1 문의 답변", body, data, ACTIVITY_CHANNEL, "inquiry-" + event.inquiryId());
-    }
-
-    /** 11/20 또는 11/20~11/22 */
-    private static String period(LocalDate start, LocalDate end) {
-        return start.equals(end) ? SHORT_DATE.format(start) : SHORT_DATE.format(start) + "~" + SHORT_DATE.format(end);
     }
 
     /** 글자(코드 포인트) 단위로 잘라 이모지를 반으로 자르지 않는다. 잘랐으면 말줄임표를 붙인다. */
