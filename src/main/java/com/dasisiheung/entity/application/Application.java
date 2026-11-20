@@ -214,15 +214,21 @@ public class Application extends BaseTimeEntity {
      * @throws BusinessException 내가 답할 제안이 없으면 NO_PENDING_OFFER
      */
     public void acceptOffer(Long memberId, PriceOffer latestOffer, LocalDateTime now) {
+        validateRespondable(memberId, latestOffer);
+        this.totalPrice = pendingOfferAmount;
+        this.pendingOfferAmount = null;
+        this.negotiationStatus = PriceNegotiationStatus.AGREED;
+        latestOffer.accept(now);
+    }
+
+    /** @throws BusinessException 참여자가 아니면 NOT_APPLICATION_PARTICIPANT, 검토 중이 아니면 INVALID_APPLICATION_STATUS,
+     *                           내가 답할 제안이 없으면 NO_PENDING_OFFER */
+    private void validateRespondable(Long memberId, PriceOffer latestOffer) {
         OfferSide side = sideOf(memberId);
         validatePending();
         if (negotiationStatus != side.waitingForMe() || latestOffer == null || latestOffer.getProposerSide() == side) {
             throw new BusinessException(ErrorCode.NO_PENDING_OFFER);
         }
-        this.totalPrice = pendingOfferAmount;
-        this.pendingOfferAmount = null;
-        this.negotiationStatus = PriceNegotiationStatus.AGREED;
-        latestOffer.accept(now);
     }
 
     private void validatePending() {
