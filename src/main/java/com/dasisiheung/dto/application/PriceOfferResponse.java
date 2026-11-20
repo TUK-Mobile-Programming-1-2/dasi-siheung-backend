@@ -13,11 +13,14 @@ public record PriceOfferResponse(
         @Schema(description = "제안 금액(원, 기간 합계)", example = "90000") int amount,
         @Schema(description = "한마디") String message,
         @Schema(description = "상대가 수락한 시각 (수락 전이면 null)") LocalDateTime acceptedAt,
+        @Schema(description = "상대가 거절한 시각 (거절 전이면 null)") LocalDateTime rejectedAt,
+        @Schema(description = "거절 한마디 (없으면 null)") String rejectionMessage,
         @Schema(description = "제안 시각") LocalDateTime createdAt
 ) {
 
     public static PriceOfferResponse from(PriceOffer offer) {
         return new PriceOfferResponse(offer.getId(), offer.getProposerSide(), offer.getProposer().getName(),
-                offer.getAmount(), offer.getMessage(), offer.getAcceptedAt(), offer.getCreatedAt());
+                offer.getAmount(), offer.getMessage(), offer.getAcceptedAt(), offer.getRejectedAt(),
+                offer.getRejectionMessage(), offer.getCreatedAt());
     }
 }
