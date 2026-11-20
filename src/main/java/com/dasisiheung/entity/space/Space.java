@@ -49,6 +49,8 @@ public class Space extends BaseTimeEntity {
     public static final int MAX_PROOFS = 5;
     public static final int MAX_CAPACITY = 500;
     public static final int MAX_EQUIPMENT = 20;
+    /** 건축물 용도 '기타' 직접 입력 최대 글자 수. */
+    public static final int MAX_BUILDING_USE_ETC_LENGTH = 50;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -89,6 +91,10 @@ public class Space extends BaseTimeEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "building_use", nullable = false, length = 30)
     private BuildingUse buildingUse;
+
+    /** 건축물 용도가 기타(ETC)일 때 제공자가 직접 적은 용도. 다른 용도면 null. */
+    @Column(name = "building_use_etc", length = MAX_BUILDING_USE_ETC_LENGTH)
+    private String buildingUseEtc;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "commercial_theme", length = 30)
@@ -201,7 +207,7 @@ public class Space extends BaseTimeEntity {
     }
 
     /**
-     * 공간 정보를 바꾼다. 공개·일시 중단 중에 검수 항목(지역·주소·건물·호실·면적·용도)이 바뀌면 다시 검수받는다.
+     * 공간 정보를 바꾼다. 공개·일시 중단 중에 검수 항목(지역·주소·건물·호실·면적·용도·기타 용도)이 바뀌면 다시 검수받는다.
      *
      * @param availableDates null 이면 기존 캘린더를 유지한다
      */
@@ -417,6 +423,7 @@ public class Space extends BaseTimeEntity {
         this.location = details.location();
         this.areaSqm = details.areaSqm();
         this.buildingUse = details.buildingUse();
+        this.buildingUseEtc = details.buildingUseEtc();
         this.commercialTheme = details.commercialTheme();
         this.dailyPrice = details.dailyPrice();
         replace(facilities, details.facilities());
@@ -431,8 +438,8 @@ public class Space extends BaseTimeEntity {
 
     protected SpaceDetails currentDetails() {
         return new SpaceDetails(title, description, rules, address, buildingName, unitNumber, location, areaSqm,
-                buildingUse, commercialTheme, dailyPrice, facilities, activityTypes, maxCapacity, equipment,
-                priceNegotiable);
+                buildingUse, buildingUseEtc, commercialTheme, dailyPrice, facilities, activityTypes, maxCapacity,
+                equipment, priceNegotiable);
     }
 
     private static <T> void replace(Set<T> target, Set<T> values) {
