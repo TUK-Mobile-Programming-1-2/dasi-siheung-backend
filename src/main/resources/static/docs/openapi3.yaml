@@ -368,7 +368,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-members-me-push-tokens-60140286"
+                $ref: "#/components/schemas/api-v1-auth-signup-60140286"
               examples:
                 inquiry-create-invalid:
                   value: |-
@@ -1153,7 +1153,7 @@ paths:
         content:
           application/json;charset=UTF-8:
             schema:
-              $ref: "#/components/schemas/api-v1-admin-faqs1691331599"
+              $ref: "#/components/schemas/api-v1-admin-faqs-faqId1691331599"
             examples:
               admin-faq-create-invalid:
                 value: |-
@@ -1181,7 +1181,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-members-me-push-tokens-60140286"
+                $ref: "#/components/schemas/api-v1-auth-signup-60140286"
               examples:
                 admin-faq-create-invalid:
                   value: |-
@@ -1191,11 +1191,11 @@ paths:
                         "code" : "INVALID_INPUT",
                         "message" : "요청 값이 올바르지 않습니다.",
                         "fieldErrors" : [ {
-                          "field" : "question",
-                          "reason" : "must not be blank"
-                        }, {
                           "field" : "category",
                           "reason" : "must not be null"
+                        }, {
+                          "field" : "question",
+                          "reason" : "must not be blank"
                         } ]
                       }
                     }
@@ -1204,7 +1204,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-admin-faqs-622886557"
+                $ref: "#/components/schemas/api-v1-admin-faqs-faqId-622886557"
               examples:
                 admin-faq-create:
                   value: |-
@@ -1723,7 +1723,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-members-me-push-tokens-60140286"
+                $ref: "#/components/schemas/api-v1-auth-signup-60140286"
               examples:
                 auth-signup-invalid:
                   value: |-
@@ -1733,8 +1733,11 @@ paths:
                         "code" : "INVALID_INPUT",
                         "message" : "요청 값이 올바르지 않습니다.",
                         "fieldErrors" : [ {
-                          "field" : "phone",
-                          "reason" : "휴대폰 번호 형식이 올바르지 않습니다. (예: 010-1234-5678)"
+                          "field" : "email",
+                          "reason" : "must be a well-formed email address"
+                        }, {
+                          "field" : "password",
+                          "reason" : "비밀번호는 영문과 숫자를 포함해 8~64자여야 합니다."
                         }, {
                           "field" : "role",
                           "reason" : "must not be null"
@@ -1742,11 +1745,8 @@ paths:
                           "field" : "name",
                           "reason" : "must not be blank"
                         }, {
-                          "field" : "password",
-                          "reason" : "비밀번호는 영문과 숫자를 포함해 8~64자여야 합니다."
-                        }, {
-                          "field" : "email",
-                          "reason" : "must be a well-formed email address"
+                          "field" : "phone",
+                          "reason" : "휴대폰 번호 형식이 올바르지 않습니다. (예: 010-1234-5678)"
                         } ]
                       }
                     }
@@ -2517,7 +2517,7 @@ paths:
       tags:
       - Provider Space
       summary: 공간 등록
-      description: 서비스 지역 밖 좌표 예시
+      description: 건축물 용도가 기타(ETC)인데 직접 입력(buildingUseEtc)이 빈 예시. 수정(PUT)도 같습니다.
       operationId: provider-space-register
       parameters:
       - name: Authorization
@@ -2531,8 +2531,37 @@ paths:
         content:
           application/json;charset=UTF-8:
             schema:
-              $ref: "#/components/schemas/api-v1-provider-spaces-spaceId-1769093125"
+              $ref: "#/components/schemas/api-v1-provider-spaces-spaceId-1107656165"
             examples:
+              provider-space-register-building-use-etc-required:
+                value: |-
+                  {
+                    "title" : "정왕역 앞 1층 상가",
+                    "description" : "유동 인구가 많은 역 앞 코너 상가입니다.",
+                    "rules" : "21시 이후 소음 금지",
+                    "address" : "경기도 시흥시 마유로 418",
+                    "buildingName" : "정왕프라자",
+                    "unitNumber" : "101호",
+                    "latitude" : 37.3517,
+                    "longitude" : 126.7428,
+                    "areaSqm" : 33.06,
+                    "buildingUse" : "ETC",
+                    "buildingUseEtc" : " ",
+                    "commercialTheme" : "FOOD_ALLEY",
+                    "dailyPrice" : 50000,
+                    "facilities" : [ "ELECTRICITY", "WIFI" ],
+                    "activityTypes" : [ "EXHIBITION", "POPUP_STORE" ],
+                    "availableDates" : [ "2026-10-21" ],
+                    "maxCapacity" : 10,
+                    "equipment" : [ {
+                      "name" : "접이식 테이블",
+                      "quantity" : 4
+                    }, {
+                      "name" : "의자",
+                      "quantity" : 8
+                    } ],
+                    "priceNegotiable" : true
+                  }
               provider-space-register-out-of-area:
                 value: |-
                   {
@@ -2546,6 +2575,7 @@ paths:
                     "longitude" : 126.978,
                     "areaSqm" : 33.06,
                     "buildingUse" : "NEIGHBORHOOD_1",
+                    "buildingUseEtc" : null,
                     "commercialTheme" : "FOOD_ALLEY",
                     "dailyPrice" : 50000,
                     "facilities" : [ "ELECTRICITY", "WIFI" ],
@@ -2574,6 +2604,7 @@ paths:
                     "longitude" : 126.7428,
                     "areaSqm" : 33.06,
                     "buildingUse" : "NEIGHBORHOOD_1",
+                    "buildingUseEtc" : null,
                     "commercialTheme" : "FOOD_ALLEY",
                     "dailyPrice" : 50000,
                     "facilities" : [ "ELECTRICITY", "WIFI" ],
@@ -2595,8 +2626,21 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-admin-faqs-order779366877"
+                $ref: "#/components/schemas/api-v1-auth-signup-60140286"
               examples:
+                provider-space-register-building-use-etc-required:
+                  value: |-
+                    {
+                      "success" : false,
+                      "error" : {
+                        "code" : "INVALID_INPUT",
+                        "message" : "요청 값이 올바르지 않습니다.",
+                        "fieldErrors" : [ {
+                          "field" : "buildingUseEtcFilled",
+                          "reason" : "건축물 용도가 기타면 용도를 직접 입력해 주세요. (buildingUseEtc, 최대 50자)"
+                        } ]
+                      }
+                    }
                 provider-space-register-out-of-area:
                   value: |-
                     {
@@ -2611,7 +2655,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-provider-spaces-spaceId-pause-1626865794"
+                $ref: "#/components/schemas/api-v1-provider-spaces-spaceId-pause2074554849"
               examples:
                 provider-space-register:
                   value: |-
@@ -2633,6 +2677,7 @@ paths:
                         "longitude" : 126.7428,
                         "areaSqm" : 33.06,
                         "buildingUse" : "NEIGHBORHOOD_1",
+                        "buildingUseEtc" : null,
                         "commercialTheme" : "FOOD_ALLEY",
                         "dailyPrice" : 50000,
                         "facilities" : [ "WIFI", "ELECTRICITY" ],
@@ -2933,7 +2978,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-spaces-spaceId1951789283"
+                $ref: "#/components/schemas/api-v1-spaces-spaceId1675094986"
               examples:
                 space-detail:
                   value: |-
@@ -2952,6 +2997,7 @@ paths:
                         "longitude" : 126.7428,
                         "areaSqm" : 33.06,
                         "buildingUse" : "NEIGHBORHOOD_1",
+                        "buildingUseEtc" : null,
                         "commercialTheme" : "FOOD_ALLEY",
                         "dailyPrice" : 50000,
                         "facilities" : [ "WIFI", "ELECTRICITY" ],
@@ -3108,7 +3154,7 @@ paths:
         content:
           application/json;charset=UTF-8:
             schema:
-              $ref: "#/components/schemas/api-v1-admin-faqs1691331599"
+              $ref: "#/components/schemas/api-v1-admin-faqs-faqId1691331599"
             examples:
               admin-faq-update:
                 value: |-
@@ -3130,7 +3176,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-admin-faqs-622886557"
+                $ref: "#/components/schemas/api-v1-admin-faqs-faqId-622886557"
               examples:
                 admin-faq-update:
                   value: |-
@@ -3469,7 +3515,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-admin-spaces-spaceId-391093405"
+                $ref: "#/components/schemas/api-v1-admin-spaces-spaceId-reviews-1836739880"
               examples:
                 admin-space-detail:
                   value: |-
@@ -3492,6 +3538,7 @@ paths:
                           "longitude" : 126.7428,
                           "areaSqm" : 33.06,
                           "buildingUse" : "NEIGHBORHOOD_1",
+                          "buildingUseEtc" : null,
                           "commercialTheme" : "FOOD_ALLEY",
                           "dailyPrice" : 50000,
                           "facilities" : [ "WIFI", "ELECTRICITY" ],
@@ -5011,7 +5058,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-members-me-push-tokens-60140286"
+                $ref: "#/components/schemas/api-v1-auth-signup-60140286"
               examples:
                 notification-settings-replace-invalid-hour-over:
                   value: |-
@@ -5276,7 +5323,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-members-me-push-tokens-60140286"
+                $ref: "#/components/schemas/api-v1-auth-signup-60140286"
               examples:
                 push-token-register-invalid:
                   value: |-
@@ -5662,7 +5709,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-provider-spaces-spaceId1590115096"
+                $ref: "#/components/schemas/api-v1-provider-spaces-spaceId-290943093"
               examples:
                 provider-space-detail:
                   value: |-
@@ -5684,6 +5731,7 @@ paths:
                         "longitude" : 126.7428,
                         "areaSqm" : 33.06,
                         "buildingUse" : "NEIGHBORHOOD_1",
+                        "buildingUseEtc" : null,
                         "commercialTheme" : "FOOD_ALLEY",
                         "dailyPrice" : 50000,
                         "facilities" : [ "WIFI", "ELECTRICITY" ],
@@ -5747,7 +5795,7 @@ paths:
         content:
           application/json;charset=UTF-8:
             schema:
-              $ref: "#/components/schemas/api-v1-provider-spaces-spaceId-1769093125"
+              $ref: "#/components/schemas/api-v1-provider-spaces-spaceId-1107656165"
             examples:
               provider-space-update:
                 value: |-
@@ -5762,6 +5810,7 @@ paths:
                     "longitude" : 126.7428,
                     "areaSqm" : 33.06,
                     "buildingUse" : "NEIGHBORHOOD_1",
+                    "buildingUseEtc" : null,
                     "commercialTheme" : "FOOD_ALLEY",
                     "dailyPrice" : 50000,
                     "facilities" : [ "ELECTRICITY", "WIFI" ],
@@ -5783,7 +5832,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-provider-spaces-spaceId-pause-1626865794"
+                $ref: "#/components/schemas/api-v1-provider-spaces-spaceId-pause2074554849"
               examples:
                 provider-space-update:
                   value: |-
@@ -5805,6 +5854,7 @@ paths:
                         "longitude" : 126.7428,
                         "areaSqm" : 33.06,
                         "buildingUse" : "NEIGHBORHOOD_1",
+                        "buildingUseEtc" : null,
                         "commercialTheme" : "FOOD_ALLEY",
                         "dailyPrice" : 50000,
                         "facilities" : [ "WIFI", "ELECTRICITY" ],
@@ -6410,7 +6460,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-admin-spaces-spaceId-391093405"
+                $ref: "#/components/schemas/api-v1-admin-spaces-spaceId-reviews-1836739880"
               examples:
                 admin-space-review:
                   value: |-
@@ -6433,6 +6483,7 @@ paths:
                           "longitude" : 126.7428,
                           "areaSqm" : 33.06,
                           "buildingUse" : "NEIGHBORHOOD_1",
+                          "buildingUseEtc" : null,
                           "commercialTheme" : "FOOD_ALLEY",
                           "dailyPrice" : 50000,
                           "facilities" : [ "WIFI", "ELECTRICITY" ],
@@ -6550,7 +6601,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-admin-spaces-spaceId-391093405"
+                $ref: "#/components/schemas/api-v1-admin-spaces-spaceId-reviews-1836739880"
               examples:
                 admin-space-theme:
                   value: |-
@@ -6573,6 +6624,7 @@ paths:
                           "longitude" : 126.7428,
                           "areaSqm" : 33.06,
                           "buildingUse" : "NEIGHBORHOOD_1",
+                          "buildingUseEtc" : null,
                           "commercialTheme" : "FOOD_ALLEY",
                           "dailyPrice" : 50000,
                           "facilities" : [ "WIFI", "ELECTRICITY" ],
@@ -7287,7 +7339,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-members-me-push-tokens-60140286"
+                $ref: "#/components/schemas/api-v1-auth-signup-60140286"
               examples:
                 provider-application-reject-without-reason:
                   value: |-
@@ -7398,7 +7450,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-provider-spaces-spaceId-pause-1626865794"
+                $ref: "#/components/schemas/api-v1-provider-spaces-spaceId-pause2074554849"
               examples:
                 provider-space-available-dates:
                   value: |-
@@ -7420,6 +7472,7 @@ paths:
                         "longitude" : 126.7428,
                         "areaSqm" : 33.06,
                         "buildingUse" : "NEIGHBORHOOD_1",
+                        "buildingUseEtc" : null,
                         "commercialTheme" : "FOOD_ALLEY",
                         "dailyPrice" : 50000,
                         "facilities" : [ "WIFI", "ELECTRICITY" ],
@@ -7470,7 +7523,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-provider-spaces-spaceId-pause-1626865794"
+                $ref: "#/components/schemas/api-v1-provider-spaces-spaceId-pause2074554849"
               examples:
                 provider-space-pause:
                   value: |-
@@ -7492,6 +7545,7 @@ paths:
                         "longitude" : 126.7428,
                         "areaSqm" : 33.06,
                         "buildingUse" : "NEIGHBORHOOD_1",
+                        "buildingUseEtc" : null,
                         "commercialTheme" : "FOOD_ALLEY",
                         "dailyPrice" : 50000,
                         "facilities" : [ "WIFI", "ELECTRICITY" ],
@@ -7709,7 +7763,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-provider-spaces-spaceId-pause-1626865794"
+                $ref: "#/components/schemas/api-v1-provider-spaces-spaceId-pause2074554849"
               examples:
                 provider-space-resubmit:
                   value: |-
@@ -7731,6 +7785,7 @@ paths:
                         "longitude" : 126.7428,
                         "areaSqm" : 33.06,
                         "buildingUse" : "NEIGHBORHOOD_1",
+                        "buildingUseEtc" : null,
                         "commercialTheme" : "FOOD_ALLEY",
                         "dailyPrice" : 50000,
                         "facilities" : [ "WIFI", "ELECTRICITY" ],
@@ -7780,7 +7835,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-provider-spaces-spaceId-pause-1626865794"
+                $ref: "#/components/schemas/api-v1-provider-spaces-spaceId-pause2074554849"
               examples:
                 provider-space-resume:
                   value: |-
@@ -7802,6 +7857,7 @@ paths:
                         "longitude" : 126.7428,
                         "areaSqm" : 33.06,
                         "buildingUse" : "NEIGHBORHOOD_1",
+                        "buildingUseEtc" : null,
                         "commercialTheme" : "FOOD_ALLEY",
                         "dailyPrice" : 50000,
                         "facilities" : [ "WIFI", "ELECTRICITY" ],
@@ -9127,6 +9183,179 @@ components:
         success:
           type: boolean
           description: 요청 성공 여부 (true)
+    api-v1-spaces-spaceId1675094986:
+      required:
+      - success
+      type: object
+      properties:
+        data:
+          required:
+          - activityTypes
+          - address
+          - areaSqm
+          - availableDates
+          - buildingUse
+          - dailyPrice
+          - description
+          - equipment
+          - facilities
+          - favoriteCount
+          - favorited
+          - id
+          - latitude
+          - longitude
+          - photos
+          - priceNegotiable
+          - region
+          - reviewCount
+          - title
+          type: object
+          properties:
+            dailyPrice:
+              type: number
+              description: 1일 이용료(원)
+            areaSqm:
+              type: number
+              description: 전용 면적(㎡)
+            latitude:
+              type: number
+              description: 위도
+            unitNumber:
+              type: string
+              description: 호실
+              nullable: true
+            description:
+              type: string
+              description: 공간 소개
+            rules:
+              type: string
+              description: 이용 수칙
+              nullable: true
+            title:
+              type: string
+              description: 공간 이름
+            photos:
+              type: array
+              description: "사진 (순서대로, 첫 번째가 대표)"
+              items:
+                required:
+                - id
+                - sortOrder
+                - url
+                type: object
+                properties:
+                  sortOrder:
+                    type: number
+                    description: 순서 (0 이 대표 사진)
+                  id:
+                    type: number
+                    description: 사진 ID
+                  url:
+                    type: string
+                    description: "사진 주소 (공개, 고정)"
+            activityTypes:
+              type: array
+              description: 허용 활동
+              items:
+                oneOf:
+                - type: object
+                - type: boolean
+                - type: string
+                - type: number
+            commercialTheme:
+              type: string
+              description: 상권 테마
+              nullable: true
+            reviewCount:
+              type: number
+              description: 후기 수
+            provider:
+              required:
+              - id
+              - name
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: 공간 제공자 이름
+                id:
+                  type: number
+                  description: 공간 제공자 회원 ID
+            id:
+              type: number
+              description: 공간 ID
+            favorited:
+              type: boolean
+              description: 내가 찜했는지 (비로그인이면 false)
+            longitude:
+              type: number
+              description: 경도
+            address:
+              type: string
+              description: 도로명 주소
+            equipment:
+              type: array
+              description: 빌려주는 비품 (입력 순서대로)
+              items:
+                type: object
+                properties:
+                  quantity:
+                    type: number
+                    description: 수량
+                    nullable: true
+                  name:
+                    type: string
+                    description: 비품 이름
+                    nullable: true
+            maxCapacity:
+              type: number
+              description: 최대 수용 인원 (정하지 않았으면 null)
+              nullable: true
+            buildingName:
+              type: string
+              description: 건물 이름
+              nullable: true
+            availableDates:
+              type: array
+              description: 오늘 이후 사용 가능 날짜 (오름차순)
+              items:
+                oneOf:
+                - type: object
+                - type: boolean
+                - type: string
+                - type: number
+            buildingUseEtc:
+              type: string
+              description: 기타(ETC) 용도일 때 직접 입력한 용도 (다른 용도 · 입력 전에 등록한 기타 공간은 null)
+              nullable: true
+            buildingUse:
+              type: string
+              description: 건축물 용도
+            priceNegotiable:
+              type: boolean
+              description: 가격 협의 가능 여부 (false 면 정가로만 신청)
+            facilities:
+              type: array
+              description: 보유 시설
+              items:
+                oneOf:
+                - type: object
+                - type: boolean
+                - type: string
+                - type: number
+            region:
+              type: string
+              description: 서비스 지역
+            ratingAverage:
+              type: number
+              description: 평균 평점 (후기 없으면 null)
+              nullable: true
+            favoriteCount:
+              type: number
+              description: 찜 수
+        success:
+          type: boolean
+          description: 요청 성공 여부 (true)
     api-v1-applications-applicationId-conversation-1576413164:
       required:
       - success
@@ -9342,6 +9571,208 @@ components:
         token:
           type: string
           description: FCM 등록 토큰 (최대 512자)
+    api-v1-provider-spaces-spaceId-290943093:
+      required:
+      - success
+      type: object
+      properties:
+        data:
+          required:
+          - activityTypes
+          - address
+          - areaSqm
+          - availableDates
+          - buildingUse
+          - createdAt
+          - dailyPrice
+          - description
+          - equipment
+          - facilities
+          - id
+          - latitude
+          - longitude
+          - photos
+          - priceNegotiable
+          - proofs
+          - region
+          - status
+          - title
+          - updatedAt
+          type: object
+          properties:
+            dailyPrice:
+              type: number
+              description: 1일 이용료(원)
+            areaSqm:
+              type: number
+              description: 전용 면적(㎡)
+            latitude:
+              type: number
+              description: 위도
+            reviewedAt:
+              type: string
+              description: 가장 최근 검수 시각
+              nullable: true
+            unitNumber:
+              type: string
+              description: 호실
+              nullable: true
+            description:
+              type: string
+              description: 공간 소개
+            rules:
+              type: string
+              description: 이용 수칙
+              nullable: true
+            title:
+              type: string
+              description: 공간 이름
+            photos:
+              type: array
+              description: "사진 (순서대로, 첫 번째가 대표)"
+              items:
+                required:
+                - id
+                - sortOrder
+                - url
+                type: object
+                properties:
+                  sortOrder:
+                    type: number
+                    description: 순서 (0 이 대표 사진)
+                  id:
+                    type: number
+                    description: 사진 ID
+                  url:
+                    type: string
+                    description: "사진 주소 (공개, 고정)"
+            activityTypes:
+              type: array
+              description: 허용 활동
+              items:
+                oneOf:
+                - type: object
+                - type: boolean
+                - type: string
+                - type: number
+            createdAt:
+              type: string
+              description: 등록 시각
+            commercialTheme:
+              type: string
+              description: 상권 테마
+              nullable: true
+            id:
+              type: number
+              description: 공간 ID
+            updatedAt:
+              type: string
+              description: 마지막 수정 시각
+            longitude:
+              type: number
+              description: 경도
+            address:
+              type: string
+              description: 도로명 주소
+            reviewComment:
+              type: string
+              description: 가장 최근 검수 사유
+              nullable: true
+            equipment:
+              type: array
+              description: 빌려주는 비품 (입력 순서대로)
+              items:
+                type: object
+                properties:
+                  quantity:
+                    type: number
+                    description: 수량
+                    nullable: true
+                  name:
+                    type: string
+                    description: 비품 이름
+                    nullable: true
+            maxCapacity:
+              type: number
+              description: 최대 수용 인원 (정하지 않았으면 null)
+              nullable: true
+            buildingName:
+              type: string
+              description: 건물 이름
+              nullable: true
+            availableDates:
+              type: array
+              description: 사용 가능 날짜 (오름차순)
+              items:
+                oneOf:
+                - type: object
+                - type: boolean
+                - type: string
+                - type: number
+            buildingUseEtc:
+              type: string
+              description: 기타(ETC) 용도일 때 직접 입력한 용도 (다른 용도 · 입력 전에 등록한 기타 공간은 null)
+              nullable: true
+            buildingUse:
+              type: string
+              description: 건축물 용도
+            proofs:
+              type: array
+              description: 권한 증빙 (임시 주소 포함)
+              items:
+                required:
+                - contentType
+                - createdAt
+                - fileSize
+                - id
+                - proofType
+                - url
+                type: object
+                properties:
+                  originalName:
+                    type: string
+                    description: 올린 파일 이름
+                    nullable: true
+                  createdAt:
+                    type: string
+                    description: 올린 시각
+                  fileSize:
+                    type: number
+                    description: 파일 크기(바이트)
+                  proofType:
+                    type: string
+                    description: 증빙 종류 (선택지 proofTypes)
+                  id:
+                    type: number
+                    description: 증빙 ID
+                  contentType:
+                    type: string
+                    description: 파일 형식
+                  url:
+                    type: string
+                    description: 열람용 임시 주소 (10분 뒤 만료)
+            priceNegotiable:
+              type: boolean
+              description: 가격 협의 가능 여부 (false 면 정가로만 신청)
+            facilities:
+              type: array
+              description: 보유 시설
+              items:
+                oneOf:
+                - type: object
+                - type: boolean
+                - type: string
+                - type: number
+            region:
+              type: string
+              description: 서비스 지역 (좌표로 판정)
+            status:
+              type: string
+              description: PENDING_REVIEW 검수 대기 | REVISION_REQUESTED 수정 요청 | ON_HOLD
+                공개 보류 | PUBLISHED 공개 | PAUSED 일시 중단 | HIDDEN 숨김
+        success:
+          type: boolean
+          description: 요청 성공 여부 (true)
     api-v1-members-me-withdraw1808255073:
       required:
       - password
@@ -10127,175 +10558,6 @@ components:
             authorityVerified:
               type: boolean
               description: 제공 권한 확인
-    api-v1-spaces-spaceId1951789283:
-      required:
-      - success
-      type: object
-      properties:
-        data:
-          required:
-          - activityTypes
-          - address
-          - areaSqm
-          - availableDates
-          - buildingUse
-          - dailyPrice
-          - description
-          - equipment
-          - facilities
-          - favoriteCount
-          - favorited
-          - id
-          - latitude
-          - longitude
-          - photos
-          - priceNegotiable
-          - region
-          - reviewCount
-          - title
-          type: object
-          properties:
-            dailyPrice:
-              type: number
-              description: 1일 이용료(원)
-            areaSqm:
-              type: number
-              description: 전용 면적(㎡)
-            latitude:
-              type: number
-              description: 위도
-            unitNumber:
-              type: string
-              description: 호실
-              nullable: true
-            description:
-              type: string
-              description: 공간 소개
-            rules:
-              type: string
-              description: 이용 수칙
-              nullable: true
-            title:
-              type: string
-              description: 공간 이름
-            photos:
-              type: array
-              description: "사진 (순서대로, 첫 번째가 대표)"
-              items:
-                required:
-                - id
-                - sortOrder
-                - url
-                type: object
-                properties:
-                  sortOrder:
-                    type: number
-                    description: 순서 (0 이 대표 사진)
-                  id:
-                    type: number
-                    description: 사진 ID
-                  url:
-                    type: string
-                    description: "사진 주소 (공개, 고정)"
-            activityTypes:
-              type: array
-              description: 허용 활동
-              items:
-                oneOf:
-                - type: object
-                - type: boolean
-                - type: string
-                - type: number
-            commercialTheme:
-              type: string
-              description: 상권 테마
-              nullable: true
-            reviewCount:
-              type: number
-              description: 후기 수
-            provider:
-              required:
-              - id
-              - name
-              type: object
-              properties:
-                name:
-                  type: string
-                  description: 공간 제공자 이름
-                id:
-                  type: number
-                  description: 공간 제공자 회원 ID
-            id:
-              type: number
-              description: 공간 ID
-            favorited:
-              type: boolean
-              description: 내가 찜했는지 (비로그인이면 false)
-            longitude:
-              type: number
-              description: 경도
-            address:
-              type: string
-              description: 도로명 주소
-            equipment:
-              type: array
-              description: 빌려주는 비품 (입력 순서대로)
-              items:
-                type: object
-                properties:
-                  quantity:
-                    type: number
-                    description: 수량
-                    nullable: true
-                  name:
-                    type: string
-                    description: 비품 이름
-                    nullable: true
-            maxCapacity:
-              type: number
-              description: 최대 수용 인원 (정하지 않았으면 null)
-              nullable: true
-            buildingName:
-              type: string
-              description: 건물 이름
-              nullable: true
-            availableDates:
-              type: array
-              description: 오늘 이후 사용 가능 날짜 (오름차순)
-              items:
-                oneOf:
-                - type: object
-                - type: boolean
-                - type: string
-                - type: number
-            buildingUse:
-              type: string
-              description: 건축물 용도
-            priceNegotiable:
-              type: boolean
-              description: 가격 협의 가능 여부 (false 면 정가로만 신청)
-            facilities:
-              type: array
-              description: 보유 시설
-              items:
-                oneOf:
-                - type: object
-                - type: boolean
-                - type: string
-                - type: number
-            region:
-              type: string
-              description: 서비스 지역
-            ratingAverage:
-              type: number
-              description: 평균 평점 (후기 없으면 null)
-              nullable: true
-            favoriteCount:
-              type: number
-              description: 찜 수
-        success:
-          type: boolean
-          description: 요청 성공 여부 (true)
     api-v1-members-me-reports798653997:
       required:
       - success
@@ -10565,7 +10827,7 @@ components:
         success:
           type: boolean
           description: 요청 성공 여부 (true)
-    api-v1-admin-faqs-622886557:
+    api-v1-admin-faqs-faqId-622886557:
       required:
       - success
       type: object
@@ -10610,7 +10872,7 @@ components:
         success:
           type: boolean
           description: 요청 성공 여부 (true)
-    api-v1-admin-faqs1691331599:
+    api-v1-admin-faqs-faqId1691331599:
       required:
       - answer
       - category
@@ -10754,6 +11016,172 @@ components:
             favorited:
               type: boolean
               description: 지금 찜한 상태인지
+        success:
+          type: boolean
+          description: 요청 성공 여부 (true)
+    api-v1-provider-spaces-spaceId-pause2074554849:
+      required:
+      - success
+      type: object
+      properties:
+        data:
+          required:
+          - activityTypes
+          - address
+          - areaSqm
+          - availableDates
+          - buildingUse
+          - createdAt
+          - dailyPrice
+          - description
+          - equipment
+          - facilities
+          - id
+          - latitude
+          - longitude
+          - photos
+          - priceNegotiable
+          - proofs
+          - region
+          - status
+          - title
+          - updatedAt
+          type: object
+          properties:
+            dailyPrice:
+              type: number
+              description: 1일 이용료(원)
+            areaSqm:
+              type: number
+              description: 전용 면적(㎡)
+            latitude:
+              type: number
+              description: 위도
+            reviewedAt:
+              type: string
+              description: 가장 최근 검수 시각
+              nullable: true
+            unitNumber:
+              type: string
+              description: 호실
+              nullable: true
+            description:
+              type: string
+              description: 공간 소개
+            rules:
+              type: string
+              description: 이용 수칙
+              nullable: true
+            title:
+              type: string
+              description: 공간 이름
+            photos:
+              type: array
+              description: "사진 (순서대로, 첫 번째가 대표)"
+              items:
+                oneOf:
+                - type: object
+                - type: boolean
+                - type: string
+                - type: number
+            activityTypes:
+              type: array
+              description: 허용 활동
+              items:
+                oneOf:
+                - type: object
+                - type: boolean
+                - type: string
+                - type: number
+            createdAt:
+              type: string
+              description: 등록 시각
+            commercialTheme:
+              type: string
+              description: 상권 테마
+              nullable: true
+            id:
+              type: number
+              description: 공간 ID
+            updatedAt:
+              type: string
+              description: 마지막 수정 시각
+            longitude:
+              type: number
+              description: 경도
+            address:
+              type: string
+              description: 도로명 주소
+            reviewComment:
+              type: string
+              description: 가장 최근 검수 사유
+              nullable: true
+            equipment:
+              type: array
+              description: 빌려주는 비품 (입력 순서대로)
+              items:
+                type: object
+                properties:
+                  quantity:
+                    type: number
+                    description: 수량
+                    nullable: true
+                  name:
+                    type: string
+                    description: 비품 이름
+                    nullable: true
+            maxCapacity:
+              type: number
+              description: 최대 수용 인원 (정하지 않았으면 null)
+              nullable: true
+            buildingName:
+              type: string
+              description: 건물 이름
+              nullable: true
+            availableDates:
+              type: array
+              description: 사용 가능 날짜 (오름차순)
+              items:
+                oneOf:
+                - type: object
+                - type: boolean
+                - type: string
+                - type: number
+            buildingUseEtc:
+              type: string
+              description: 기타(ETC) 용도일 때 직접 입력한 용도 (다른 용도 · 입력 전에 등록한 기타 공간은 null)
+              nullable: true
+            buildingUse:
+              type: string
+              description: 건축물 용도
+            priceNegotiable:
+              type: boolean
+              description: 가격 협의 가능 여부 (false 면 정가로만 신청)
+            proofs:
+              type: array
+              description: 권한 증빙 (임시 주소 포함)
+              items:
+                oneOf:
+                - type: object
+                - type: boolean
+                - type: string
+                - type: number
+            facilities:
+              type: array
+              description: 보유 시설
+              items:
+                oneOf:
+                - type: object
+                - type: boolean
+                - type: string
+                - type: number
+            region:
+              type: string
+              description: 서비스 지역 (좌표로 판정)
+            status:
+              type: string
+              description: PENDING_REVIEW 검수 대기 | REVISION_REQUESTED 수정 요청 | ON_HOLD
+                공개 보류 | PUBLISHED 공개 | PAUSED 일시 중단 | HIDDEN 숨김
         success:
           type: boolean
           description: 요청 성공 여부 (true)
@@ -10995,291 +11423,6 @@ components:
             totalElements:
               type: number
               description: 전체 항목 수
-        success:
-          type: boolean
-          description: 요청 성공 여부 (true)
-    api-v1-admin-spaces-spaceId-391093405:
-      required:
-      - success
-      type: object
-      properties:
-        data:
-          type: object
-          properties:
-            referenceLinks:
-              type: array
-              items:
-                required:
-                - name
-                - url
-                type: object
-                properties:
-                  name:
-                    type: string
-                    description: 공식 정보 사이트 이름
-                  url:
-                    type: string
-                    description: 주소
-            reviews:
-              type: array
-              items:
-                required:
-                - adminName
-                - decision
-                - id
-                - reviewedAt
-                type: object
-                properties:
-                  adminName:
-                    type: string
-                    description: 검수한 관리자
-                  reason:
-                    type: string
-                    description: 사유
-                    nullable: true
-                  decision:
-                    type: string
-                    description: 검수 결과
-                  reviewedAt:
-                    type: string
-                    description: 검수 시각
-                  checklist:
-                    required:
-                    - addressMatched
-                    - areaMatched
-                    - authorityVerified
-                    - buildingUnitMatched
-                    - usageMatched
-                    type: object
-                    properties:
-                      buildingUnitMatched:
-                        type: boolean
-                        description: 건물·호실 일치
-                      areaMatched:
-                        type: boolean
-                        description: 면적 일치
-                      usageMatched:
-                        type: boolean
-                        description: 용도 일치
-                      addressMatched:
-                        type: boolean
-                        description: 주소 일치
-                      authorityVerified:
-                        type: boolean
-                        description: 제공 권한 확인
-                  id:
-                    type: number
-                    description: 검수 ID
-            provider:
-              required:
-              - email
-              - id
-              - name
-              type: object
-              properties:
-                phone:
-                  type: string
-                  description: 제공자 휴대폰 번호
-                  nullable: true
-                name:
-                  type: string
-                  description: 제공자 이름
-                id:
-                  type: number
-                  description: 제공자 회원 ID
-                email:
-                  type: string
-                  description: 제공자 이메일
-            space:
-              required:
-              - activityTypes
-              - address
-              - areaSqm
-              - availableDates
-              - buildingUse
-              - createdAt
-              - dailyPrice
-              - description
-              - equipment
-              - facilities
-              - id
-              - latitude
-              - longitude
-              - photos
-              - priceNegotiable
-              - proofs
-              - region
-              - status
-              - title
-              - updatedAt
-              type: object
-              properties:
-                dailyPrice:
-                  type: number
-                  description: 1일 이용료(원)
-                areaSqm:
-                  type: number
-                  description: 전용 면적(㎡)
-                latitude:
-                  type: number
-                  description: 위도
-                reviewedAt:
-                  type: string
-                  description: 가장 최근 검수 시각
-                  nullable: true
-                unitNumber:
-                  type: string
-                  description: 호실
-                  nullable: true
-                description:
-                  type: string
-                  description: 공간 소개
-                rules:
-                  type: string
-                  description: 이용 수칙
-                  nullable: true
-                title:
-                  type: string
-                  description: 공간 이름
-                photos:
-                  type: array
-                  description: "사진 (순서대로, 첫 번째가 대표)"
-                  items:
-                    required:
-                    - id
-                    - sortOrder
-                    - url
-                    type: object
-                    properties:
-                      sortOrder:
-                        type: number
-                        description: 순서 (0 이 대표 사진)
-                      id:
-                        type: number
-                        description: 사진 ID
-                      url:
-                        type: string
-                        description: "사진 주소 (공개, 고정)"
-                activityTypes:
-                  type: array
-                  description: 허용 활동
-                  items:
-                    oneOf:
-                    - type: object
-                    - type: boolean
-                    - type: string
-                    - type: number
-                createdAt:
-                  type: string
-                  description: 등록 시각
-                commercialTheme:
-                  type: string
-                  description: 상권 테마
-                  nullable: true
-                id:
-                  type: number
-                  description: 공간 ID
-                updatedAt:
-                  type: string
-                  description: 마지막 수정 시각
-                longitude:
-                  type: number
-                  description: 경도
-                address:
-                  type: string
-                  description: 도로명 주소
-                reviewComment:
-                  type: string
-                  description: 가장 최근 검수 사유
-                  nullable: true
-                equipment:
-                  type: array
-                  description: 빌려주는 비품 (입력 순서대로)
-                  items:
-                    type: object
-                    properties:
-                      quantity:
-                        type: number
-                        description: 수량
-                        nullable: true
-                      name:
-                        type: string
-                        description: 비품 이름
-                        nullable: true
-                maxCapacity:
-                  type: number
-                  description: 최대 수용 인원 (정하지 않았으면 null)
-                  nullable: true
-                buildingName:
-                  type: string
-                  description: 건물 이름
-                  nullable: true
-                availableDates:
-                  type: array
-                  description: 사용 가능 날짜 (오름차순)
-                  items:
-                    oneOf:
-                    - type: object
-                    - type: boolean
-                    - type: string
-                    - type: number
-                buildingUse:
-                  type: string
-                  description: 건축물 용도
-                proofs:
-                  type: array
-                  description: 권한 증빙 (임시 주소 포함)
-                  items:
-                    required:
-                    - contentType
-                    - createdAt
-                    - fileSize
-                    - id
-                    - proofType
-                    - url
-                    type: object
-                    properties:
-                      originalName:
-                        type: string
-                        description: 올린 파일 이름
-                        nullable: true
-                      createdAt:
-                        type: string
-                        description: 올린 시각
-                      fileSize:
-                        type: number
-                        description: 파일 크기(바이트)
-                      proofType:
-                        type: string
-                        description: 증빙 종류 (선택지 proofTypes)
-                      id:
-                        type: number
-                        description: 증빙 ID
-                      contentType:
-                        type: string
-                        description: 파일 형식
-                      url:
-                        type: string
-                        description: 열람용 임시 주소 (10분 뒤 만료)
-                priceNegotiable:
-                  type: boolean
-                  description: 가격 협의 가능 여부 (false 면 정가로만 신청)
-                facilities:
-                  type: array
-                  description: 보유 시설
-                  items:
-                    oneOf:
-                    - type: object
-                    - type: boolean
-                    - type: string
-                    - type: number
-                region:
-                  type: string
-                  description: 서비스 지역 (좌표로 판정)
-                status:
-                  type: string
-                  description: PENDING_REVIEW 검수 대기 | REVISION_REQUESTED 수정 요청 | ON_HOLD
-                    공개 보류 | PUBLISHED 공개 | PAUSED 일시 중단 | HIDDEN 숨김
         success:
           type: boolean
           description: 요청 성공 여부 (true)
@@ -11825,201 +11968,292 @@ components:
         success:
           type: boolean
           description: 요청 성공 여부 (true)
-    api-v1-provider-spaces-spaceId1590115096:
+    api-v1-admin-spaces-spaceId-reviews-1836739880:
       required:
       - success
       type: object
       properties:
         data:
-          required:
-          - activityTypes
-          - address
-          - areaSqm
-          - availableDates
-          - buildingUse
-          - createdAt
-          - dailyPrice
-          - description
-          - equipment
-          - facilities
-          - id
-          - latitude
-          - longitude
-          - photos
-          - priceNegotiable
-          - proofs
-          - region
-          - status
-          - title
-          - updatedAt
           type: object
           properties:
-            dailyPrice:
-              type: number
-              description: 1일 이용료(원)
-            areaSqm:
-              type: number
-              description: 전용 면적(㎡)
-            latitude:
-              type: number
-              description: 위도
-            reviewedAt:
-              type: string
-              description: 가장 최근 검수 시각
-              nullable: true
-            unitNumber:
-              type: string
-              description: 호실
-              nullable: true
-            description:
-              type: string
-              description: 공간 소개
-            rules:
-              type: string
-              description: 이용 수칙
-              nullable: true
-            title:
-              type: string
-              description: 공간 이름
-            photos:
+            referenceLinks:
               type: array
-              description: "사진 (순서대로, 첫 번째가 대표)"
               items:
                 required:
-                - id
-                - sortOrder
+                - name
                 - url
                 type: object
                 properties:
-                  sortOrder:
-                    type: number
-                    description: 순서 (0 이 대표 사진)
-                  id:
-                    type: number
-                    description: 사진 ID
-                  url:
-                    type: string
-                    description: "사진 주소 (공개, 고정)"
-            activityTypes:
-              type: array
-              description: 허용 활동
-              items:
-                oneOf:
-                - type: object
-                - type: boolean
-                - type: string
-                - type: number
-            createdAt:
-              type: string
-              description: 등록 시각
-            commercialTheme:
-              type: string
-              description: 상권 테마
-              nullable: true
-            id:
-              type: number
-              description: 공간 ID
-            updatedAt:
-              type: string
-              description: 마지막 수정 시각
-            longitude:
-              type: number
-              description: 경도
-            address:
-              type: string
-              description: 도로명 주소
-            reviewComment:
-              type: string
-              description: 가장 최근 검수 사유
-              nullable: true
-            equipment:
-              type: array
-              description: 빌려주는 비품 (입력 순서대로)
-              items:
-                type: object
-                properties:
-                  quantity:
-                    type: number
-                    description: 수량
-                    nullable: true
                   name:
                     type: string
-                    description: 비품 이름
-                    nullable: true
-            maxCapacity:
-              type: number
-              description: 최대 수용 인원 (정하지 않았으면 null)
-              nullable: true
-            buildingName:
-              type: string
-              description: 건물 이름
-              nullable: true
-            availableDates:
-              type: array
-              description: 사용 가능 날짜 (오름차순)
-              items:
-                oneOf:
-                - type: object
-                - type: boolean
-                - type: string
-                - type: number
-            buildingUse:
-              type: string
-              description: 건축물 용도
-            proofs:
-              type: array
-              description: 권한 증빙 (임시 주소 포함)
-              items:
-                required:
-                - contentType
-                - createdAt
-                - fileSize
-                - id
-                - proofType
-                - url
-                type: object
-                properties:
-                  originalName:
-                    type: string
-                    description: 올린 파일 이름
-                    nullable: true
-                  createdAt:
-                    type: string
-                    description: 올린 시각
-                  fileSize:
-                    type: number
-                    description: 파일 크기(바이트)
-                  proofType:
-                    type: string
-                    description: 증빙 종류 (선택지 proofTypes)
-                  id:
-                    type: number
-                    description: 증빙 ID
-                  contentType:
-                    type: string
-                    description: 파일 형식
+                    description: 공식 정보 사이트 이름
                   url:
                     type: string
-                    description: 열람용 임시 주소 (10분 뒤 만료)
-            priceNegotiable:
-              type: boolean
-              description: 가격 협의 가능 여부 (false 면 정가로만 신청)
-            facilities:
+                    description: 주소
+            reviews:
               type: array
-              description: 보유 시설
               items:
-                oneOf:
-                - type: object
-                - type: boolean
-                - type: string
-                - type: number
-            region:
-              type: string
-              description: 서비스 지역 (좌표로 판정)
-            status:
-              type: string
-              description: PENDING_REVIEW 검수 대기 | REVISION_REQUESTED 수정 요청 | ON_HOLD
-                공개 보류 | PUBLISHED 공개 | PAUSED 일시 중단 | HIDDEN 숨김
+                required:
+                - adminName
+                - decision
+                - id
+                - reviewedAt
+                type: object
+                properties:
+                  adminName:
+                    type: string
+                    description: 검수한 관리자
+                  reason:
+                    type: string
+                    description: 사유
+                    nullable: true
+                  decision:
+                    type: string
+                    description: 검수 결과
+                  reviewedAt:
+                    type: string
+                    description: 검수 시각
+                  checklist:
+                    required:
+                    - addressMatched
+                    - areaMatched
+                    - authorityVerified
+                    - buildingUnitMatched
+                    - usageMatched
+                    type: object
+                    properties:
+                      buildingUnitMatched:
+                        type: boolean
+                        description: 건물·호실 일치
+                      areaMatched:
+                        type: boolean
+                        description: 면적 일치
+                      usageMatched:
+                        type: boolean
+                        description: 용도 일치
+                      addressMatched:
+                        type: boolean
+                        description: 주소 일치
+                      authorityVerified:
+                        type: boolean
+                        description: 제공 권한 확인
+                  id:
+                    type: number
+                    description: 검수 ID
+            provider:
+              required:
+              - email
+              - id
+              - name
+              type: object
+              properties:
+                phone:
+                  type: string
+                  description: 제공자 휴대폰 번호
+                  nullable: true
+                name:
+                  type: string
+                  description: 제공자 이름
+                id:
+                  type: number
+                  description: 제공자 회원 ID
+                email:
+                  type: string
+                  description: 제공자 이메일
+            space:
+              required:
+              - activityTypes
+              - address
+              - areaSqm
+              - availableDates
+              - buildingUse
+              - createdAt
+              - dailyPrice
+              - description
+              - equipment
+              - facilities
+              - id
+              - latitude
+              - longitude
+              - photos
+              - priceNegotiable
+              - proofs
+              - region
+              - status
+              - title
+              - updatedAt
+              type: object
+              properties:
+                dailyPrice:
+                  type: number
+                  description: 1일 이용료(원)
+                areaSqm:
+                  type: number
+                  description: 전용 면적(㎡)
+                latitude:
+                  type: number
+                  description: 위도
+                reviewedAt:
+                  type: string
+                  description: 가장 최근 검수 시각
+                  nullable: true
+                unitNumber:
+                  type: string
+                  description: 호실
+                  nullable: true
+                description:
+                  type: string
+                  description: 공간 소개
+                rules:
+                  type: string
+                  description: 이용 수칙
+                  nullable: true
+                title:
+                  type: string
+                  description: 공간 이름
+                photos:
+                  type: array
+                  description: "사진 (순서대로, 첫 번째가 대표)"
+                  items:
+                    required:
+                    - id
+                    - sortOrder
+                    - url
+                    type: object
+                    properties:
+                      sortOrder:
+                        type: number
+                        description: 순서 (0 이 대표 사진)
+                      id:
+                        type: number
+                        description: 사진 ID
+                      url:
+                        type: string
+                        description: "사진 주소 (공개, 고정)"
+                activityTypes:
+                  type: array
+                  description: 허용 활동
+                  items:
+                    oneOf:
+                    - type: object
+                    - type: boolean
+                    - type: string
+                    - type: number
+                createdAt:
+                  type: string
+                  description: 등록 시각
+                commercialTheme:
+                  type: string
+                  description: 상권 테마
+                  nullable: true
+                id:
+                  type: number
+                  description: 공간 ID
+                updatedAt:
+                  type: string
+                  description: 마지막 수정 시각
+                longitude:
+                  type: number
+                  description: 경도
+                address:
+                  type: string
+                  description: 도로명 주소
+                reviewComment:
+                  type: string
+                  description: 가장 최근 검수 사유
+                  nullable: true
+                equipment:
+                  type: array
+                  description: 빌려주는 비품 (입력 순서대로)
+                  items:
+                    type: object
+                    properties:
+                      quantity:
+                        type: number
+                        description: 수량
+                        nullable: true
+                      name:
+                        type: string
+                        description: 비품 이름
+                        nullable: true
+                maxCapacity:
+                  type: number
+                  description: 최대 수용 인원 (정하지 않았으면 null)
+                  nullable: true
+                buildingName:
+                  type: string
+                  description: 건물 이름
+                  nullable: true
+                availableDates:
+                  type: array
+                  description: 사용 가능 날짜 (오름차순)
+                  items:
+                    oneOf:
+                    - type: object
+                    - type: boolean
+                    - type: string
+                    - type: number
+                buildingUseEtc:
+                  type: string
+                  description: 기타(ETC) 용도일 때 직접 입력한 용도 (다른 용도 · 입력 전에 등록한 기타 공간은 null)
+                  nullable: true
+                buildingUse:
+                  type: string
+                  description: 건축물 용도
+                proofs:
+                  type: array
+                  description: 권한 증빙 (임시 주소 포함)
+                  items:
+                    required:
+                    - contentType
+                    - createdAt
+                    - fileSize
+                    - id
+                    - proofType
+                    - url
+                    type: object
+                    properties:
+                      originalName:
+                        type: string
+                        description: 올린 파일 이름
+                        nullable: true
+                      createdAt:
+                        type: string
+                        description: 올린 시각
+                      fileSize:
+                        type: number
+                        description: 파일 크기(바이트)
+                      proofType:
+                        type: string
+                        description: 증빙 종류 (선택지 proofTypes)
+                      id:
+                        type: number
+                        description: 증빙 ID
+                      contentType:
+                        type: string
+                        description: 파일 형식
+                      url:
+                        type: string
+                        description: 열람용 임시 주소 (10분 뒤 만료)
+                priceNegotiable:
+                  type: boolean
+                  description: 가격 협의 가능 여부 (false 면 정가로만 신청)
+                facilities:
+                  type: array
+                  description: 보유 시설
+                  items:
+                    oneOf:
+                    - type: object
+                    - type: boolean
+                    - type: string
+                    - type: number
+                region:
+                  type: string
+                  description: 서비스 지역 (좌표로 판정)
+                status:
+                  type: string
+                  description: PENDING_REVIEW 검수 대기 | REVISION_REQUESTED 수정 요청 | ON_HOLD
+                    공개 보류 | PUBLISHED 공개 | PAUSED 일시 중단 | HIDDEN 숨김
         success:
           type: boolean
           description: 요청 성공 여부 (true)
@@ -12036,6 +12270,115 @@ components:
         content:
           type: string
           description: 문의 내용 (최대 1000자)
+    api-v1-provider-spaces-spaceId-1107656165:
+      required:
+      - activityTypes
+      - address
+      - areaSqm
+      - buildingUse
+      - dailyPrice
+      - description
+      - latitude
+      - longitude
+      - title
+      type: object
+      properties:
+        dailyPrice:
+          type: number
+          description: 1일 이용료(원)
+        areaSqm:
+          type: number
+          description: "전용 면적(㎡), 소수 둘째 자리까지"
+        address:
+          type: string
+          description: 도로명 주소
+        latitude:
+          type: number
+          description: 위도 (지도 SDK 로 주소를 변환한 값)
+        equipment:
+          type: array
+          description: "빌려주는 비품 (최대 20줄, 선택). 수정할 때는 보낸 목록으로 통째로 바뀝니다"
+          items:
+            type: object
+            properties:
+              quantity:
+                type: number
+                description: 수량 (1~999)
+                nullable: true
+              name:
+                type: string
+                description: "비품 이름 (최대 40자, 같은 이름은 한 줄로)"
+                nullable: true
+        maxCapacity:
+          type: number
+          description: "최대 수용 인원 (1~500, 선택). 정하면 이보다 많은 운영 인원의 신청은 400 HEADCOUNT_EXCEEDS_CAPACITY"
+          nullable: true
+        unitNumber:
+          type: string
+          description: 호실 (선택)
+          nullable: true
+        description:
+          type: string
+          description: 공간 소개 (최대 2000자)
+        rules:
+          type: string
+          description: 이용 수칙 (선택)
+          nullable: true
+        title:
+          type: string
+          description: 공간 이름 (최대 60자)
+        activityTypes:
+          type: array
+          description: "허용 활동 (선택지 activityTypes, 1개 이상)"
+          items:
+            oneOf:
+            - type: object
+            - type: boolean
+            - type: string
+            - type: number
+        buildingName:
+          type: string
+          description: 건물 이름 (선택)
+          nullable: true
+        availableDates:
+          type: array
+          description: 사용 가능 날짜 yyyy-MM-dd (오늘~1년). 수정 시 보내지 않으면 기존 캘린더 유지
+          nullable: true
+          items:
+            oneOf:
+            - type: object
+            - type: boolean
+            - type: string
+            - type: number
+        commercialTheme:
+          type: string
+          description: "상권 테마 (선택지 commercialThemes, 선택)"
+          nullable: true
+        buildingUseEtc:
+          type: string
+          description: "건축물 용도가 기타(ETC)일 때 직접 입력한 용도 (ETC 면 필수, 최대 50자 — 비면 400 fieldErrors\
+            \ buildingUseEtcFilled). 다른 용도면 무시하고 저장하지 않습니다"
+          nullable: true
+        buildingUse:
+          type: string
+          description: 건축물 용도 (선택지 buildingUses)
+        priceNegotiable:
+          type: boolean
+          description: "가격 협의 가능 여부 (선택, 기본 true). false 면 가격 제안이 409 PRICE_NEGOTIATION_NOT_ALLOWED"
+          nullable: true
+        facilities:
+          type: array
+          description: 보유 시설 (선택지 facilities)
+          nullable: true
+          items:
+            oneOf:
+            - type: object
+            - type: boolean
+            - type: string
+            - type: number
+        longitude:
+          type: number
+          description: 경도
     api-v1-admin-statistics-monthly34152426:
       required:
       - success
@@ -12124,7 +12467,7 @@ components:
             - type: boolean
             - type: string
             - type: number
-    api-v1-members-me-push-tokens-60140286:
+    api-v1-auth-signup-60140286:
       required:
       - success
       type: object
@@ -12322,6 +12665,34 @@ components:
         success:
           type: boolean
           description: 요청 성공 여부 (true)
+    api-v1-auth-signup1500708097:
+      required:
+      - success
+      type: object
+      properties:
+        data:
+          required:
+          - email
+          - id
+          - name
+          - role
+          type: object
+          properties:
+            role:
+              type: string
+              description: "역할: USER | PROVIDER | ADMIN"
+            name:
+              type: string
+              description: 이름
+            id:
+              type: number
+              description: 회원 ID
+            email:
+              type: string
+              description: 이메일
+        success:
+          type: boolean
+          description: 요청 성공 여부 (true)
     api-v1-reviews-reviewId796819085:
       required:
       - success
@@ -12390,34 +12761,6 @@ components:
         success:
           type: boolean
           description: 요청 성공 여부 (true)
-    api-v1-auth-signup1500708097:
-      required:
-      - success
-      type: object
-      properties:
-        data:
-          required:
-          - email
-          - id
-          - name
-          - role
-          type: object
-          properties:
-            role:
-              type: string
-              description: "역할: USER | PROVIDER | ADMIN"
-            name:
-              type: string
-              description: 이름
-            id:
-              type: number
-              description: 회원 ID
-            email:
-              type: string
-              description: 이메일
-        success:
-          type: boolean
-          description: 요청 성공 여부 (true)
     api-v1-reports-1981119463:
       required:
       - success
@@ -12474,110 +12817,6 @@ components:
         success:
           type: boolean
           description: 요청 성공 여부 (true)
-    api-v1-provider-spaces-spaceId-1769093125:
-      required:
-      - activityTypes
-      - address
-      - areaSqm
-      - buildingUse
-      - dailyPrice
-      - description
-      - latitude
-      - longitude
-      - title
-      type: object
-      properties:
-        dailyPrice:
-          type: number
-          description: 1일 이용료(원)
-        areaSqm:
-          type: number
-          description: "전용 면적(㎡), 소수 둘째 자리까지"
-        address:
-          type: string
-          description: 도로명 주소
-        latitude:
-          type: number
-          description: 위도 (지도 SDK 로 주소를 변환한 값)
-        equipment:
-          type: array
-          description: "빌려주는 비품 (최대 20줄, 선택). 수정할 때는 보낸 목록으로 통째로 바뀝니다"
-          items:
-            type: object
-            properties:
-              quantity:
-                type: number
-                description: 수량 (1~999)
-                nullable: true
-              name:
-                type: string
-                description: "비품 이름 (최대 40자, 같은 이름은 한 줄로)"
-                nullable: true
-        maxCapacity:
-          type: number
-          description: "최대 수용 인원 (1~500, 선택). 정하면 이보다 많은 운영 인원의 신청은 400 HEADCOUNT_EXCEEDS_CAPACITY"
-          nullable: true
-        unitNumber:
-          type: string
-          description: 호실 (선택)
-          nullable: true
-        description:
-          type: string
-          description: 공간 소개 (최대 2000자)
-        rules:
-          type: string
-          description: 이용 수칙 (선택)
-          nullable: true
-        title:
-          type: string
-          description: 공간 이름 (최대 60자)
-        activityTypes:
-          type: array
-          description: "허용 활동 (선택지 activityTypes, 1개 이상)"
-          items:
-            oneOf:
-            - type: object
-            - type: boolean
-            - type: string
-            - type: number
-        buildingName:
-          type: string
-          description: 건물 이름 (선택)
-          nullable: true
-        availableDates:
-          type: array
-          description: 사용 가능 날짜 yyyy-MM-dd (오늘~1년). 수정 시 보내지 않으면 기존 캘린더 유지
-          nullable: true
-          items:
-            oneOf:
-            - type: object
-            - type: boolean
-            - type: string
-            - type: number
-        commercialTheme:
-          type: string
-          description: "상권 테마 (선택지 commercialThemes, 선택)"
-          nullable: true
-        buildingUse:
-          type: string
-          description: 건축물 용도 (선택지 buildingUses)
-        priceNegotiable:
-          type: boolean
-          description: "가격 협의 가능 여부 (선택, 기본 true). false 면 가격 제안이 409 PRICE_NEGOTIATION_NOT_ALLOWED"
-          nullable: true
-        facilities:
-          type: array
-          description: 보유 시설 (선택지 facilities)
-          nullable: true
-          items:
-            oneOf:
-            - type: object
-            - type: boolean
-            - type: string
-            - type: number
-        longitude:
-          type: number
-          description: 경도
     api-v1-admin-spaces-spaceId-theme1063396244:
       type: object
       properties:
@@ -12585,168 +12824,6 @@ components:
           type: string
           description: "상권 테마 (선택지 commercialThemes, null 이면 비움)"
           nullable: true
-    api-v1-provider-spaces-spaceId-pause-1626865794:
-      required:
-      - success
-      type: object
-      properties:
-        data:
-          required:
-          - activityTypes
-          - address
-          - areaSqm
-          - availableDates
-          - buildingUse
-          - createdAt
-          - dailyPrice
-          - description
-          - equipment
-          - facilities
-          - id
-          - latitude
-          - longitude
-          - photos
-          - priceNegotiable
-          - proofs
-          - region
-          - status
-          - title
-          - updatedAt
-          type: object
-          properties:
-            dailyPrice:
-              type: number
-              description: 1일 이용료(원)
-            areaSqm:
-              type: number
-              description: 전용 면적(㎡)
-            latitude:
-              type: number
-              description: 위도
-            reviewedAt:
-              type: string
-              description: 가장 최근 검수 시각
-              nullable: true
-            unitNumber:
-              type: string
-              description: 호실
-              nullable: true
-            description:
-              type: string
-              description: 공간 소개
-            rules:
-              type: string
-              description: 이용 수칙
-              nullable: true
-            title:
-              type: string
-              description: 공간 이름
-            photos:
-              type: array
-              description: "사진 (순서대로, 첫 번째가 대표)"
-              items:
-                oneOf:
-                - type: object
-                - type: boolean
-                - type: string
-                - type: number
-            activityTypes:
-              type: array
-              description: 허용 활동
-              items:
-                oneOf:
-                - type: object
-                - type: boolean
-                - type: string
-                - type: number
-            createdAt:
-              type: string
-              description: 등록 시각
-            commercialTheme:
-              type: string
-              description: 상권 테마
-              nullable: true
-            id:
-              type: number
-              description: 공간 ID
-            updatedAt:
-              type: string
-              description: 마지막 수정 시각
-            longitude:
-              type: number
-              description: 경도
-            address:
-              type: string
-              description: 도로명 주소
-            reviewComment:
-              type: string
-              description: 가장 최근 검수 사유
-              nullable: true
-            equipment:
-              type: array
-              description: 빌려주는 비품 (입력 순서대로)
-              items:
-                type: object
-                properties:
-                  quantity:
-                    type: number
-                    description: 수량
-                    nullable: true
-                  name:
-                    type: string
-                    description: 비품 이름
-                    nullable: true
-            maxCapacity:
-              type: number
-              description: 최대 수용 인원 (정하지 않았으면 null)
-              nullable: true
-            buildingName:
-              type: string
-              description: 건물 이름
-              nullable: true
-            availableDates:
-              type: array
-              description: 사용 가능 날짜 (오름차순)
-              items:
-                oneOf:
-                - type: object
-                - type: boolean
-                - type: string
-                - type: number
-            buildingUse:
-              type: string
-              description: 건축물 용도
-            priceNegotiable:
-              type: boolean
-              description: 가격 협의 가능 여부 (false 면 정가로만 신청)
-            proofs:
-              type: array
-              description: 권한 증빙 (임시 주소 포함)
-              items:
-                oneOf:
-                - type: object
-                - type: boolean
-                - type: string
-                - type: number
-            facilities:
-              type: array
-              description: 보유 시설
-              items:
-                oneOf:
-                - type: object
-                - type: boolean
-                - type: string
-                - type: number
-            region:
-              type: string
-              description: 서비스 지역 (좌표로 판정)
-            status:
-              type: string
-              description: PENDING_REVIEW 검수 대기 | REVISION_REQUESTED 수정 요청 | ON_HOLD
-                공개 보류 | PUBLISHED 공개 | PAUSED 일시 중단 | HIDDEN 숨김
-        success:
-          type: boolean
-          description: 요청 성공 여부 (true)
     api-v1-faqs-2000522056:
       required:
       - data
