@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.dasisiheung.dto.space.EquipmentItem;
 import com.dasisiheung.dto.space.SpaceRequest;
+import com.dasisiheung.entity.space.BuildingUse;
 import com.dasisiheung.entity.space.Equipment;
 import com.dasisiheung.entity.space.SpaceDetails;
 import com.dasisiheung.support.SpaceFixtures;
@@ -46,11 +47,33 @@ class SpaceRequestTest {
         assertThat(details.maxCapacity()).isEqualTo(10);
     }
 
+    @Test
+    @DisplayName("기타(ETC) 용도면 직접 입력이 있어야 하고, 다른 용도면 비어 있어도 된다")
+    void buildingUseEtcFilled() {
+        SpaceRequest base = SpaceFixtures.request(Set.of());
+
+        assertThat(SpaceFixtures.withBuildingUse(base, BuildingUse.ETC, "복합 문화 공간").isBuildingUseEtcFilled()).isTrue();
+        assertThat(SpaceFixtures.withBuildingUse(base, BuildingUse.ETC, null).isBuildingUseEtcFilled()).isFalse();
+        assertThat(SpaceFixtures.withBuildingUse(base, BuildingUse.ETC, "   ").isBuildingUseEtcFilled()).isFalse();
+        assertThat(SpaceFixtures.withBuildingUse(base, BuildingUse.SALES, null).isBuildingUseEtcFilled()).isTrue();
+    }
+
+    @Test
+    @DisplayName("기타 용도 직접 입력은 앞뒤 공백을 떼고, 기타가 아닌 용도에서는 버린다")
+    void buildingUseEtcNormalized() {
+        SpaceRequest base = SpaceFixtures.request(Set.of());
+
+        assertThat(SpaceFixtures.withBuildingUse(base, BuildingUse.ETC, "  복합 문화 공간 ").toDetails().buildingUseEtc())
+                .isEqualTo("복합 문화 공간");
+        assertThat(SpaceFixtures.withBuildingUse(base, BuildingUse.SALES, "복합 문화 공간").toDetails().buildingUseEtc())
+                .isNull();
+    }
+
     private static SpaceRequest withEquipment(List<EquipmentItem> equipment) {
         SpaceRequest base = SpaceFixtures.request(Set.of(LocalDate.of(2026, 10, 21)));
         return new SpaceRequest(base.title(), base.description(), base.rules(), base.address(), base.buildingName(),
                 base.unitNumber(), base.latitude(), base.longitude(), base.areaSqm(), base.buildingUse(),
-                base.commercialTheme(), base.dailyPrice(), base.facilities(), base.activityTypes(),
-                base.availableDates(), null, equipment, null);
+                base.buildingUseEtc(), base.commercialTheme(), base.dailyPrice(), base.facilities(),
+                base.activityTypes(), base.availableDates(), null, equipment, null);
     }
 }
