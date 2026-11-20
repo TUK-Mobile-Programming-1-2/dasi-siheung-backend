@@ -86,6 +86,9 @@ public enum ErrorCode {
     NO_PENDING_OFFER(HttpStatus.CONFLICT, "답할 가격 제안이 없습니다. 상대가 보낸 제안을 기다려 주세요."),
     PRICE_NEGOTIATION_NOT_ALLOWED(HttpStatus.CONFLICT, "가격 협의를 받지 않는 공간입니다. 정가로 신청해 주세요."),
 
+    // 알림함
+    NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "알림을 찾을 수 없습니다."),
+
     // 이용 후기
     REVIEW_NOT_ALLOWED(HttpStatus.CONFLICT, "이용이 끝난 확정 예약에만 후기를 남길 수 있습니다."),
     DUPLICATE_REVIEW(HttpStatus.CONFLICT, "이미 후기를 남긴 예약입니다."),
