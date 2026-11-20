@@ -28,6 +28,8 @@ public record SpaceDetailResponse(
         @Schema(description = "경도", example = "126.7428") double longitude,
         @Schema(description = "전용 면적(㎡)", example = "33.06") BigDecimal areaSqm,
         @Schema(description = "건축물 용도") BuildingUse buildingUse,
+        @Schema(description = "기타(ETC) 용도일 때 직접 입력한 용도 (다른 용도면 null)", example = "복합 문화 공간")
+        String buildingUseEtc,
         @Schema(description = "상권 테마") CommercialTheme commercialTheme,
         @Schema(description = "1일 이용료(원)", example = "50000") int dailyPrice,
         @Schema(description = "보유 시설") List<Facility> facilities,
@@ -52,7 +54,7 @@ public record SpaceDetailResponse(
                                          boolean favorited) {
         return new SpaceDetailResponse(space.getId(), space.getRegion(), space.getTitle(), space.getDescription(),
                 space.getRules(), space.getAddress(), space.getBuildingName(), space.getUnitNumber(),
-                space.latitude(), space.longitude(), space.getAreaSqm(), space.getBuildingUse(),
+                space.latitude(), space.longitude(), space.getAreaSqm(), space.getBuildingUse(), space.getBuildingUseEtc(),
                 space.getCommercialTheme(), space.getDailyPrice(), SpaceResponses.sorted(space.getFacilities()),
                 SpaceResponses.sorted(space.getActivityTypes()), space.getMaxCapacity(),
                 SpaceResponses.equipment(space), space.isPriceNegotiable(), availableDates, photos,
