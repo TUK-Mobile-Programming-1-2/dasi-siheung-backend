@@ -12,6 +12,7 @@ import java.time.Clock;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,8 @@ import org.springframework.transaction.event.TransactionalEventListener;
  *   <li>채팅 메시지 → 대화 상대 (대화 알림). data-only 로 보내 앱이 메시지를 쌓고 읽음 · 답장 버튼을 단다.</li>
  *   <li>새 이용 신청 → 공간 제공자 (활동 알림). 시스템이 바로 그린다.</li>
  *   <li>1:1 문의 답변 → 문의한 회원 (활동 알림). 시스템이 바로 그린다.</li>
+ *   <li>알림함 알림(가격 제안 · 수락 · 거절) → 받는 회원 (활동 알림). data-only 로 보내 앱이 신청 접근을 확인한 뒤 그린다.
+ *       신청 알림이라 conversationId 를 넣지 않는다. (앱이 채팅 알림으로 분류하지 않도록)</li>
  * </ul>
  */
 @Slf4j
@@ -70,6 +73,13 @@ public class PushNotificationService {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onInquiryAnswered(InquiryAnsweredEvent event) {
         send(event.memberId(), NotificationCategory.ACTIVITY, inquiryAnswered(event));
+    }
+
+    /** 알림함에 남은 알림(가격 제안 · 수락 · 거절)을 받는 회원에게 보낸다. (알림 설정의 활동 알림) */
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onNotificationCreated(NotificationCreatedEvent event) {
+        send(event.recipientId(), NotificationCategory.ACTIVITY, notificationCreated(event));
     }
 
     private void send(Long recipientId, NotificationCategory category, PushMessage message) {
@@ -126,6 +136,23 @@ public class PushNotificationService {
                 "type", TYPE_INQUIRY_ANSWERED,
                 "inquiryId", String.valueOf(event.inquiryId()));
         return PushMessage.notification("1:1 문의 답변", body, data, ACTIVITY_CHANNEL, "inquiry-" + event.inquiryId());
+    }
+
+    /**
+     * data-only: 앱이 onMessageReceived 로 받아 신청 접근을 확인한 뒤 알림을 그리고, 누르면 신청 상세(applicationId)를 연다.
+     * 같은 알림을 알림함(GET /api/v1/notifications)에서도 볼 수 있다. (notificationId 로 읽음 처리)
+     */
+    static PushMessage notificationCreated(NotificationCreatedEvent event) {
+        Map<String, String> data = new LinkedHashMap<>();
+        data.put("type", event.type().name());
+        data.put("notificationId", String.valueOf(event.notificationId()));
+        if (event.applicationId() != null) {
+            data.put("applicationId", String.valueOf(event.applicationId()));
+        }
+        data.put("title", event.title());
+        data.put("body", event.body());
+        data.put("createdAt", DATA_TIME.format(event.createdAt().truncatedTo(ChronoUnit.SECONDS)));
+        return PushMessage.dataOnly(data);
     }
 
     /** 글자(코드 포인트) 단위로 잘라 이모지를 반으로 자르지 않는다. 잘랐으면 말줄임표를 붙인다. */
