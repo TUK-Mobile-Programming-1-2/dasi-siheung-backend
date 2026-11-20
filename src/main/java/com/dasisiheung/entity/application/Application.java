@@ -35,8 +35,14 @@ import lombok.NoArgsConstructor;
  * </pre>
  * 정가(1일 이용료 × 일수)는 신청 시점 값으로 고정한다.
  * <p>
- * 가격 협의: 한쪽이 제안하면 상대가 수락하거나 다시 제안(역제안)한다. 자기 제안에 대한 답을 기다리는 동안에는
- * 다시 제안할 수 없다. 제안 금액은 정가 합계를 넘을 수 없다.
+ * 가격 협의: 한쪽이 제안하면 상대가 수락 · 거절하거나 다시 제안(역제안)한다. 자기 제안에 대한 답을 기다리는 동안에는
+ * 다시 제안할 수 없다. 거절되면 합의 금액은 그대로 두고 양쪽 모두 새로 제안할 수 있다. 제안 금액은 정가 합계를 넘을 수 없다.
+ * <pre>
+ * NONE · AGREED · OFFER_REJECTED ─ 신청자 제안 → WAITING_PROVIDER ─┬─ 제공자 수락 → AGREED
+ *                                                               ├─ 제공자 거절 → OFFER_REJECTED
+ *                                                               └─ 제공자 역제안 → WAITING_APPLICANT
+ * (제공자가 먼저 제안하면 방향만 반대다)
+ * </pre>
  */
 @Getter
 @Entity
@@ -184,7 +190,7 @@ public class Application extends BaseTimeEntity {
     }
 
     /**
-     * 가격을 제안한다. 처음 제안 · 받은 제안에 대한 역제안 · 합의 뒤 재협의 모두 이 메서드로 한다.
+     * 가격을 제안한다. 처음 제안 · 받은 제안에 대한 역제안 · 거절 뒤 재제안 · 합의 뒤 재협의 모두 이 메서드로 한다.
      *
      * @return 이력으로 저장할 제안
      * @throws BusinessException 검토 중이 아니면 INVALID_APPLICATION_STATUS,
@@ -219,6 +225,21 @@ public class Application extends BaseTimeEntity {
         this.pendingOfferAmount = null;
         this.negotiationStatus = PriceNegotiationStatus.AGREED;
         latestOffer.accept(now);
+    }
+
+    /**
+     * 받은 제안을 거절한다. 신청은 검토 중으로 남고, 합의 금액은 그대로(정가 또는 이전 합의 금액)다.
+     * 이후 양쪽 모두 새로 제안할 수 있다. (신청 자체의 거절 · 취소와는 다르다)
+     *
+     * @param latestOffer 가장 최근 제안 (거절 시각 · 한마디를 남긴다)
+     * @param message     거절 한마디 (선택)
+     * @throws BusinessException 내가 답할 제안이 없으면 NO_PENDING_OFFER
+     */
+    public void rejectOffer(Long memberId, PriceOffer latestOffer, String message, LocalDateTime now) {
+        validateRespondable(memberId, latestOffer);
+        this.pendingOfferAmount = null;
+        this.negotiationStatus = PriceNegotiationStatus.OFFER_REJECTED;
+        latestOffer.reject(blankToNull(message), now);
     }
 
     /** @throws BusinessException 참여자가 아니면 NOT_APPLICATION_PARTICIPANT, 검토 중이 아니면 INVALID_APPLICATION_STATUS,
