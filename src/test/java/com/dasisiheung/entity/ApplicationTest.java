@@ -339,6 +339,71 @@ class ApplicationTest {
         }
 
         @Test
+        @DisplayName("제공자 역제안을 신청자가 거절하면 검토 중으로 남고 합의 금액은 그대로, 양쪽 모두 다시 제안할 수 있다")
+        void rejectCounterOffer() {
+            Application application = submit(TODAY.plusDays(1), TODAY.plusDays(2));
+            application.offer(applicant, 80_000, null, NOW);
+            PriceOffer counter = application.offer(provider, 95_000, null, NOW);
+
+            application.rejectOffer(APPLICANT_ID, counter, "  주말이라 어렵습니다. ", NOW);
+
+            assertThat(application.getStatus()).isEqualTo(ApplicationStatus.PENDING);
+            assertThat(application.getNegotiationStatus()).isEqualTo(PriceNegotiationStatus.OFFER_REJECTED);
+            assertThat(application.getPendingOfferAmount()).isNull();
+            assertThat(application.getTotalPrice()).isEqualTo(100_000);
+            assertThat(counter.isRejected()).isTrue();
+            assertThat(counter.isAccepted()).isFalse();
+            assertThat(counter.getRejectedAt()).isEqualTo(NOW);
+            assertThat(counter.getRejectionMessage()).isEqualTo("주말이라 어렵습니다.");
+            assertThat(application.respondingSide()).isEmpty();
+            assertThat(application.canOffer(OfferSide.APPLICANT)).isTrue();
+            assertThat(application.canOffer(OfferSide.PROVIDER)).isTrue();
+
+            PriceOffer again = application.offer(provider, 90_000, null, NOW);
+            assertThat(application.getNegotiationStatus()).isEqualTo(PriceNegotiationStatus.WAITING_APPLICANT);
+            application.acceptOffer(APPLICANT_ID, again, NOW);
+            assertThat(application.getTotalPrice()).isEqualTo(90_000);
+        }
+
+        @Test
+        @DisplayName("합의 뒤 재협의 제안을 거절하면 이전 합의 금액이 그대로 남는다")
+        void rejectAfterAgreement() {
+            Application application = submit(TODAY.plusDays(1), TODAY.plusDays(2));
+            PriceOffer first = application.offer(applicant, 90_000, null, NOW);
+            application.acceptOffer(2L, first, NOW);
+            PriceOffer renegotiation = application.offer(applicant, 85_000, null, NOW);
+
+            application.rejectOffer(2L, renegotiation, "   ", NOW);
+
+            assertThat(application.getTotalPrice()).isEqualTo(90_000);
+            assertThat(application.getNegotiationStatus()).isEqualTo(PriceNegotiationStatus.OFFER_REJECTED);
+            assertThat(renegotiation.getRejectionMessage()).isNull();
+        }
+
+        @Test
+        @DisplayName("거절 규칙: 내 제안 · 답할 제안 없음은 NO_PENDING_OFFER, 남은 NOT_APPLICATION_PARTICIPANT, 끝난 신청은 INVALID_APPLICATION_STATUS")
+        void rejectRules() {
+            Application application = submit(TODAY.plusDays(1), TODAY.plusDays(2));
+            assertThatThrownBy(() -> application.rejectOffer(2L, null, null, NOW))
+                    .extracting("errorCode").isEqualTo(ErrorCode.NO_PENDING_OFFER);
+
+            PriceOffer first = application.offer(applicant, 80_000, null, NOW);
+            assertThatThrownBy(() -> application.rejectOffer(APPLICANT_ID, first, null, NOW))
+                    .extracting("errorCode").isEqualTo(ErrorCode.NO_PENDING_OFFER);
+            assertThatThrownBy(() -> application.rejectOffer(99L, first, null, NOW))
+                    .extracting("errorCode").isEqualTo(ErrorCode.NOT_APPLICATION_PARTICIPANT);
+
+            application.rejectOffer(2L, first, null, NOW);
+            assertThatThrownBy(() -> application.rejectOffer(2L, first, null, NOW))
+                    .extracting("errorCode").isEqualTo(ErrorCode.NO_PENDING_OFFER);
+
+            PriceOffer second = application.offer(applicant, 85_000, null, NOW);
+            application.cancel(APPLICANT_ID, null, TODAY, NOW);
+            assertThatThrownBy(() -> application.rejectOffer(2L, second, null, NOW))
+                    .extracting("errorCode").isEqualTo(ErrorCode.INVALID_APPLICATION_STATUS);
+        }
+
+        @Test
         @DisplayName("답을 기다리는 제안이 있는 채로 취소하면 대기 제안은 사라지고 합의 금액은 그대로다")
         void cancelClearsPendingOffer() {
             Application application = submit(TODAY.plusDays(1), TODAY.plusDays(2));
