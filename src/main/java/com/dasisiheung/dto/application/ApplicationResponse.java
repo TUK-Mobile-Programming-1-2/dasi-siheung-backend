@@ -2,6 +2,7 @@ package com.dasisiheung.dto.application;
 
 import com.dasisiheung.entity.application.Application;
 import com.dasisiheung.entity.application.ApplicationStatus;
+import com.dasisiheung.entity.application.OfferSide;
 import com.dasisiheung.entity.application.PriceNegotiationStatus;
 import com.dasisiheung.entity.member.Member;
 import com.dasisiheung.entity.space.ActivityType;
@@ -10,6 +11,7 @@ import com.dasisiheung.entity.space.Space;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 
 /** 신청 상세. 신청자와 공간 제공자가 같은 화면을 본다. */
@@ -31,6 +33,10 @@ public record ApplicationResponse(
         @Schema(description = "현재 합의 금액(원) — 협의 전에는 정가 합계", example = "100000") int totalPrice,
         @Schema(description = "가격 협의 상태", example = "NONE") PriceNegotiationStatus negotiationStatus,
         @Schema(description = "답변을 기다리는 제안 금액 (없으면 null)", example = "90000") Integer pendingOfferAmount,
+        @Schema(description = "받은 제안에 답(수락 · 거절 · 역제안)할 차례인 쪽 (답할 제안이 없으면 null)",
+                example = "APPLICANT") OfferSide respondingSide,
+        @Schema(description = "지금 새 제안 · 재제안을 보낼 수 있는 쪽 (검토 중 · 협의 가능 공간 · 내 제안의 답을 기다리는 중이 아님)")
+        List<OfferSide> offerableSides,
         @Schema(description = "가격 협의 이력 (오래된 순)") List<PriceOfferResponse> offers,
         @Schema(description = "신청자 ↔ 공간 제공자 1:1 대화 ID (아직 없으면 null — "
                 + "POST /api/v1/applications/{id}/conversation 으로 열기)", example = "3") Long conversationId,
@@ -45,8 +51,13 @@ public record ApplicationResponse(
                 application.getActivityType(), application.getActivityTitle(), application.getPlan(),
                 application.getHeadcount(), application.getStartDate(), application.getEndDate(), application.days(),
                 application.getListDailyPrice(), application.getListTotalPrice(), application.getTotalPrice(),
-                application.getNegotiationStatus(), application.getPendingOfferAmount(), offers, conversationId,
+                application.getNegotiationStatus(), application.getPendingOfferAmount(),
+                application.respondingSide().orElse(null), offerableSides(application), offers, conversationId,
                 application.getCreatedAt(), application.getDecidedAt());
+    }
+
+    private static List<OfferSide> offerableSides(Application application) {
+        return Arrays.stream(OfferSide.values()).filter(application::canOffer).toList();
     }
 
     public record SpaceInfo(
