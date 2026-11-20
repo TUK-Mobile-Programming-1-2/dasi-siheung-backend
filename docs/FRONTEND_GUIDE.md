@@ -236,8 +236,14 @@ flowchart LR
 | --- | --- | --- | --- |
 | `INVALID_OFFER_PRICE` | 400 | 제안 금액이 1원 미만이거나 정가 합계 초과 | 입력 범위 안내 |
 | `OFFER_NOT_ALLOWED` | 409 | 보낸 제안에 상대가 아직 답하지 않음 | 제안 버튼 비활성화 |
-| `NO_PENDING_OFFER` | 409 | 내가 답할 제안이 없는데 수락 | 상세 새로고침 |
+| `NO_PENDING_OFFER` | 409 | 내가 답할 제안이 없는데 수락 · 거절 (내 제안이거나 이미 답함) | 상세 새로고침 (`respondingSide` 로 버튼 표시) |
 | `PRICE_NEGOTIATION_NOT_ALLOWED` | 409 | 가격 협의를 받지 않는 공간(`priceNegotiable=false`)에 제안 | 그 공간에서는 제안 입력 · 버튼 숨기기 |
+
+**알림함**
+
+| `error.code` | HTTP 상태 | 언제 | 화면 처리 예시 |
+| --- | --- | --- | --- |
+| `NOTIFICATION_NOT_FOUND` | 404 | 없거나 남의 알림을 읽음 처리 (다른 계정 기기에 남은 푸시 등) | 무시하고 알림함 새로고침 |
 
 **이용 후기**
 
@@ -432,7 +438,13 @@ HIDDEN(숨김): 신고 처리로 관리자가 내린 공간 — 수정 불가
 ```
 
 - **가격 협의**: 금액은 이용 기간 **합계**입니다. 정가 합계(`listTotalPrice`)를 넘을 수 없습니다.
-  - 신청자 제안 → `WAITING_PROVIDER` → 제공자가 수락하거나 역제안 → `WAITING_APPLICANT` → … → 수락하면 `AGREED`
+  - 신청자 제안 → `WAITING_PROVIDER` → 제공자가 수락 · 거절하거나 역제안 → `WAITING_APPLICANT` → … → 수락하면 `AGREED`
+  - **받은 제안 거절** (`POST /applications/{id}/offers/reject`): 신청 거절 · 취소와 다릅니다. 신청은 `PENDING` 그대로,
+    협의 상태는 `OFFER_REJECTED`, 합의 금액(`totalPrice`)은 그대로(정가 또는 이전 합의 금액)이고 **양쪽 모두 다시 제안**할 수 있습니다.
+    거절 시각 · 한마디는 제안 이력의 `rejectedAt` · `rejectionMessage` 에 남습니다. `OFFER_REJECTED` 에서도 제공자는 지금 금액으로 승인할 수 있습니다.
+  - 버튼은 응답의 두 값으로 정하세요. 내 쪽은 `applicant.id` 가 내 회원 ID 면 `APPLICANT`, 아니면 `PROVIDER` 입니다.
+    - `respondingSide` 가 내 쪽 → **수락 · 거절 · 역제안** 버튼 (답할 제안 금액은 `pendingOfferAmount`)
+    - `offerableSides` 에 내 쪽이 있음 → **제안(재제안)** 버튼. 없으면 상대 답변 대기 중이거나 제안할 수 없는 신청입니다.
   - 내가 보낸 제안에 상대가 답하기 전에는 다시 보낼 수 없습니다 (`OFFER_NOT_ALLOWED`). 버튼을 비활성화하세요.
   - `*_WAITING` 상태에서는 승인할 수 없습니다 (`PRICE_NEGOTIATION_IN_PROGRESS`). 화면에 "협의 중" 배지를 보여주세요.
   - 공간의 `priceNegotiable` 이 `false` 면 **정가로만** 신청합니다. 신청서의 `offerAmount` · 제안 API 모두 `PRICE_NEGOTIATION_NOT_ALLOWED`.
@@ -519,6 +531,9 @@ HIDDEN(숨김): 신고 처리로 관리자가 내린 공간 — 수정 불가
 | 1:1 메시지가 옴 | 대화 상대 | `CHAT_MESSAGE` | `chat` (대화 알림) | **data-only** — 앱이 직접 그림 (채널 · tag 도 앱이 정함) |
 | 이용 신청이 들어옴 | 공간 제공자 | `APPLICATION_SUBMITTED` | `activity` (활동 알림) | notification — 시스템이 그림 (채널 `activity`) |
 | 1:1 문의에 답변이 달림 | 문의한 회원 | `INQUIRY_ANSWERED` | `activity` (활동 알림) | notification — 시스템이 그림 (채널 `activity`) |
+| 상대가 가격을 제안 · 역제안함 | 제안을 받은 쪽 | `PRICE_OFFER_RECEIVED` | `activity` (활동 알림) | **data-only** — 앱이 신청 접근 확인 뒤 그림 · 알림함에도 남음 |
+| 내 제안을 상대가 수락함 | 제안한 쪽 | `PRICE_OFFER_ACCEPTED` | `activity` (활동 알림) | **data-only** · 알림함에도 남음 |
+| 내 제안을 상대가 거절함 | 제안한 쪽 | `PRICE_OFFER_REJECTED` | `activity` (활동 알림) | **data-only** · 알림함에도 남음 |
 
 **토큰 등록 · 해제**
 
@@ -587,6 +602,30 @@ override fun onNewToken(token: String) { /* 로그인 상태면 registerPushToke
 
 - 본문의 `'계정'` 자리에는 문의 분류의 화면 이름(선택지 `inquiryCategories` 의 label)이 들어갑니다.
 - 누르면 문의 상세(`GET /api/v1/inquiries/{inquiryId}`) 화면으로 이동하세요.
+
+**받는 알림 — 가격 제안 · 역제안 · 수락 · 거절 (data-only, 알림함과 같은 내용)**
+
+```json
+{
+  "data": {
+    "type": "PRICE_OFFER_RECEIVED",
+    "notificationId": "12",
+    "applicationId": "31",
+    "title": "공간 제공자의 역제안",
+    "body": "김제공님이 '배곧 카페거리 2층 갤러리' 11/20~11/22 이용 금액으로 95,000원을 제안했어요.",
+    "createdAt": "2026-11-20T10:15:03"
+  },
+  "android": { "priority": "HIGH" }
+}
+```
+
+- **신청 알림입니다.** `conversationId` 는 넣지 않습니다. (가격 제안은 채팅 메시지를 남기지 않아 채팅 이벤트가 따로 없습니다)
+- `type` 별 제목: `PRICE_OFFER_RECEIVED` = "신청자의 가격 제안" / "공간 제공자의 역제안", `PRICE_OFFER_ACCEPTED` = "가격 제안 수락",
+  `PRICE_OFFER_REJECTED` = "가격 제안 거절". `title` · `body` 를 그대로 쓰면 됩니다. 한마디(자유 입력)는 본문에 넣지 않습니다.
+- 누르면 신청 상세(`GET /api/v1/applications/{applicationId}`)로 이동하고 `POST /api/v1/notifications/{notificationId}/read` 로 읽음 처리하세요.
+  신청 상세가 403 · 404 면(다른 계정으로 로그인 등) 알림을 버리면 됩니다.
+- 신청서와 함께 보낸 첫 제안은 `APPLICATION_SUBMITTED` 알림(본문 끝 "희망 가격 제안 있음")으로 갑니다. 그 뒤의 제안 · 역제안 · 수락 · 거절부터 위 알림이 갑니다.
+- **알림함**(`GET /api/v1/notifications`)에는 푸시를 못 받았어도(알림 끔 · 방해금지 · 기기 없음) 항상 남습니다. 배지는 `GET /api/v1/notifications/unread-count`.
 
 **공통**
 
@@ -987,6 +1026,15 @@ try {
 | PUT | `/api/v1/members/me/push-tokens` | 로그인 | 기기 FCM 토큰 등록 (앱 시작 · 로그인 · `onNewToken`, 여러 번 보내도 됨) |
 | DELETE | `/api/v1/members/me/push-tokens?token=` | 로그인 | 기기 토큰 해제 (로그아웃 전, 없어도 200) ([3-3-9](#3-3-9-푸시-알림-fcm)) |
 
+### 알림함 (`http/notification.http`)
+
+| 메서드 | 경로 | 인증 | 설명 |
+| --- | --- | --- | --- |
+| GET | `/api/v1/notifications?unreadOnly=` | 로그인 | 내 알림 (최근 순, 페이지). 항목: `id` · `type` · `title` · `body` · `applicationId` · `read` · `readAt` · `createdAt` |
+| GET | `/api/v1/notifications/unread-count` | 로그인 | 안 읽은 알림 수 (배지) |
+| POST | `/api/v1/notifications/{notificationId}/read` | 로그인 | 읽음 처리 (남의 알림이면 404 `NOTIFICATION_NOT_FOUND`) |
+| POST | `/api/v1/notifications/read-all` | 로그인 | 모두 읽음 (`count` = 이번에 읽음으로 바뀐 수) |
+
 ### 선택지 (`http/option.http`)
 
 | 메서드 | 경로 | 인증 | 설명 |
@@ -1065,8 +1113,9 @@ try {
 | GET | `/api/v1/applications` | USER | 내가 보낸 신청 (status 필터) |
 | GET | `/api/v1/applications/{applicationId}` | 신청자 · 공간 제공자 | 신청 상세 (연결된 대화 `conversationId` 포함) |
 | POST | `/api/v1/applications/{applicationId}/cancel` | USER | 신청 취소 |
-| POST | `/api/v1/applications/{applicationId}/offers` | 신청자 · 공간 제공자 | 가격 제안 · 역제안 (기간 합계 금액) |
-| POST | `/api/v1/applications/{applicationId}/offers/accept` | 신청자 · 공간 제공자 | 받은 가격 제안 수락 |
+| POST | `/api/v1/applications/{applicationId}/offers` | 신청자 · 공간 제공자 | 가격 제안 · 역제안 (기간 합계 금액, 받는 쪽에 `PRICE_OFFER_RECEIVED` 알림) |
+| POST | `/api/v1/applications/{applicationId}/offers/accept` | 신청자 · 공간 제공자 | 받은 가격 제안 수락 (제안한 쪽에 `PRICE_OFFER_ACCEPTED` 알림) |
+| POST | `/api/v1/applications/{applicationId}/offers/reject` | 신청자 · 공간 제공자 | 받은 가격 제안 거절 (신청은 검토 중 유지, `OFFER_REJECTED`, 재제안 가능, 본문 `{"message"}` 선택) |
 
 ### 공간 제공자 — 받은 신청 (`http/application.http`)
 
