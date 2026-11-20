@@ -18,6 +18,9 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 신청자와 공간 제공자의 가격 제안 · 역제안 · 수락 · 거절. 규칙은 {@link Application#offer} 참고.
  * 두 사람이 동시에 답하면 신청의 버전 충돌로 한쪽은 409 DATA_CONFLICT 를 받는다.
+ * <p>
+ * 제안은 상대에게, 수락 · 거절은 제안한 사람에게 알림함 + 푸시로 알린다. ({@link PriceOfferNotices})
+ * 신청서와 함께 보낸 첫 제안은 새 신청 알림(APPLICATION_SUBMITTED)에 포함되므로 여기서 따로 알리지 않는다.
  */
 @Service
 @RequiredArgsConstructor
@@ -28,6 +31,7 @@ public class PriceNegotiationService {
     private final PriceOfferRepository priceOfferRepository;
     private final MemberRepository memberRepository;
     private final ApplicationResponseMapper responseMapper;
+    private final NotificationService notificationService;
     private final Clock clock;
 
     public ApplicationResponse offer(Long memberId, Long applicationId, PriceOfferRequest request) {
@@ -37,6 +41,7 @@ public class PriceNegotiationService {
         PriceOffer offer = application.offer(proposer, request.amount(), request.message(), LocalDateTime.now(clock));
         priceOfferRepository.save(offer);
         applicationRepository.flush();
+        notificationService.send(PriceOfferNotices.received(application, offer));
         return responseMapper.detail(application);
     }
 
@@ -46,6 +51,7 @@ public class PriceNegotiationService {
 
         application.acceptOffer(memberId, latestOffer, LocalDateTime.now(clock));
         applicationRepository.flush();
+        notificationService.send(PriceOfferNotices.accepted(application, latestOffer));
         return responseMapper.detail(application);
     }
 
@@ -56,6 +62,7 @@ public class PriceNegotiationService {
 
         application.rejectOffer(memberId, latestOffer, request.message(), LocalDateTime.now(clock));
         applicationRepository.flush();
+        notificationService.send(PriceOfferNotices.rejected(application, latestOffer));
         return responseMapper.detail(application);
     }
 
