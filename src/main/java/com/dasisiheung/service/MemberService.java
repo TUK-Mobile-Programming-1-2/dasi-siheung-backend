@@ -8,6 +8,7 @@ import com.dasisiheung.exception.BusinessException;
 import com.dasisiheung.exception.ErrorCode;
 import com.dasisiheung.repository.ApplicationRepository;
 import com.dasisiheung.repository.MemberRepository;
+import com.dasisiheung.repository.NotificationRepository;
 import com.dasisiheung.repository.NotificationSettingRepository;
 import com.dasisiheung.repository.PushTokenRepository;
 import com.dasisiheung.repository.RefreshTokenRepository;
@@ -33,6 +34,7 @@ public class MemberService {
     private final ApplicationRepository applicationRepository;
     private final NotificationSettingRepository notificationSettingRepository;
     private final PushTokenRepository pushTokenRepository;
+    private final NotificationRepository notificationRepository;
     private final PasswordEncoder passwordEncoder;
     private final FileUploadService fileUploadService;
     private final ProfileImageResolver profileImageResolver;
@@ -104,6 +106,7 @@ public class MemberService {
         refreshTokenRepository.deleteAllByMemberId(memberId);
         notificationSettingRepository.deleteById(memberId);
         pushTokenRepository.deleteAllByMemberId(memberId);
+        notificationRepository.deleteAllByRecipientId(memberId);
     }
 
     private MyProfileResponse toProfile(Member member) {
