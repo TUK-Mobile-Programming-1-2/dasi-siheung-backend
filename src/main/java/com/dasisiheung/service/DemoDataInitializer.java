@@ -51,6 +51,9 @@ public class DemoDataInitializer implements ApplicationRunner {
     static final int CALENDAR_DAYS = 180;
 
     /** 시연 공간별 수용 인원 · 비품 · 가격 협의 여부 (공간 이름 기준). 정왕역 상가는 정가 고정 공간 예시. */
+    /** 기타(ETC) 용도 시연 공간(거북섬 창고형 공간)의 직접 입력 용도. */
+    static final String DEMO_BUILDING_USE_ETC = "창고형 다목적 공간";
+
     static final Map<String, SpaceExtras> SPACE_EXTRAS = Map.of(
             "정왕역 앞 코너 상가", new SpaceExtras(8, List.of(new EquipmentItem("접이식 테이블", 2),
                     new EquipmentItem("의자", 6), new EquipmentItem("옷걸이 행거", 2)), false),
@@ -245,9 +248,10 @@ public class DemoDataInitializer implements ApplicationRunner {
                                       CommercialTheme theme, int dailyPrice, Set<Facility> facilities,
                                       Set<ActivityType> activityTypes, Set<LocalDate> availableDates) {
         SpaceExtras extras = SPACE_EXTRAS.get(title);
+        String buildingUseEtc = buildingUse == BuildingUse.ETC ? DEMO_BUILDING_USE_ETC : null;
         return new SpaceRequest(title, description, "퇴실 시 원상 복구, 21시 이후 소음 금지", address, null, null, latitude,
-                longitude, new BigDecimal(areaSqm), buildingUse, theme, dailyPrice, facilities, activityTypes,
-                availableDates, extras.maxCapacity(), extras.equipment(), extras.priceNegotiable());
+                longitude, new BigDecimal(areaSqm), buildingUse, buildingUseEtc, theme, dailyPrice, facilities,
+                activityTypes, availableDates, extras.maxCapacity(), extras.equipment(), extras.priceNegotiable());
     }
 
     /** 시연 공간의 수용 인원 · 비품 · 가격 협의 여부. */
