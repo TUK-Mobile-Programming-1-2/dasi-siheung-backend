@@ -1,6 +1,7 @@
 package com.dasisiheung.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -8,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.dasisiheung.dto.space.EquipmentItem;
 import com.dasisiheung.entity.member.Role;
+import com.dasisiheung.entity.space.BuildingUse;
 import com.dasisiheung.entity.space.Equipment;
 import com.dasisiheung.entity.space.Space;
 import com.dasisiheung.entity.space.SpaceStatus;
@@ -134,6 +136,51 @@ class SpaceRegistrationIntegrationTest {
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.error.code").value("INVALID_INPUT"));
         }
+    }
+
+    @Test
+    @DisplayName("기타 용도 직접 입력: 등록 → 상세 · DB 같은 값 → 다른 용도로 수정하면 지움 → 기타인데 비우면 400")
+    void buildingUseEtc() throws Exception {
+        TestAccounts.Account provider = testAccounts.create(Role.PROVIDER);
+        var request = SpaceFixtures.withBuildingUse(SpaceFixtures.request(Set.of(LocalDate.now().plusDays(1))),
+                BuildingUse.ETC, "복합 문화 공간");
+
+        String body = mockMvc.perform(post("/api/v1/provider/spaces")
+                        .header(HttpHeaders.AUTHORIZATION, provider.bearer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.buildingUse").value("ETC"))
+                .andExpect(jsonPath("$.data.buildingUseEtc").value("복합 문화 공간"))
+                .andReturn().getResponse().getContentAsString();
+        long spaceId = objectMapper.readTree(body).at("/data/id").asLong();
+
+        mockMvc.perform(get("/api/v1/provider/spaces/{id}", spaceId).header(HttpHeaders.AUTHORIZATION, provider.bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.buildingUseEtc").value("복합 문화 공간"));
+        entityManager.flush();
+        entityManager.clear();
+        assertThat(spaceRepository.findById(spaceId).orElseThrow().getBuildingUseEtc()).isEqualTo("복합 문화 공간");
+
+        mockMvc.perform(put("/api/v1/provider/spaces/{id}", spaceId)
+                        .header(HttpHeaders.AUTHORIZATION, provider.bearer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                SpaceFixtures.withBuildingUse(request, BuildingUse.SALES, "복합 문화 공간"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.buildingUse").value("SALES"))
+                .andExpect(jsonPath("$.data.buildingUseEtc").doesNotExist());
+        entityManager.flush();
+        entityManager.clear();
+        assertThat(spaceRepository.findById(spaceId).orElseThrow().getBuildingUseEtc()).isNull();
+
+        mockMvc.perform(put("/api/v1/provider/spaces/{id}", spaceId)
+                        .header(HttpHeaders.AUTHORIZATION, provider.bearer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                SpaceFixtures.withBuildingUse(request, BuildingUse.ETC, null))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.fieldErrors[0].field").value("buildingUseEtcFilled"));
     }
 
     @Test
