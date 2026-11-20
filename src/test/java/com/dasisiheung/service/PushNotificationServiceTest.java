@@ -15,6 +15,7 @@ import com.dasisiheung.entity.member.Member;
 import com.dasisiheung.entity.member.NotificationPreferences;
 import com.dasisiheung.entity.member.NotificationSetting;
 import com.dasisiheung.entity.member.Role;
+import com.dasisiheung.entity.notification.NotificationType;
 import com.dasisiheung.push.PushMessage;
 import com.dasisiheung.push.PushResult;
 import com.dasisiheung.push.PushSender;
@@ -50,6 +51,10 @@ class PushNotificationServiceTest {
     private static final InquiryAnsweredEvent INQUIRY_ANSWERED = new InquiryAnsweredEvent(12L, RECIPIENT_ID,
             InquiryCategory.ACCOUNT);
     private static final ChatMessageSentEvent EVENT = chatEvent("안녕하세요\n11월 첫 주말 가능할까요?");
+    private static final NotificationCreatedEvent COUNTER_OFFER = new NotificationCreatedEvent(12L, RECIPIENT_ID,
+            NotificationType.PRICE_OFFER_RECEIVED, 31L, "공간 제공자의 역제안",
+            "김제공님이 '배곧 카페거리 2층 갤러리' 11/20~11/22 이용 금액으로 95,000원을 제안했어요.",
+            LocalDateTime.of(2026, 11, 13, 11, 30, 5, 123_000_000));
 
     @Mock
     private NotificationSettingRepository notificationSettingRepository;
@@ -235,6 +240,42 @@ class PushNotificationServiceTest {
         given(notificationSettingRepository.findById(RECIPIENT_ID)).willReturn(Optional.of(setting(activityOff)));
 
         service(EVENING).onInquiryAnswered(INQUIRY_ANSWERED);
+
+        then(pushSender).should(never()).send(anyList(), any());
+    }
+
+    @Test
+    @DisplayName("알림함 알림(역제안)은 받는 회원에게 data-only 로 보낸다 — 신청 ID · type 을 담고 conversationId 는 넣지 않는다")
+    void notificationCreated() {
+        given(notificationSettingRepository.findById(RECIPIENT_ID)).willReturn(Optional.empty());
+        given(pushTokenRepository.findTokensByMemberId(RECIPIENT_ID)).willReturn(List.of("phone"));
+        given(pushSender.send(anyList(), any())).willReturn(new PushResult(1, List.of()));
+
+        service(EVENING).onNotificationCreated(COUNTER_OFFER);
+
+        ArgumentCaptor<PushMessage> message = ArgumentCaptor.forClass(PushMessage.class);
+        then(pushSender).should().send(eq(List.of("phone")), message.capture());
+        assertThat(message.getValue().isDataOnly()).isTrue();
+        assertThat(message.getValue().data()).containsOnly(
+                entry("type", "PRICE_OFFER_RECEIVED"),
+                entry("notificationId", "12"),
+                entry("applicationId", "31"),
+                entry("title", "공간 제공자의 역제안"),
+                entry("body", "김제공님이 '배곧 카페거리 2층 갤러리' 11/20~11/22 이용 금액으로 95,000원을 제안했어요."),
+                entry("createdAt", "2026-11-13T11:30:05"));
+        assertThat(message.getValue().data()).doesNotContainKey("conversationId");
+    }
+
+    @Test
+    @DisplayName("활동 알림을 끄거나 방해금지 시간이면 알림함 알림 푸시를 보내지 않는다 (알림함에는 이미 남아 있다)")
+    void skipNotificationWhenActivityOffOrDoNotDisturb() {
+        NotificationPreferences activityOff = new NotificationPreferences(true, true, false, false, false,
+                DoNotDisturb.of(false, 22, 8));
+        given(notificationSettingRepository.findById(RECIPIENT_ID)).willReturn(Optional.of(setting(activityOff)));
+        service(EVENING).onNotificationCreated(COUNTER_OFFER);
+
+        given(notificationSettingRepository.findById(RECIPIENT_ID)).willReturn(Optional.empty());
+        service(NIGHT).onNotificationCreated(COUNTER_OFFER);
 
         then(pushSender).should(never()).send(anyList(), any());
     }
