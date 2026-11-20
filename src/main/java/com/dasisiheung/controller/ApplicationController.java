@@ -6,6 +6,7 @@ import com.dasisiheung.dto.application.ApplicationResponse;
 import com.dasisiheung.dto.application.ApplicationSummaryResponse;
 import com.dasisiheung.dto.application.CancelApplicationRequest;
 import com.dasisiheung.dto.application.PriceOfferRequest;
+import com.dasisiheung.dto.application.RejectOfferRequest;
 import com.dasisiheung.dto.common.ApiResult;
 import com.dasisiheung.dto.common.PageQuery;
 import com.dasisiheung.dto.common.PageResponse;
@@ -31,7 +32,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 공간 이용 신청. 신청 · 목록 · 취소는 이용자(USER), 상세 · 가격 협의는 신청자와 공간 제공자 모두. */
+/** 공간 이용 신청. 신청 · 목록 · 취소는 이용자(USER), 상세 · 가격 협의(제안 · 수락 · 거절)는 신청자와 공간 제공자 모두. */
 @Tag(name = "Application", description = "공간 이용 신청")
 @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
 @RestController
@@ -89,5 +90,16 @@ public class ApplicationController {
     public ApiResult<ApplicationResponse> acceptOffer(@LoginMember AuthMember loginMember,
                                                       @PathVariable Long applicationId) {
         return ApiResult.ok(priceNegotiationService.accept(loginMember.id(), applicationId));
+    }
+
+    @Operation(summary = "받은 가격 제안 거절",
+            description = "신청 거절 · 취소와 달리 신청은 검토 중으로 남습니다. 협의 상태는 OFFER_REJECTED, "
+                    + "합의 금액은 그대로이고 양쪽 모두 다시 제안할 수 있습니다. 본문은 생략할 수 있습니다.")
+    @PostMapping("/{applicationId}/offers/reject")
+    public ApiResult<ApplicationResponse> rejectOffer(@LoginMember AuthMember loginMember,
+                                                      @PathVariable Long applicationId,
+                                                      @Valid @RequestBody(required = false) RejectOfferRequest request) {
+        RejectOfferRequest rejection = request == null ? RejectOfferRequest.EMPTY : request;
+        return ApiResult.ok(priceNegotiationService.reject(loginMember.id(), applicationId, rejection));
     }
 }
