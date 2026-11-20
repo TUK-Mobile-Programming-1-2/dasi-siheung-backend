@@ -871,10 +871,8 @@ try {
 | --- | --- |
 | `http://localhost:5173` | Vite 개발 서버 기본 포트 |
 | `http://localhost:3000` | CRA · Next.js 개발 서버 기본 포트 |
-| `https://dasi-siheung-web-develop.vercel.app` | 관리자 웹 배포 주소 (Vercel) |
 
-- 다른 포트를 쓰거나 **관리자 웹 주소가 새로 생기거나 바뀌면 백엔드 담당에게 알려주세요.** 허용 목록에 추가합니다.
-- Vercel 의 브랜치별 미리보기 주소(`...-git-<브랜치>-...vercel.app`)는 허용하지 않습니다. 고정 주소로 확인해 주세요.
+- 다른 포트를 쓰거나 **관리자 웹을 배포해서 주소가 생기면 백엔드 담당에게 알려주세요.** 허용 목록에 추가합니다.
 - 브라우저 콘솔에 `CORS policy` 오류가 보이면 거의 이 문제입니다.
 - 허용되는 메서드는 `GET POST PUT PATCH DELETE`, 헤더 제한은 없습니다. 쿠키는 쓰지 않습니다. 인증은 헤더의 토큰으로 합니다.
 
@@ -1062,7 +1060,7 @@ try {
 | DELETE | `/api/v1/provider/spaces/{spaceId}/proofs/{proofId}` | PROVIDER | 권한 증빙 삭제 |
 | GET | `/api/v1/provider/spaces` | PROVIDER | 내 공간 목록 (검수 상태·사유, status 필터) |
 | GET | `/api/v1/provider/spaces/{spaceId}` | PROVIDER | 내 공간 상세 (사진·증빙 포함) |
-| PUT | `/api/v1/provider/spaces/{spaceId}` | PROVIDER | 공간 정보 수정 (검수 항목 변경 시 재검수, 통째로 바꿈) |
+| PUT | `/api/v1/provider/spaces/{spaceId}` | PROVIDER | 공간 정보 수정 (검수 항목 — 주소 · 건물 · 호실 · 면적 · 용도 · 기타 용도 직접 입력 — 변경 시 재검수, 통째로 바꿈) |
 | PUT | `/api/v1/provider/spaces/{spaceId}/available-dates` | PROVIDER | 사용 가능 날짜(캘린더) 설정 |
 | POST | `/api/v1/provider/spaces/{spaceId}/pause` | PROVIDER | 공개 일시 중단 |
 | POST | `/api/v1/provider/spaces/{spaceId}/resume` | PROVIDER | 공개 재개 |
@@ -1079,6 +1077,19 @@ try {
 - 보유 시설(`facilities`)은 정해진 목록에서 고르고, 비품(`equipment`)은 제공자가 자유롭게 적습니다.
 - **수정(PUT)은 통째로 바꿉니다.** 수정 화면에서도 세 필드를 항상 함께 보내세요. 빼면 수용 인원 없음 · 비품 없음 · 협의 가능이 됩니다.
 - 세 항목은 관리자 검수 항목이 아니라, 공개 중에 바꿔도 다시 검수받지 않습니다.
+
+**건축물 용도 '기타' 직접 입력** (`buildingUseEtc`)
+
+| 필드 | 형식 | 설명 |
+| --- | --- | --- |
+| `buildingUseEtc` (요청) | 문자열, 최대 50자 | `buildingUse` 가 `ETC` 면 **필수**(공백만이면 안 됨). 다른 용도면 보내도 무시하고 저장하지 않습니다 |
+| `buildingUseEtc` (응답) | 문자열 또는 `null` | 내 공간 상세 · 공간 상세 · 관리자 검수 상세에 있습니다. `ETC` 가 아니면 항상 `null` |
+
+- 기타인데 비었으면 400 `INVALID_INPUT`, `fieldErrors[].field` = **`buildingUseEtcFilled`** (50자 초과는 `buildingUseEtc`). 두 경우 모두 기타 입력칸 아래에 표시하세요.
+- 앞뒤 공백은 떼고 저장합니다. 다른 용도로 바꾸면 서버가 직접 입력을 지웁니다.
+- 기타 용도의 직접 입력도 **검수 항목**입니다. 공개 중에 바꾸면 다시 검수 대기가 됩니다.
+- 이 필드 전에 등록한 기타 공간은 `null` 일 수 있습니다. 수정 화면에서 입력을 받으세요 (수정은 통째로 바꾸므로 기타면 필수).
+- 소개(`description`) 앞에 붙여 보내던 `[건축물 용도(기타): …]` 한 줄은 서버가 배포할 때 `buildingUseEtc` 로 옮기고 소개에서 뗐습니다. 앱은 접두사 처리를 지우면 됩니다.
 
 ### 관리자 — 공간 검수 (`http/admin-review.http`)
 
