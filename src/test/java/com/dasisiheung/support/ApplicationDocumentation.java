@@ -52,8 +52,14 @@ public final class ApplicationDocumentation {
                 fieldWithPath(prefix + "listTotalPrice").type(JsonFieldType.NUMBER).description("정가 합계(원)"),
                 fieldWithPath(prefix + "totalPrice").type(JsonFieldType.NUMBER).description("현재 합의 금액(원) — 협의 전에는 정가 합계"),
                 fieldWithPath(prefix + "negotiationStatus").type(JsonFieldType.STRING)
-                        .description("NONE 정가 신청 | WAITING_PROVIDER 제공자 답변 대기 | WAITING_APPLICANT 신청자 답변 대기 | AGREED 가격 합의"),
+                        .description("NONE 정가 신청 | WAITING_PROVIDER 제공자 답변 대기 | WAITING_APPLICANT 신청자 답변 대기 | "
+                                + "AGREED 가격 합의 | OFFER_REJECTED 받은 제안 거절 (합의 금액 그대로, 양쪽 모두 재제안 가능)"),
                 fieldWithPath(prefix + "pendingOfferAmount").type(JsonFieldType.NUMBER).optional().description("답변을 기다리는 제안 금액"),
+                fieldWithPath(prefix + "respondingSide").type(JsonFieldType.STRING).optional()
+                        .description("받은 제안에 답(수락 · 거절 · 역제안)할 차례인 쪽 APPLICANT | PROVIDER (답할 제안이 없으면 null)"),
+                fieldWithPath(prefix + "offerableSides").type(JsonFieldType.ARRAY)
+                        .description("지금 새 제안 · 재제안을 보낼 수 있는 쪽 목록 (검토 중 · 협의 가능 공간 · 내 제안의 답을 기다리는 중이 아닐 때). "
+                                + "내 쪽은 applicant.id 가 내 회원 ID 면 APPLICANT, 아니면 PROVIDER"),
                 fieldWithPath(prefix + "offers").type(JsonFieldType.ARRAY).description("가격 협의 이력 (오래된 순)"),
                 fieldWithPath(prefix + "offers[].id").type(JsonFieldType.NUMBER).optional().description("제안 ID"),
                 fieldWithPath(prefix + "offers[].proposerSide").type(JsonFieldType.STRING).optional().description("APPLICANT 신청자 | PROVIDER 공간 제공자"),
@@ -61,6 +67,8 @@ public final class ApplicationDocumentation {
                 fieldWithPath(prefix + "offers[].amount").type(JsonFieldType.NUMBER).optional().description("제안 금액(원, 기간 합계)"),
                 fieldWithPath(prefix + "offers[].message").type(JsonFieldType.STRING).optional().description("한마디"),
                 fieldWithPath(prefix + "offers[].acceptedAt").type(JsonFieldType.STRING).optional().description("상대가 수락한 시각 (수락 전이면 null)"),
+                fieldWithPath(prefix + "offers[].rejectedAt").type(JsonFieldType.STRING).optional().description("상대가 거절한 시각 (거절 전이면 null)"),
+                fieldWithPath(prefix + "offers[].rejectionMessage").type(JsonFieldType.STRING).optional().description("거절 한마디 (없으면 null)"),
                 fieldWithPath(prefix + "offers[].createdAt").type(JsonFieldType.STRING).optional().description("제안 시각"),
                 fieldWithPath(prefix + "conversationId").type(JsonFieldType.NUMBER).optional()
                         .description("신청자 ↔ 공간 제공자 1:1 대화 ID (아직 없으면 null — POST /api/v1/applications/{id}/conversation 으로 열기)"),

@@ -1,0 +1,437 @@
+# 역제안 알림 시나리오 — 제공자 역제안 → 창작자 알림함(푸시와 같은 내용) → 읽음 → 거절 · 재제안 · 수락
+# Android #91 완료 확인 흐름과 같다. 신청은 끝까지 검토 중(PENDING)으로 남고, 각 응답의 협의 상태 · 제안 이력으로 확인한다.
+# 푸시(FCM data-only)는 http/manual/push-check.http 로 기기를 등록한 뒤 실제 기기에서 확인한다.
+#   data: type(PRICE_OFFER_RECEIVED | PRICE_OFFER_ACCEPTED | PRICE_OFFER_REJECTED), notificationId, applicationId, title, body, createdAt
+#   (신청 알림이라 conversationId 는 넣지 않는다)
+# 준비 단계에서 공개 공간을 만든다. (관리자 계정: http-client.private.env.json)
+
+### 준비: 공간 제공자 가입
+POST {{baseUrl}}/api/v1/auth/signup
+Content-Type: application/json
+
+{
+  "email": "http-ntf-provider-{{$timestamp}}-{{$randomInt}}@test.dasisiheung.com",
+  "password": "password123",
+  "name": "역제안 제공자",
+  "phone": "010-7777-8888",
+  "role": "PROVIDER"
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+    client.global.set("ntfProviderEmail", response.body.data.email);
+%}
+
+### 준비: 공간 제공자 로그인
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{ntfProviderEmail}}",
+  "password": "password123"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+    client.global.set("ntfProviderToken", response.body.data.accessToken);
+    const day = (offset) => new Date(Date.now() + 9 * 3600 * 1000 + offset * 86400 * 1000).toISOString().substring(0, 10);
+    for (let i = 1; i <= 6; i++) {
+        client.global.set(`ntfDay${i}`, day(i));
+    }
+%}
+
+### 준비: 공간 등록 (정왕, 1일 5만원, 내일부터 5일, 최대 6명)
+POST {{baseUrl}}/api/v1/provider/spaces
+Authorization: Bearer {{ntfProviderToken}}
+Content-Type: application/json
+
+{
+  "title": "정왕 시장 골목 2층",
+  "description": "전통시장 입구 바로 앞 상가입니다.",
+  "address": "경기도 시흥시 정왕대로 233",
+  "latitude": 37.3517,
+  "longitude": 126.7428,
+  "areaSqm": 28.5,
+  "buildingUse": "NEIGHBORHOOD_1",
+  "commercialTheme": "FOOD_ALLEY",
+  "dailyPrice": 50000,
+  "facilities": ["ELECTRICITY", "WATER"],
+  "activityTypes": ["POPUP_STORE", "EXPERIENCE"],
+  "availableDates": ["{{ntfDay1}}", "{{ntfDay2}}", "{{ntfDay3}}", "{{ntfDay4}}", "{{ntfDay5}}"],
+  "maxCapacity": 6
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+    client.global.set("ntfSpaceId", response.body.data.id);
+%}
+
+### 준비: 증빙 제출
+POST {{baseUrl}}/api/v1/provider/spaces/{{ntfSpaceId}}/proofs
+Authorization: Bearer {{ntfProviderToken}}
+Content-Type: multipart/form-data; boundary=dasi-boundary
+
+--dasi-boundary
+Content-Disposition: form-data; name="proofType"
+
+LEASE_CONTRACT
+--dasi-boundary
+Content-Disposition: form-data; name="file"; filename="proof.pdf"
+Content-Type: application/pdf
+
+< ./fixtures/proof.pdf
+--dasi-boundary--
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+%}
+
+### 준비: 관리자 로그인
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+> {%
+    client.test("200 OK + ADMIN", () => {
+        client.assert(response.status === 200, `실제 ${response.status} — http-client.private.env.json 의 관리자 계정 확인`);
+        client.assert(response.body.data.member.role === "ADMIN", `실제 ${response.body.data.member.role}`);
+    });
+    client.global.set("adminToken", response.body.data.accessToken);
+%}
+
+### 준비: 공개 승인
+POST {{baseUrl}}/api/v1/admin/spaces/{{ntfSpaceId}}/reviews
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "decision": "APPROVE",
+  "checklist": { "authorityVerified": true, "addressMatched": true, "buildingUnitMatched": true, "areaMatched": true, "usageMatched": true }
+}
+
+> {%
+    client.test("200 OK + PUBLISHED", () => client.assert(response.body.data.space.status === "PUBLISHED", `실제 ${response.body.data.space.status}`));
+%}
+
+### 준비: 창작자 가입
+POST {{baseUrl}}/api/v1/auth/signup
+Content-Type: application/json
+
+{
+  "email": "http-ntf-user-{{$timestamp}}-{{$randomInt}}@test.dasisiheung.com",
+  "password": "password123",
+  "name": "창작자",
+  "phone": "010-1234-0001",
+  "role": "USER"
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, `실제 ${response.status}`));
+    client.global.set("ntfUserEmail", response.body.data.email);
+%}
+
+### 준비: 창작자 로그인
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{ntfUserEmail}}",
+  "password": "password123"
+}
+
+> {%
+    client.test("200 OK", () => client.assert(response.status === 200, `실제 ${response.status}`));
+    client.global.set("ntfUserToken", response.body.data.accessToken);
+%}
+
+### 신청서 제출 (창작자, 1~2일차, 정가)
+# 인증: USER
+# 기대값: 201 Created, PENDING, 협의 NONE, 양쪽 모두 제안 가능
+POST {{baseUrl}}/api/v1/applications
+Authorization: Bearer {{ntfUserToken}}
+Content-Type: application/json
+
+{
+  "spaceId": {{ntfSpaceId}},
+  "activityType": "POPUP_STORE",
+  "activityTitle": "수제 캔들 팝업 스토어",
+  "plan": "이틀 동안 수제 캔들을 전시 · 판매합니다.",
+  "headcount": 2,
+  "startDate": "{{ntfDay1}}",
+  "endDate": "{{ntfDay2}}"
+}
+
+> {%
+    client.test("201 Created + 협의 NONE", () => {
+        const data = response.body.data;
+        client.assert(response.status === 201, `실제 ${response.status}`);
+        client.assert(data.negotiationStatus === "NONE", `실제 ${data.negotiationStatus}`);
+        client.assert(data.respondingSide === null, `실제 ${data.respondingSide}`);
+        client.assert(JSON.stringify(data.offerableSides) === '["APPLICANT","PROVIDER"]', `실제 ${JSON.stringify(data.offerableSides)}`);
+    });
+    client.global.set("ntfAppId", response.body.data.id);
+%}
+
+### 시작 전 알림함 (창작자)
+# 기대값: 200 OK, 안 읽은 알림 0
+GET {{baseUrl}}/api/v1/notifications/unread-count
+Authorization: Bearer {{ntfUserToken}}
+
+> {%
+    client.test("200 OK + 0", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.count === 0, `실제 ${response.body.data.count}`);
+    });
+%}
+
+### 제공자 역제안 (제공자 → 창작자)
+# 인증: 공간 제공자
+# 기대값: 200 OK, WAITING_APPLICANT, 대기 금액 95000, 답할 차례 APPLICANT, 제공자는 답을 기다리므로 제안 불가
+POST {{baseUrl}}/api/v1/applications/{{ntfAppId}}/offers
+Authorization: Bearer {{ntfProviderToken}}
+Content-Type: application/json
+
+{
+  "amount": 95000,
+  "message": "9만 5천원까지 가능합니다."
+}
+
+> {%
+    client.test("200 OK + 신청자 답변 대기", () => {
+        const data = response.body.data;
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(data.negotiationStatus === "WAITING_APPLICANT", `실제 ${data.negotiationStatus}`);
+        client.assert(data.pendingOfferAmount === 95000, `실제 ${data.pendingOfferAmount}`);
+        client.assert(data.respondingSide === "APPLICANT", `실제 ${data.respondingSide}`);
+        client.assert(JSON.stringify(data.offerableSides) === '["APPLICANT"]', `실제 ${JSON.stringify(data.offerableSides)}`);
+        client.assert(data.offers.length === 1 && data.offers[0].proposerSide === "PROVIDER", "협의 이력");
+    });
+%}
+
+### 창작자 알림함 — 역제안 도착
+# 인증: 로그인 회원 누구나 (내 알림만)
+# 기대값: 200 OK, 안 읽은 알림 1건, PRICE_OFFER_RECEIVED, 이 신청 ID, 제목 "공간 제공자의 역제안"
+GET {{baseUrl}}/api/v1/notifications?unreadOnly=true
+Authorization: Bearer {{ntfUserToken}}
+
+> {%
+    client.test("200 OK + 역제안 알림", () => {
+        const item = response.body.data.content[0];
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.totalElements === 1, `실제 ${response.body.data.totalElements}`);
+        client.assert(item.type === "PRICE_OFFER_RECEIVED", `실제 ${item.type}`);
+        client.assert(item.applicationId === client.global.get("ntfAppId"), `실제 ${item.applicationId}`);
+        client.assert(item.title === "공간 제공자의 역제안", `실제 ${item.title}`);
+        client.assert(item.body.includes("95,000원"), `실제 ${item.body}`);
+        client.assert(item.read === false, `실제 ${item.read}`);
+    });
+    client.global.set("ntfReceivedId", response.body.data.content[0].id);
+%}
+
+### 안 읽은 알림 수 (창작자)
+# 기대값: 200 OK, 1
+GET {{baseUrl}}/api/v1/notifications/unread-count
+Authorization: Bearer {{ntfUserToken}}
+
+> {%
+    client.test("200 OK + 1", () => client.assert(response.body.data.count === 1, `실제 ${response.body.data.count}`));
+%}
+
+### 남의 알림 읽음 처리 (제공자가 창작자 알림을)
+# 기대값: 404 NOTIFICATION_NOT_FOUND
+POST {{baseUrl}}/api/v1/notifications/{{ntfReceivedId}}/read
+Authorization: Bearer {{ntfProviderToken}}
+
+> {%
+    client.test("404 NOTIFICATION_NOT_FOUND", () => {
+        client.assert(response.status === 404, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "NOTIFICATION_NOT_FOUND", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 알림 탭 → 읽음 처리 (창작자)
+# 기대값: 200 OK, read true, readAt 있음
+POST {{baseUrl}}/api/v1/notifications/{{ntfReceivedId}}/read
+Authorization: Bearer {{ntfUserToken}}
+
+> {%
+    client.test("200 OK + 읽음", () => {
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(response.body.data.read === true && response.body.data.readAt, "읽음 시각");
+    });
+%}
+
+### 알림 탭 → 신청 상세 진입 (창작자)
+# 기대값: 200 OK, 같은 신청, WAITING_APPLICANT, 대기 금액 95000
+GET {{baseUrl}}/api/v1/applications/{{ntfAppId}}
+Authorization: Bearer {{ntfUserToken}}
+
+> {%
+    client.test("200 OK + 역제안 대기", () => {
+        const data = response.body.data;
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(data.negotiationStatus === "WAITING_APPLICANT" && data.pendingOfferAmount === 95000, `실제 ${data.negotiationStatus} / ${data.pendingOfferAmount}`);
+    });
+%}
+
+### 제공자가 자기 역제안을 거절
+# 기대값: 409 NO_PENDING_OFFER
+POST {{baseUrl}}/api/v1/applications/{{ntfAppId}}/offers/reject
+Authorization: Bearer {{ntfProviderToken}}
+
+> {%
+    client.test("409 NO_PENDING_OFFER", () => {
+        client.assert(response.status === 409, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "NO_PENDING_OFFER", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 거절 한마디 300자 초과
+# 기대값: 400 INVALID_INPUT
+POST {{baseUrl}}/api/v1/applications/{{ntfAppId}}/offers/reject
+Authorization: Bearer {{ntfUserToken}}
+Content-Type: application/json
+
+{
+  "message": "{{$random.alphabetic(301)}}"
+}
+
+> {%
+    client.test("400 INVALID_INPUT", () => {
+        client.assert(response.status === 400, `실제 ${response.status}`);
+        client.assert(response.body.error.code === "INVALID_INPUT", `실제 ${response.body.error.code}`);
+    });
+%}
+
+### 받은 역제안 거절 (창작자)
+# 인증: 신청자 또는 공간 제공자 (받은 쪽만)
+# 기대값: 200 OK, 신청은 PENDING 그대로, OFFER_REJECTED, 합의 금액 정가 100000 그대로, 대기 금액 없음,
+#         답할 차례 없음, 양쪽 모두 다시 제안 가능, 이력의 역제안에 거절 시각 · 한마디
+POST {{baseUrl}}/api/v1/applications/{{ntfAppId}}/offers/reject
+Authorization: Bearer {{ntfUserToken}}
+Content-Type: application/json
+
+{
+  "message": "주말이라 9만 5천원은 어렵습니다."
+}
+
+> {%
+    client.test("200 OK + 제안 거절 (신청은 검토 중)", () => {
+        const data = response.body.data;
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(data.status === "PENDING", `실제 ${data.status}`);
+        client.assert(data.negotiationStatus === "OFFER_REJECTED", `실제 ${data.negotiationStatus}`);
+        client.assert(data.totalPrice === 100000 && data.pendingOfferAmount === null, `실제 ${data.totalPrice} / ${data.pendingOfferAmount}`);
+        client.assert(data.respondingSide === null, `실제 ${data.respondingSide}`);
+        client.assert(JSON.stringify(data.offerableSides) === '["APPLICANT","PROVIDER"]', `실제 ${JSON.stringify(data.offerableSides)}`);
+        client.assert(data.offers[0].rejectedAt && data.offers[0].acceptedAt === null, "거절 기록");
+        client.assert(data.offers[0].rejectionMessage === "주말이라 9만 5천원은 어렵습니다.", `실제 ${data.offers[0].rejectionMessage}`);
+    });
+%}
+
+### 이미 거절한 제안을 다시 거절
+# 기대값: 409 NO_PENDING_OFFER
+POST {{baseUrl}}/api/v1/applications/{{ntfAppId}}/offers/reject
+Authorization: Bearer {{ntfUserToken}}
+
+> {%
+    client.test("409 NO_PENDING_OFFER", () => client.assert(response.body.error.code === "NO_PENDING_OFFER", `실제 ${response.body.error.code}`));
+%}
+
+### 제공자 알림함 — 거절됨
+# 기대값: 200 OK, 안 읽은 알림 1건, PRICE_OFFER_REJECTED, 이 신청 ID
+GET {{baseUrl}}/api/v1/notifications?unreadOnly=true
+Authorization: Bearer {{ntfProviderToken}}
+
+> {%
+    client.test("200 OK + 거절 알림", () => {
+        const item = response.body.data.content[0];
+        client.assert(response.body.data.totalElements === 1, `실제 ${response.body.data.totalElements}`);
+        client.assert(item.type === "PRICE_OFFER_REJECTED", `실제 ${item.type}`);
+        client.assert(item.applicationId === client.global.get("ntfAppId"), `실제 ${item.applicationId}`);
+    });
+%}
+
+### 거절 뒤 재제안 (창작자 → 제공자)
+# 기대값: 200 OK, WAITING_PROVIDER, 대기 금액 90000, 답할 차례 PROVIDER
+POST {{baseUrl}}/api/v1/applications/{{ntfAppId}}/offers
+Authorization: Bearer {{ntfUserToken}}
+Content-Type: application/json
+
+{
+  "amount": 90000,
+  "message": "9만원이면 바로 진행하겠습니다."
+}
+
+> {%
+    client.test("200 OK + 제공자 답변 대기", () => {
+        const data = response.body.data;
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(data.negotiationStatus === "WAITING_PROVIDER" && data.pendingOfferAmount === 90000, `실제 ${data.negotiationStatus} / ${data.pendingOfferAmount}`);
+        client.assert(data.respondingSide === "PROVIDER", `실제 ${data.respondingSide}`);
+        client.assert(data.offers.length === 2, `실제 ${data.offers.length}`);
+    });
+%}
+
+### 제공자 알림함 — 재제안 도착
+# 기대값: 200 OK, 최신 알림이 PRICE_OFFER_RECEIVED (제목 "신청자의 가격 제안")
+GET {{baseUrl}}/api/v1/notifications
+Authorization: Bearer {{ntfProviderToken}}
+
+> {%
+    client.test("200 OK + 재제안 알림", () => {
+        const item = response.body.data.content[0];
+        client.assert(response.body.data.totalElements === 2, `실제 ${response.body.data.totalElements}`);
+        client.assert(item.type === "PRICE_OFFER_RECEIVED" && item.title === "신청자의 가격 제안", `실제 ${item.type} / ${item.title}`);
+    });
+%}
+
+### 재제안 수락 (제공자)
+# 기대값: 200 OK, AGREED, 합의 금액 90000, 이력 2건 중 마지막이 수락됨
+POST {{baseUrl}}/api/v1/applications/{{ntfAppId}}/offers/accept
+Authorization: Bearer {{ntfProviderToken}}
+
+> {%
+    client.test("200 OK + 합의", () => {
+        const data = response.body.data;
+        client.assert(response.status === 200, `실제 ${response.status}`);
+        client.assert(data.negotiationStatus === "AGREED" && data.totalPrice === 90000, `실제 ${data.negotiationStatus} / ${data.totalPrice}`);
+        client.assert(data.offers[1].acceptedAt && data.offers[0].rejectedAt, "이력: 거절 → 수락");
+        client.assert(data.respondingSide === null, `실제 ${data.respondingSide}`);
+    });
+%}
+
+### 창작자 알림함 — 수락됨
+# 기대값: 200 OK, 최신 알림이 PRICE_OFFER_ACCEPTED, 안 읽은 알림 1건
+GET {{baseUrl}}/api/v1/notifications
+Authorization: Bearer {{ntfUserToken}}
+
+> {%
+    client.test("200 OK + 수락 알림", () => {
+        const data = response.body.data;
+        client.assert(data.totalElements === 2, `실제 ${data.totalElements}`);
+        client.assert(data.content[0].type === "PRICE_OFFER_ACCEPTED" && data.content[0].read === false, `실제 ${data.content[0].type}`);
+        client.assert(data.content[1].type === "PRICE_OFFER_RECEIVED" && data.content[1].read === true, "역제안 알림은 읽음");
+    });
+%}
+
+### 모두 읽음 처리 (창작자)
+# 기대값: 200 OK, 이번에 읽음으로 바뀐 수 1
+POST {{baseUrl}}/api/v1/notifications/read-all
+Authorization: Bearer {{ntfUserToken}}
+
+> {%
+    client.test("200 OK + 1건 읽음", () => client.assert(response.body.data.count === 1, `실제 ${response.body.data.count}`));
+%}
+
+### 로그인 없이 알림함
+# 기대값: 401 UNAUTHORIZED
+GET {{baseUrl}}/api/v1/notifications
+
+> {%
+    client.test("401 UNAUTHORIZED", () => client.assert(response.status === 401, `실제 ${response.status}`));
+%}

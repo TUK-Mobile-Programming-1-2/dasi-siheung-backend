@@ -18,6 +18,7 @@ import com.dasisiheung.entity.member.Role;
 import com.dasisiheung.exception.ErrorCode;
 import com.dasisiheung.repository.ApplicationRepository;
 import com.dasisiheung.repository.MemberRepository;
+import com.dasisiheung.repository.NotificationRepository;
 import com.dasisiheung.repository.NotificationSettingRepository;
 import com.dasisiheung.repository.PushTokenRepository;
 import com.dasisiheung.repository.RefreshTokenRepository;
@@ -57,6 +58,9 @@ class MemberServiceTest {
     private PushTokenRepository pushTokenRepository;
 
     @Mock
+    private NotificationRepository notificationRepository;
+
+    @Mock
     private FileUploadService fileUploadService;
 
     @Mock
@@ -70,8 +74,8 @@ class MemberServiceTest {
     @BeforeEach
     void setUp() {
         memberService = new MemberService(memberRepository, refreshTokenRepository, applicationRepository,
-                notificationSettingRepository, pushTokenRepository, passwordEncoder, fileUploadService, profileImageResolver,
-                FixedClockConfig.fixedClock());
+                notificationSettingRepository, pushTokenRepository, notificationRepository, passwordEncoder,
+                fileUploadService, profileImageResolver, FixedClockConfig.fixedClock());
         member = Member.signUp("user@example.com", passwordEncoder.encode(PASSWORD), "김시흥", "01012345678", Role.USER);
         ReflectionTestUtils.setField(member, "id", MEMBER_ID);
     }
@@ -119,7 +123,7 @@ class MemberServiceTest {
     }
 
     @Test
-    @DisplayName("탈퇴하면 개인정보를 지우고 리프레시 토큰 · 알림 설정 · 푸시 토큰을 지운다")
+    @DisplayName("탈퇴하면 개인정보를 지우고 리프레시 토큰 · 알림 설정 · 푸시 토큰 · 알림함을 지운다")
     void withdraw() {
         given(memberRepository.findById(MEMBER_ID)).willReturn(Optional.of(member));
 
@@ -134,6 +138,7 @@ class MemberServiceTest {
         then(refreshTokenRepository).should().deleteAllByMemberId(MEMBER_ID);
         then(notificationSettingRepository).should().deleteById(MEMBER_ID);
         then(pushTokenRepository).should().deleteAllByMemberId(MEMBER_ID);
+        then(notificationRepository).should().deleteAllByRecipientId(MEMBER_ID);
         then(applicationRepository).should().existsInProgressByParticipant(MEMBER_ID, FixedClockConfig.FIXED_TODAY);
     }
 
@@ -151,6 +156,7 @@ class MemberServiceTest {
         then(refreshTokenRepository).should(never()).deleteAllByMemberId(MEMBER_ID);
         then(notificationSettingRepository).should(never()).deleteById(MEMBER_ID);
         then(pushTokenRepository).should(never()).deleteAllByMemberId(MEMBER_ID);
+        then(notificationRepository).should(never()).deleteAllByRecipientId(MEMBER_ID);
     }
 
     @Test

@@ -43,7 +43,7 @@ public interface PrivacyRepository extends JpaRepository<PrivacyPurgeLog, Long> 
     long countBookingsIntoStats(@Param("today") LocalDate today);
 
     /**
-     * 보관 기간이 지난 끝난 신청의 글(활동 이름 · 계획 · 사유)과 가격 제안 한마디를 비식별화한다.
+     * 보관 기간이 지난 끝난 신청의 글(활동 이름 · 계획 · 사유)과 가격 제안 · 거절 한마디를 비식별화한다.
      * 통계에 들어가지 않은 확정 예약은 건너뛴다. (쓰기 트랜잭션 안에서 불러야 한다)
      *
      * @return 비식별화한 신청 수
@@ -57,8 +57,9 @@ public interface PrivacyRepository extends JpaRepository<PrivacyPurgeLog, Long> 
                   AND (status <> 'APPROVED' OR counted_in_stats)
                 RETURNING id
             ), offers AS (
-                UPDATE price_offer SET message = NULL
-                WHERE application_id IN (SELECT id FROM anonymized) AND message IS NOT NULL
+                UPDATE price_offer SET message = NULL, rejection_message = NULL
+                WHERE application_id IN (SELECT id FROM anonymized)
+                  AND (message IS NOT NULL OR rejection_message IS NOT NULL)
                 RETURNING 1
             )
             SELECT COUNT(*) FROM anonymized

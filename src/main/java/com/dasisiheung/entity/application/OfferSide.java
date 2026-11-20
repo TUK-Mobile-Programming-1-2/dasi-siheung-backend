@@ -14,6 +14,11 @@ public enum OfferSide implements LabeledEnum {
 
     private final String label;
 
+    /** 상대 쪽. */
+    public OfferSide counterpart() {
+        return this == APPLICANT ? PROVIDER : APPLICANT;
+    }
+
     /** 이 쪽이 제안하면 상대 답변을 기다리는 상태. */
     PriceNegotiationStatus waitingForCounterpart() {
         return this == APPLICANT ? PriceNegotiationStatus.WAITING_PROVIDER : PriceNegotiationStatus.WAITING_APPLICANT;
