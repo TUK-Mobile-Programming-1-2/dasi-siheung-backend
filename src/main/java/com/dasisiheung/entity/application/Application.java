@@ -189,6 +189,11 @@ public class Application extends BaseTimeEntity {
         throw new BusinessException(ErrorCode.NOT_APPLICATION_PARTICIPANT);
     }
 
+    /** 신청의 한쪽 회원. (신청자 또는 공간 제공자) */
+    public Member memberOf(OfferSide side) {
+        return side == OfferSide.APPLICANT ? applicant : space.getProvider();
+    }
+
     /**
      * 가격을 제안한다. 처음 제안 · 받은 제안에 대한 역제안 · 거절 뒤 재제안 · 합의 뒤 재협의 모두 이 메서드로 한다.
      *
