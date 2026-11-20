@@ -25,6 +25,9 @@ public final class SpaceDocumentation {
                 fieldWithPath("longitude").type(JsonFieldType.NUMBER).description("경도"),
                 fieldWithPath("areaSqm").type(JsonFieldType.NUMBER).description("전용 면적(㎡), 소수 둘째 자리까지"),
                 fieldWithPath("buildingUse").type(JsonFieldType.STRING).description("건축물 용도 (선택지 buildingUses)"),
+                fieldWithPath("buildingUseEtc").type(JsonFieldType.STRING).optional()
+                        .description("건축물 용도가 기타(ETC)일 때 직접 입력한 용도 (ETC 면 필수, 최대 50자 — 비면 400 fieldErrors "
+                                + "buildingUseEtcFilled). 다른 용도면 무시하고 저장하지 않습니다"),
                 fieldWithPath("commercialTheme").type(JsonFieldType.STRING).optional().description("상권 테마 (선택지 commercialThemes, 선택)"),
                 fieldWithPath("dailyPrice").type(JsonFieldType.NUMBER).description("1일 이용료(원)"),
                 fieldWithPath("facilities").type(JsonFieldType.ARRAY).optional().description("보유 시설 (선택지 facilities)"),
@@ -73,6 +76,8 @@ public final class SpaceDocumentation {
                 fieldWithPath(prefix + "longitude").type(JsonFieldType.NUMBER).description("경도"),
                 fieldWithPath(prefix + "areaSqm").type(JsonFieldType.NUMBER).description("전용 면적(㎡)"),
                 fieldWithPath(prefix + "buildingUse").type(JsonFieldType.STRING).description("건축물 용도"),
+                fieldWithPath(prefix + "buildingUseEtc").type(JsonFieldType.STRING).optional()
+                        .description("기타(ETC) 용도일 때 직접 입력한 용도 (다른 용도 · 입력 전에 등록한 기타 공간은 null)"),
                 fieldWithPath(prefix + "commercialTheme").type(JsonFieldType.STRING).optional().description("상권 테마"),
                 fieldWithPath(prefix + "dailyPrice").type(JsonFieldType.NUMBER).description("1일 이용료(원)"),
                 fieldWithPath(prefix + "facilities").type(JsonFieldType.ARRAY).description("보유 시설"),
@@ -101,6 +106,8 @@ public final class SpaceDocumentation {
                 fieldWithPath(prefix + "longitude").type(JsonFieldType.NUMBER).description("경도"),
                 fieldWithPath(prefix + "areaSqm").type(JsonFieldType.NUMBER).description("전용 면적(㎡)"),
                 fieldWithPath(prefix + "buildingUse").type(JsonFieldType.STRING).description("건축물 용도"),
+                fieldWithPath(prefix + "buildingUseEtc").type(JsonFieldType.STRING).optional()
+                        .description("기타(ETC) 용도일 때 직접 입력한 용도 (다른 용도 · 입력 전에 등록한 기타 공간은 null)"),
                 fieldWithPath(prefix + "commercialTheme").type(JsonFieldType.STRING).optional().description("상권 테마"),
                 fieldWithPath(prefix + "dailyPrice").type(JsonFieldType.NUMBER).description("1일 이용료(원)"),
                 fieldWithPath(prefix + "facilities").type(JsonFieldType.ARRAY).description("보유 시설"),
