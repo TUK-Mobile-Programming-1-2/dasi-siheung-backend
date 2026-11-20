@@ -27,11 +27,13 @@ import com.dasisiheung.dto.application.ApplicationSummaryResponse;
 import com.dasisiheung.dto.application.CancelApplicationRequest;
 import com.dasisiheung.dto.application.PriceOfferRequest;
 import com.dasisiheung.dto.application.PriceOfferResponse;
+import com.dasisiheung.dto.application.RejectOfferRequest;
 import com.dasisiheung.dto.common.PageQuery;
 import com.dasisiheung.dto.common.PageResponse;
 import com.dasisiheung.entity.application.Application;
 import com.dasisiheung.entity.application.ApplicationStatus;
 import com.dasisiheung.entity.application.OfferSide;
+import com.dasisiheung.entity.application.PriceOffer;
 import com.dasisiheung.exception.BusinessException;
 import com.dasisiheung.exception.ErrorCode;
 import com.dasisiheung.service.ApplicationService;
@@ -237,6 +239,73 @@ class ApplicationControllerTest extends ApiDocsTestSupport {
                         responseFields(success(fields(ApplicationDocumentation.detailFields("data."))))));
     }
 
+    @Test
+    @DisplayName("받은 가격 제안 거절")
+    void rejectOffer() throws Exception {
+        given(priceNegotiationService.reject(eq(USER_ID), eq(7L), any(RejectOfferRequest.class)))
+                .willReturn(offerRejectedDetail());
+
+        mockMvc.perform(post("/api/v1/applications/{applicationId}/offers/reject", 7L)
+                        .header(HttpHeaders.AUTHORIZATION, userToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(new RejectOfferRequest("주말이라 어렵습니다."))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("PENDING"))
+                .andExpect(jsonPath("$.data.negotiationStatus").value("OFFER_REJECTED"))
+                .andExpect(jsonPath("$.data.pendingOfferAmount").doesNotExist())
+                .andExpect(jsonPath("$.data.respondingSide").doesNotExist())
+                .andExpect(jsonPath("$.data.offerableSides.length()").value(2))
+                .andExpect(jsonPath("$.data.offers[0].rejectedAt").exists())
+                .andDo(document("application-offer-reject",
+                        resource(TAG, "받은 가격 제안 거절", "신청 거절 · 취소와 달리 신청은 검토 중(PENDING)으로 남습니다. "
+                                + "협의 상태는 OFFER_REJECTED, 합의 금액(totalPrice)은 그대로이고 offerableSides 의 양쪽 모두 "
+                                + "다시 제안할 수 있습니다. 제안한 사람에게 PRICE_OFFER_REJECTED 알림이 갑니다. "
+                                + "본문은 생략할 수 있습니다. 내가 답할 제안이 없으면 409 NO_PENDING_OFFER, "
+                                + "검토 중이 아니면 409 INVALID_APPLICATION_STATUS."),
+                        requestHeaders(authorization()),
+                        pathParameters(parameterWithName("applicationId").description("신청 ID")),
+                        requestFields(fieldWithPath("message").type(JsonFieldType.STRING).optional()
+                                .description("거절 한마디 (선택, 최대 300자) — 제안 이력에서 상대에게 보입니다")),
+                        responseFields(success(fields(ApplicationDocumentation.detailFields("data."))))));
+    }
+
+    @Test
+    @DisplayName("받은 가격 제안 거절: 본문 없이 보내면 한마디 없이 거절한다")
+    void rejectOfferWithoutBody() throws Exception {
+        given(priceNegotiationService.reject(USER_ID, 7L, RejectOfferRequest.EMPTY)).willReturn(offerRejectedDetail());
+
+        mockMvc.perform(post("/api/v1/applications/{applicationId}/offers/reject", 7L)
+                        .header(HttpHeaders.AUTHORIZATION, userToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.negotiationStatus").value("OFFER_REJECTED"));
+    }
+
+    @Test
+    @DisplayName("받은 가격 제안 거절: 답할 제안이 없으면 409 NO_PENDING_OFFER")
+    void rejectOfferWithoutPendingOffer() throws Exception {
+        given(priceNegotiationService.reject(eq(PROVIDER_ID), eq(7L), any(RejectOfferRequest.class)))
+                .willThrow(new BusinessException(ErrorCode.NO_PENDING_OFFER));
+
+        mockMvc.perform(post("/api/v1/applications/{applicationId}/offers/reject", 7L)
+                        .header(HttpHeaders.AUTHORIZATION, providerToken()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("NO_PENDING_OFFER"))
+                .andDo(document("application-offer-reject-no-pending-offer",
+                        resource(TAG, "받은 가격 제안 거절", "자기가 보낸 제안을 거절하려 한 예시"),
+                        responseFields(error())));
+    }
+
+    @Test
+    @DisplayName("받은 가격 제안 거절: 한마디가 300자를 넘으면 400 INVALID_INPUT")
+    void rejectOfferTooLongMessage() throws Exception {
+        mockMvc.perform(post("/api/v1/applications/{applicationId}/offers/reject", 7L)
+                        .header(HttpHeaders.AUTHORIZATION, userToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(new RejectOfferRequest("가".repeat(301)))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_INPUT"));
+    }
+
     static Application application() {
         return ApplicationFixtures.application(7L,
                 ApplicationFixtures.publishedSpace(SpaceFixtures.space(10L, SpaceFixtures.provider(PROVIDER_ID),
@@ -246,8 +315,19 @@ class ApplicationControllerTest extends ApiDocsTestSupport {
 
     static ApplicationResponse detail() {
         return ApplicationResponse.of(application(), ProviderSpaceControllerTest.photos().get(0).url(), List.of(
-                new PriceOfferResponse(1L, OfferSide.APPLICANT, "이이용", 90_000, "조금만 조정 부탁드립니다.", null,
-                        FixedClockConfig.FIXED_LOCAL_NOW)), 3L);
+                new PriceOfferResponse(1L, OfferSide.APPLICANT, "이이용", 90_000, "조금만 조정 부탁드립니다.", null, null,
+                        null, FixedClockConfig.FIXED_LOCAL_NOW)), 3L);
+    }
+
+    /** 제공자 역제안(95,000원)을 신청자가 거절한 상태. */
+    static ApplicationResponse offerRejectedDetail() {
+        Application application = application();
+        PriceOffer counter = application.offer(application.getSpace().getProvider(), 95_000, "9만 5천원까지 가능합니다.",
+                FixedClockConfig.FIXED_LOCAL_NOW);
+        application.rejectOffer(USER_ID, counter, "주말이라 어렵습니다.", FixedClockConfig.FIXED_LOCAL_NOW);
+        return ApplicationResponse.of(application, ProviderSpaceControllerTest.photos().get(0).url(), List.of(
+                new PriceOfferResponse(1L, OfferSide.PROVIDER, "제공자", 95_000, "9만 5천원까지 가능합니다.", null,
+                        FixedClockConfig.FIXED_LOCAL_NOW, "주말이라 어렵습니다.", FixedClockConfig.FIXED_LOCAL_NOW)), 3L);
     }
 
     static ApplicationSummaryResponse summary() {
