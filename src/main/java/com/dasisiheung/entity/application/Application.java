@@ -21,6 +21,8 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.Optional;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -192,6 +194,21 @@ public class Application extends BaseTimeEntity {
     /** 신청의 한쪽 회원. (신청자 또는 공간 제공자) */
     public Member memberOf(OfferSide side) {
         return side == OfferSide.APPLICANT ? applicant : space.getProvider();
+    }
+
+    /**
+     * 이 쪽이 지금 새 제안(역제안 · 거절 뒤 재제안 포함)을 보낼 수 있는지. 금액을 뺀 {@link #offer} 의 조건과 같다.
+     */
+    public boolean canOffer(OfferSide side) {
+        return status == ApplicationStatus.PENDING && space.isPriceNegotiable()
+                && negotiationStatus != side.waitingForCounterpart();
+    }
+
+    /** 받은 제안에 답(수락 · 거절 · 역제안)할 차례인 쪽. 답을 기다리는 제안이 없으면 비어 있다. */
+    public Optional<OfferSide> respondingSide() {
+        return Arrays.stream(OfferSide.values())
+                .filter(side -> negotiationStatus == side.waitingForMe())
+                .findFirst();
     }
 
     /**
