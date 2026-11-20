@@ -146,7 +146,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-applications337582482"
+                $ref: "#/components/schemas/api-v1-applications-applicationId-offers-reject-1135237885"
               examples:
                 application-submit:
                   value: |-
@@ -179,6 +179,8 @@ paths:
                         "totalPrice" : 100000,
                         "negotiationStatus" : "NONE",
                         "pendingOfferAmount" : null,
+                        "respondingSide" : null,
+                        "offerableSides" : [ "APPLICANT", "PROVIDER" ],
                         "offers" : [ {
                           "id" : 1,
                           "proposerSide" : "APPLICANT",
@@ -186,6 +188,8 @@ paths:
                           "amount" : 90000,
                           "message" : "조금만 조정 부탁드립니다.",
                           "acceptedAt" : null,
+                          "rejectedAt" : null,
+                          "rejectionMessage" : null,
                           "createdAt" : "2026-10-20T21:00:00"
                         } ],
                         "conversationId" : 3,
@@ -377,6 +381,73 @@ paths:
                           "field" : "content",
                           "reason" : "size must be between 0 and 1000"
                         } ]
+                      }
+                    }
+      security:
+      - bearerAuthJWT: []
+  /api/v1/notifications:
+    get:
+      tags:
+      - Notification
+      summary: 내 알림 목록
+      description: "로그인한 회원의 알림함 (최근 순). 가격 제안 · 수락 · 거절이 남으며, 푸시를 받지 못했어도(알림 끔 ·\
+        \ 방해금지 · 기기 없음) 여기에는 항상 있습니다. 항목을 누르면 applicationId 의 신청 상세(GET /api/v1/applications/{id})를\
+        \ 열고 읽음 처리하세요."
+      operationId: notification-list
+      parameters:
+      - name: unreadOnly
+        in: query
+        description: true 면 안 읽은 알림만 (기본 false)
+        required: false
+        schema:
+          type: string
+      - name: page
+        in: query
+        description: 페이지 (0부터)
+        required: false
+        schema:
+          type: string
+      - name: size
+        in: query
+        description: 페이지 크기 (최대 100)
+        required: false
+        schema:
+          type: string
+      - name: Authorization
+        in: header
+        description: "Bearer {액세스 토큰}"
+        required: true
+        schema:
+          type: string
+        example: Bearer eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiIxIiwicm9sZSI6IlVTRVIiLCJpYXQiOjE3OTI0OTc2MDAsImV4cCI6MTc5MjQ5OTQwMH0.qCsN0QXweH8Gj_bAv3s3HLo7SnDsOxEnz6rOqzYHwT8m_vfVz4TnSeJzE2f9ib8e
+      responses:
+        "200":
+          description: "200"
+          content:
+            application/json;charset=UTF-8:
+              schema:
+                $ref: "#/components/schemas/api-v1-notifications381373704"
+              examples:
+                notification-list:
+                  value: |-
+                    {
+                      "success" : true,
+                      "data" : {
+                        "content" : [ {
+                          "id" : 12,
+                          "type" : "PRICE_OFFER_RECEIVED",
+                          "title" : "공간 제공자의 역제안",
+                          "body" : "제공자님이 '정왕역 앞 1층 상가' 10/23~10/24 이용 금액으로 95,000원을 제안했어요.",
+                          "applicationId" : 31,
+                          "read" : false,
+                          "readAt" : null,
+                          "createdAt" : "2026-10-20T21:00:00"
+                        } ],
+                        "page" : 0,
+                        "size" : 20,
+                        "totalElements" : 1,
+                        "totalPages" : 1,
+                        "hasNext" : false
                       }
                     }
       security:
@@ -621,6 +692,9 @@ paths:
                         }, {
                           "code" : "AGREED",
                           "label" : "가격 합의"
+                        }, {
+                          "code" : "OFFER_REJECTED",
+                          "label" : "제안 거절"
                         } ],
                         "offerSides" : [ {
                           "code" : "APPLICANT",
@@ -1034,9 +1108,9 @@ paths:
                           "GEOBUKSEOM" : 0
                         },
                         "membersByRole" : {
-                          "ADMIN" : 1,
+                          "USER" : 10,
                           "PROVIDER" : 5,
-                          "USER" : 10
+                          "ADMIN" : 1
                         },
                         "pendingApplicationCount" : 5,
                         "applicationsByStatus" : {
@@ -1079,7 +1153,7 @@ paths:
         content:
           application/json;charset=UTF-8:
             schema:
-              $ref: "#/components/schemas/api-v1-admin-faqs-faqId1691331599"
+              $ref: "#/components/schemas/api-v1-admin-faqs1691331599"
             examples:
               admin-faq-create-invalid:
                 value: |-
@@ -1117,11 +1191,11 @@ paths:
                         "code" : "INVALID_INPUT",
                         "message" : "요청 값이 올바르지 않습니다.",
                         "fieldErrors" : [ {
-                          "field" : "category",
-                          "reason" : "must not be null"
-                        }, {
                           "field" : "question",
                           "reason" : "must not be blank"
+                        }, {
+                          "field" : "category",
+                          "reason" : "must not be null"
                         } ]
                       }
                     }
@@ -1130,7 +1204,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-admin-faqs-faqId-622886557"
+                $ref: "#/components/schemas/api-v1-admin-faqs-622886557"
               examples:
                 admin-faq-create:
                   value: |-
@@ -1407,7 +1481,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-applications337582482"
+                $ref: "#/components/schemas/api-v1-applications-applicationId-offers-reject-1135237885"
               examples:
                 application-detail:
                   value: |-
@@ -1440,6 +1514,8 @@ paths:
                         "totalPrice" : 100000,
                         "negotiationStatus" : "NONE",
                         "pendingOfferAmount" : null,
+                        "respondingSide" : null,
+                        "offerableSides" : [ "APPLICANT", "PROVIDER" ],
                         "offers" : [ {
                           "id" : 1,
                           "proposerSide" : "APPLICANT",
@@ -1447,6 +1523,8 @@ paths:
                           "amount" : 90000,
                           "message" : "조금만 조정 부탁드립니다.",
                           "acceptedAt" : null,
+                          "rejectedAt" : null,
+                          "rejectionMessage" : null,
                           "createdAt" : "2026-10-20T21:00:00"
                         } ],
                         "conversationId" : 3,
@@ -1655,12 +1733,6 @@ paths:
                         "code" : "INVALID_INPUT",
                         "message" : "요청 값이 올바르지 않습니다.",
                         "fieldErrors" : [ {
-                          "field" : "email",
-                          "reason" : "must be a well-formed email address"
-                        }, {
-                          "field" : "password",
-                          "reason" : "비밀번호는 영문과 숫자를 포함해 8~64자여야 합니다."
-                        }, {
                           "field" : "phone",
                           "reason" : "휴대폰 번호 형식이 올바르지 않습니다. (예: 010-1234-5678)"
                         }, {
@@ -1669,6 +1741,12 @@ paths:
                         }, {
                           "field" : "name",
                           "reason" : "must not be blank"
+                        }, {
+                          "field" : "password",
+                          "reason" : "비밀번호는 영문과 숫자를 포함해 8~64자여야 합니다."
+                        }, {
+                          "field" : "email",
+                          "reason" : "must be a well-formed email address"
                         } ]
                       }
                     }
@@ -2142,6 +2220,72 @@ paths:
                         "role" : "USER",
                         "status" : "ACTIVE",
                         "createdAt" : "2026-10-20T21:00:00"
+                      }
+                    }
+      security:
+      - bearerAuthJWT: []
+  /api/v1/notifications/read-all:
+    post:
+      tags:
+      - Notification
+      summary: 모두 읽음 처리
+      description: 안 읽은 내 알림을 모두 읽음으로 바꿉니다.
+      operationId: notification-read-all
+      parameters:
+      - name: Authorization
+        in: header
+        description: "Bearer {액세스 토큰}"
+        required: true
+        schema:
+          type: string
+        example: Bearer eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiIxIiwicm9sZSI6IlVTRVIiLCJpYXQiOjE3OTI0OTc2MDAsImV4cCI6MTc5MjQ5OTQwMH0.qCsN0QXweH8Gj_bAv3s3HLo7SnDsOxEnz6rOqzYHwT8m_vfVz4TnSeJzE2f9ib8e
+      responses:
+        "200":
+          description: "200"
+          content:
+            application/json;charset=UTF-8:
+              schema:
+                $ref: "#/components/schemas/api-v1-notifications-read-all1933898612"
+              examples:
+                notification-read-all:
+                  value: |-
+                    {
+                      "success" : true,
+                      "data" : {
+                        "count" : 2
+                      }
+                    }
+      security:
+      - bearerAuthJWT: []
+  /api/v1/notifications/unread-count:
+    get:
+      tags:
+      - Notification
+      summary: 안 읽은 알림 수
+      description: 알림 아이콘 배지용입니다.
+      operationId: notification-unread-count
+      parameters:
+      - name: Authorization
+        in: header
+        description: "Bearer {액세스 토큰}"
+        required: true
+        schema:
+          type: string
+        example: Bearer eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiIxIiwicm9sZSI6IlVTRVIiLCJpYXQiOjE3OTI0OTc2MDAsImV4cCI6MTc5MjQ5OTQwMH0.qCsN0QXweH8Gj_bAv3s3HLo7SnDsOxEnz6rOqzYHwT8m_vfVz4TnSeJzE2f9ib8e
+      responses:
+        "200":
+          description: "200"
+          content:
+            application/json;charset=UTF-8:
+              schema:
+                $ref: "#/components/schemas/api-v1-notifications-unread-count-1715688474"
+              examples:
+                notification-unread-count:
+                  value: |-
+                    {
+                      "success" : true,
+                      "data" : {
+                        "count" : 2
                       }
                     }
       security:
@@ -2964,7 +3108,7 @@ paths:
         content:
           application/json;charset=UTF-8:
             schema:
-              $ref: "#/components/schemas/api-v1-admin-faqs-faqId1691331599"
+              $ref: "#/components/schemas/api-v1-admin-faqs1691331599"
             examples:
               admin-faq-update:
                 value: |-
@@ -2986,7 +3130,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-admin-faqs-faqId-622886557"
+                $ref: "#/components/schemas/api-v1-admin-faqs-622886557"
               examples:
                 admin-faq-update:
                   value: |-
@@ -3645,7 +3789,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-applications337582482"
+                $ref: "#/components/schemas/api-v1-applications-applicationId-offers-reject-1135237885"
               examples:
                 application-cancel:
                   value: |-
@@ -3678,6 +3822,8 @@ paths:
                         "totalPrice" : 100000,
                         "negotiationStatus" : "NONE",
                         "pendingOfferAmount" : null,
+                        "respondingSide" : null,
+                        "offerableSides" : [ "APPLICANT", "PROVIDER" ],
                         "offers" : [ {
                           "id" : 1,
                           "proposerSide" : "APPLICANT",
@@ -3685,6 +3831,8 @@ paths:
                           "amount" : 90000,
                           "message" : "조금만 조정 부탁드립니다.",
                           "acceptedAt" : null,
+                          "rejectedAt" : null,
+                          "rejectionMessage" : null,
                           "createdAt" : "2026-10-20T21:00:00"
                         } ],
                         "conversationId" : 3,
@@ -3812,7 +3960,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-applications337582482"
+                $ref: "#/components/schemas/api-v1-applications-applicationId-offers-reject-1135237885"
               examples:
                 application-offer:
                   value: |-
@@ -3845,6 +3993,8 @@ paths:
                         "totalPrice" : 100000,
                         "negotiationStatus" : "NONE",
                         "pendingOfferAmount" : null,
+                        "respondingSide" : null,
+                        "offerableSides" : [ "APPLICANT", "PROVIDER" ],
                         "offers" : [ {
                           "id" : 1,
                           "proposerSide" : "APPLICANT",
@@ -3852,6 +4002,8 @@ paths:
                           "amount" : 90000,
                           "message" : "조금만 조정 부탁드립니다.",
                           "acceptedAt" : null,
+                          "rejectedAt" : null,
+                          "rejectionMessage" : null,
                           "createdAt" : "2026-10-20T21:00:00"
                         } ],
                         "conversationId" : 3,
@@ -5420,6 +5572,69 @@ paths:
                     }
       security:
       - bearerAuthJWT: []
+  /api/v1/notifications/{notificationId}/read:
+    post:
+      tags:
+      - Notification
+      summary: 알림 읽음 처리
+      description: 푸시 data 의 notificationId 또는 목록의 id 를 씁니다. 이미 읽은 알림이면 처음 읽은 시각을
+        그대로 돌려줍니다. 없거나 남의 알림이면 404 NOTIFICATION_NOT_FOUND.
+      operationId: notification-read
+      parameters:
+      - name: notificationId
+        in: path
+        description: 알림 ID
+        required: true
+        schema:
+          type: string
+      - name: Authorization
+        in: header
+        description: "Bearer {액세스 토큰}"
+        required: true
+        schema:
+          type: string
+        example: Bearer eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiIxIiwicm9sZSI6IlVTRVIiLCJpYXQiOjE3OTI0OTc2MDAsImV4cCI6MTc5MjQ5OTQwMH0.qCsN0QXweH8Gj_bAv3s3HLo7SnDsOxEnz6rOqzYHwT8m_vfVz4TnSeJzE2f9ib8e
+      responses:
+        "200":
+          description: "200"
+          content:
+            application/json;charset=UTF-8:
+              schema:
+                $ref: "#/components/schemas/api-v1-notifications-notificationId-read1742647396"
+              examples:
+                notification-read:
+                  value: |-
+                    {
+                      "success" : true,
+                      "data" : {
+                        "id" : 12,
+                        "type" : "PRICE_OFFER_RECEIVED",
+                        "title" : "공간 제공자의 역제안",
+                        "body" : "제공자님이 '정왕역 앞 1층 상가' 10/23~10/24 이용 금액으로 95,000원을 제안했어요.",
+                        "applicationId" : 31,
+                        "read" : true,
+                        "readAt" : "2026-10-20T21:03:00",
+                        "createdAt" : "2026-10-20T21:00:00"
+                      }
+                    }
+        "404":
+          description: "404"
+          content:
+            application/json;charset=UTF-8:
+              schema:
+                $ref: "#/components/schemas/api-v1-admin-faqs-order779366877"
+              examples:
+                notification-read-not-found:
+                  value: |-
+                    {
+                      "success" : false,
+                      "error" : {
+                        "code" : "NOTIFICATION_NOT_FOUND",
+                        "message" : "알림을 찾을 수 없습니다."
+                      }
+                    }
+      security:
+      - bearerAuthJWT: []
   /api/v1/provider/spaces/{spaceId}:
     get:
       tags:
@@ -6490,7 +6705,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-applications337582482"
+                $ref: "#/components/schemas/api-v1-applications-applicationId-offers-reject-1135237885"
               examples:
                 application-offer-accept:
                   value: |-
@@ -6523,6 +6738,8 @@ paths:
                         "totalPrice" : 100000,
                         "negotiationStatus" : "NONE",
                         "pendingOfferAmount" : null,
+                        "respondingSide" : null,
+                        "offerableSides" : [ "APPLICANT", "PROVIDER" ],
                         "offers" : [ {
                           "id" : 1,
                           "proposerSide" : "APPLICANT",
@@ -6530,11 +6747,123 @@ paths:
                           "amount" : 90000,
                           "message" : "조금만 조정 부탁드립니다.",
                           "acceptedAt" : null,
+                          "rejectedAt" : null,
+                          "rejectionMessage" : null,
                           "createdAt" : "2026-10-20T21:00:00"
                         } ],
                         "conversationId" : 3,
                         "createdAt" : "2026-10-20T21:00:00",
                         "decidedAt" : null
+                      }
+                    }
+      security:
+      - bearerAuthJWT: []
+  /api/v1/applications/{applicationId}/offers/reject:
+    post:
+      tags:
+      - Application
+      summary: 받은 가격 제안 거절
+      description: "신청 거절 · 취소와 달리 신청은 검토 중(PENDING)으로 남습니다. 협의 상태는 OFFER_REJECTED,\
+        \ 합의 금액(totalPrice)은 그대로이고 offerableSides 의 양쪽 모두 다시 제안할 수 있습니다. 제안한 사람에게\
+        \ PRICE_OFFER_REJECTED 알림이 갑니다. 본문은 생략할 수 있습니다. 내가 답할 제안이 없으면 409 NO_PENDING_OFFER,\
+        \ 검토 중이 아니면 409 INVALID_APPLICATION_STATUS."
+      operationId: application-offer-reject
+      parameters:
+      - name: applicationId
+        in: path
+        description: 신청 ID
+        required: true
+        schema:
+          type: string
+      - name: Authorization
+        in: header
+        description: "Bearer {액세스 토큰}"
+        required: true
+        schema:
+          type: string
+        example: Bearer eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiIxIiwicm9sZSI6IlVTRVIiLCJpYXQiOjE3OTI0OTc2MDAsImV4cCI6MTc5MjQ5OTQwMH0.qCsN0QXweH8Gj_bAv3s3HLo7SnDsOxEnz6rOqzYHwT8m_vfVz4TnSeJzE2f9ib8e
+      requestBody:
+        content:
+          application/json;charset=UTF-8:
+            schema:
+              $ref: "#/components/schemas/api-v1-applications-applicationId-offers-reject1662806852"
+            examples:
+              application-offer-reject:
+                value: |-
+                  {
+                    "message" : "주말이라 어렵습니다."
+                  }
+      responses:
+        "200":
+          description: "200"
+          content:
+            application/json;charset=UTF-8:
+              schema:
+                $ref: "#/components/schemas/api-v1-applications-applicationId-offers-reject-1135237885"
+              examples:
+                application-offer-reject:
+                  value: |-
+                    {
+                      "success" : true,
+                      "data" : {
+                        "id" : 7,
+                        "status" : "PENDING",
+                        "statusReason" : null,
+                        "space" : {
+                          "id" : 10,
+                          "title" : "정왕역 앞 1층 상가",
+                          "region" : "JEONGWANG",
+                          "address" : "경기도 시흥시 마유로 418",
+                          "thumbnailUrl" : "https://abc.supabase.co/storage/v1/object/public/space-photos/spaces/10/photos/b.jpg"
+                        },
+                        "applicant" : {
+                          "id" : 1,
+                          "name" : "이이용"
+                        },
+                        "activityType" : "POPUP_STORE",
+                        "activityTitle" : "수제 캔들 팝업 스토어",
+                        "plan" : "주말 이틀 동안 수제 캔들을 전시 · 판매합니다.",
+                        "headcount" : 3,
+                        "startDate" : "2026-10-23",
+                        "endDate" : "2026-10-24",
+                        "days" : 2,
+                        "listDailyPrice" : 50000,
+                        "listTotalPrice" : 100000,
+                        "totalPrice" : 100000,
+                        "negotiationStatus" : "OFFER_REJECTED",
+                        "pendingOfferAmount" : null,
+                        "respondingSide" : null,
+                        "offerableSides" : [ "APPLICANT", "PROVIDER" ],
+                        "offers" : [ {
+                          "id" : 1,
+                          "proposerSide" : "PROVIDER",
+                          "proposerName" : "제공자",
+                          "amount" : 95000,
+                          "message" : "9만 5천원까지 가능합니다.",
+                          "acceptedAt" : null,
+                          "rejectedAt" : "2026-10-20T21:00:00",
+                          "rejectionMessage" : "주말이라 어렵습니다.",
+                          "createdAt" : "2026-10-20T21:00:00"
+                        } ],
+                        "conversationId" : 3,
+                        "createdAt" : "2026-10-20T21:00:00",
+                        "decidedAt" : null
+                      }
+                    }
+        "409":
+          description: "409"
+          content:
+            application/json;charset=UTF-8:
+              schema:
+                $ref: "#/components/schemas/api-v1-admin-faqs-order779366877"
+              examples:
+                application-offer-reject-no-pending-offer:
+                  value: |-
+                    {
+                      "success" : false,
+                      "error" : {
+                        "code" : "NO_PENDING_OFFER",
+                        "message" : "답할 가격 제안이 없습니다. 상대가 보낸 제안을 기다려 주세요."
                       }
                     }
       security:
@@ -6846,7 +7175,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-applications337582482"
+                $ref: "#/components/schemas/api-v1-applications-applicationId-offers-reject-1135237885"
               examples:
                 provider-application-approve:
                   value: |-
@@ -6879,6 +7208,8 @@ paths:
                         "totalPrice" : 100000,
                         "negotiationStatus" : "NONE",
                         "pendingOfferAmount" : null,
+                        "respondingSide" : null,
+                        "offerableSides" : [ "APPLICANT", "PROVIDER" ],
                         "offers" : [ {
                           "id" : 1,
                           "proposerSide" : "APPLICANT",
@@ -6886,6 +7217,8 @@ paths:
                           "amount" : 90000,
                           "message" : "조금만 조정 부탁드립니다.",
                           "acceptedAt" : null,
+                          "rejectedAt" : null,
+                          "rejectionMessage" : null,
                           "createdAt" : "2026-10-20T21:00:00"
                         } ],
                         "conversationId" : 3,
@@ -6974,7 +7307,7 @@ paths:
           content:
             application/json;charset=UTF-8:
               schema:
-                $ref: "#/components/schemas/api-v1-applications337582482"
+                $ref: "#/components/schemas/api-v1-applications-applicationId-offers-reject-1135237885"
               examples:
                 provider-application-reject:
                   value: |-
@@ -7007,6 +7340,8 @@ paths:
                         "totalPrice" : 100000,
                         "negotiationStatus" : "NONE",
                         "pendingOfferAmount" : null,
+                        "respondingSide" : null,
+                        "offerableSides" : [ "APPLICANT", "PROVIDER" ],
                         "offers" : [ {
                           "id" : 1,
                           "proposerSide" : "APPLICANT",
@@ -7014,6 +7349,8 @@ paths:
                           "amount" : 90000,
                           "message" : "조금만 조정 부탁드립니다.",
                           "acceptedAt" : null,
+                          "rejectedAt" : null,
+                          "rejectionMessage" : null,
                           "createdAt" : "2026-10-20T21:00:00"
                         } ],
                         "conversationId" : 3,
@@ -8115,6 +8452,26 @@ components:
         success:
           type: boolean
           description: 요청 성공 여부 (true)
+    api-v1-system-ping318687861:
+      required:
+      - success
+      type: object
+      properties:
+        data:
+          required:
+          - serverTime
+          - status
+          type: object
+          properties:
+            serverTime:
+              type: string
+              description: "서버 시각 (ISO-8601, Asia/Seoul)"
+            status:
+              type: string
+              description: 서버 상태 (정상이면 OK)
+        success:
+          type: boolean
+          description: 요청 성공 여부
     api-v1-options130970565:
       required:
       - success
@@ -8495,184 +8852,6 @@ components:
         success:
           type: boolean
           description: 요청 성공 여부 (true)
-    api-v1-system-ping318687861:
-      required:
-      - success
-      type: object
-      properties:
-        data:
-          required:
-          - serverTime
-          - status
-          type: object
-          properties:
-            serverTime:
-              type: string
-              description: "서버 시각 (ISO-8601, Asia/Seoul)"
-            status:
-              type: string
-              description: 서버 상태 (정상이면 OK)
-        success:
-          type: boolean
-          description: 요청 성공 여부
-    api-v1-applications337582482:
-      required:
-      - success
-      type: object
-      properties:
-        data:
-          required:
-          - activityTitle
-          - activityType
-          - createdAt
-          - days
-          - endDate
-          - headcount
-          - id
-          - listDailyPrice
-          - listTotalPrice
-          - negotiationStatus
-          - offers
-          - plan
-          - startDate
-          - status
-          - totalPrice
-          type: object
-          properties:
-            offers:
-              type: array
-              description: 가격 협의 이력 (오래된 순)
-              items:
-                type: object
-                properties:
-                  createdAt:
-                    type: string
-                    description: 제안 시각
-                    nullable: true
-                  amount:
-                    type: number
-                    description: "제안 금액(원, 기간 합계)"
-                    nullable: true
-                  proposerName:
-                    type: string
-                    description: 제안한 회원 이름
-                    nullable: true
-                  proposerSide:
-                    type: string
-                    description: APPLICANT 신청자 | PROVIDER 공간 제공자
-                    nullable: true
-                  id:
-                    type: number
-                    description: 제안 ID
-                    nullable: true
-                  message:
-                    type: string
-                    description: 한마디
-                    nullable: true
-                  acceptedAt:
-                    type: string
-                    description: 상대가 수락한 시각 (수락 전이면 null)
-                    nullable: true
-            headcount:
-              type: number
-              description: 예상 운영 인원
-            totalPrice:
-              type: number
-              description: 현재 합의 금액(원) — 협의 전에는 정가 합계
-            endDate:
-              type: string
-              description: 이용 종료일
-            conversationId:
-              type: number
-              description: "신청자 ↔ 공간 제공자 1:1 대화 ID (아직 없으면 null — POST /api/v1/applications/{id}/conversation\
-                \ 으로 열기)"
-              nullable: true
-            negotiationStatus:
-              type: string
-              description: NONE 정가 신청 | WAITING_PROVIDER 제공자 답변 대기 | WAITING_APPLICANT
-                신청자 답변 대기 | AGREED 가격 합의
-            listTotalPrice:
-              type: number
-              description: 정가 합계(원)
-            listDailyPrice:
-              type: number
-              description: 신청 시점 1일 이용료(원)
-            space:
-              required:
-              - address
-              - id
-              - region
-              - title
-              type: object
-              properties:
-                address:
-                  type: string
-                  description: 도로명 주소
-                id:
-                  type: number
-                  description: 공간 ID
-                region:
-                  type: string
-                  description: 서비스 지역
-                title:
-                  type: string
-                  description: 공간 이름
-                thumbnailUrl:
-                  type: string
-                  description: 대표 사진 주소
-                  nullable: true
-            applicant:
-              required:
-              - id
-              - name
-              type: object
-              properties:
-                name:
-                  type: string
-                  description: 신청자 이름
-                id:
-                  type: number
-                  description: 신청자 회원 ID
-            createdAt:
-              type: string
-              description: 신청 시각
-            pendingOfferAmount:
-              type: number
-              description: 답변을 기다리는 제안 금액
-              nullable: true
-            statusReason:
-              type: string
-              description: 거절 · 취소 · 마감 사유
-              nullable: true
-            activityTitle:
-              type: string
-              description: 활동 이름
-            decidedAt:
-              type: string
-              description: 확정 · 거절 · 취소 · 마감 시각
-              nullable: true
-            days:
-              type: number
-              description: 이용 일수
-            id:
-              type: number
-              description: 신청 ID
-            activityType:
-              type: string
-              description: 활동 종류
-            plan:
-              type: string
-              description: 활동 계획
-            startDate:
-              type: string
-              description: 이용 시작일
-            status:
-              type: string
-              description: PENDING 검토 중 | APPROVED 예약 확정 | REJECTED 거절 | CANCELLED
-                취소 | CLOSED 마감(다른 신청 확정)
-        success:
-          type: boolean
-          description: 요청 성공 여부 (true)
     api-v1-provider-spaces-spaceId-proofs770688767:
       required:
       - success
@@ -8715,6 +8894,18 @@ components:
         success:
           type: boolean
           description: 요청 성공 여부 (true)
+    api-v1-applications-applicationId-offers-865504904:
+      required:
+      - amount
+      type: object
+      properties:
+        amount:
+          type: number
+          description: "제안 금액(원, 기간 합계)"
+        message:
+          type: string
+          description: "한마디 (선택, 최대 300자)"
+          nullable: true
     api-v1-admin-dashboard-707135416:
       required:
       - success
@@ -8789,18 +8980,6 @@ components:
         success:
           type: boolean
           description: 요청 성공 여부 (true)
-    api-v1-applications-applicationId-offers-865504904:
-      required:
-      - amount
-      type: object
-      properties:
-        amount:
-          type: number
-          description: "제안 금액(원, 기간 합계)"
-        message:
-          type: string
-          description: "한마디 (선택, 최대 300자)"
-          nullable: true
     api-v1-inquiries-inquiryId-photos821318252:
       required:
       - success
@@ -9500,6 +9679,22 @@ components:
         success:
           type: boolean
           description: 요청 성공 여부 (true)
+    api-v1-notifications-read-all1933898612:
+      required:
+      - success
+      type: object
+      properties:
+        data:
+          required:
+          - count
+          type: object
+          properties:
+            count:
+              type: number
+              description: 이번에 읽음으로 바뀐 알림 수
+        success:
+          type: boolean
+          description: 요청 성공 여부 (true)
     api-v1-spaces-recommendations1097508056:
       required:
       - success
@@ -9770,6 +9965,80 @@ components:
         content:
           type: string
           description: 메시지 (최대 1000자)
+    api-v1-notifications381373704:
+      required:
+      - success
+      type: object
+      properties:
+        data:
+          required:
+          - content
+          - hasNext
+          - page
+          - size
+          - totalElements
+          - totalPages
+          type: object
+          properties:
+            size:
+              type: number
+              description: 페이지 크기
+            totalPages:
+              type: number
+              description: 전체 페이지 수
+            hasNext:
+              type: boolean
+              description: 다음 페이지 존재 여부
+            page:
+              type: number
+              description: 현재 페이지 (0부터)
+            content:
+              type: array
+              description: 현재 페이지 항목
+              items:
+                required:
+                - applicationId
+                - body
+                - createdAt
+                - id
+                - read
+                - title
+                - type
+                type: object
+                properties:
+                  createdAt:
+                    type: string
+                    description: 알림 시각
+                  read:
+                    type: boolean
+                    description: 읽었는지
+                  id:
+                    type: number
+                    description: 알림 ID (읽음 처리에 사용)
+                  readAt:
+                    type: string
+                    description: 처음 읽은 시각 (안 읽었으면 null)
+                    nullable: true
+                  applicationId:
+                    type: number
+                    description: 연결된 신청 ID — 누르면 신청 상세로 이동
+                  body:
+                    type: string
+                    description: 본문
+                  title:
+                    type: string
+                    description: 제목
+                  type:
+                    type: string
+                    description: PRICE_OFFER_RECEIVED 상대의 가격 제안 · 역제안 도착 (수락 · 거절
+                      · 역제안할 차례) | PRICE_OFFER_ACCEPTED 내 제안이 수락됨 | PRICE_OFFER_REJECTED
+                      내 제안이 거절됨 (다시 제안 가능). 푸시 data 의 type 과 같습니다
+            totalElements:
+              type: number
+              description: 전체 항목 수
+        success:
+          type: boolean
+          description: 요청 성공 여부 (true)
     api-v1-auth-login-1974317722:
       required:
       - success
@@ -10178,6 +10447,52 @@ components:
         success:
           type: boolean
           description: 요청 성공 여부 (true)
+    api-v1-notifications-notificationId-read1742647396:
+      required:
+      - success
+      type: object
+      properties:
+        data:
+          required:
+          - applicationId
+          - body
+          - createdAt
+          - id
+          - read
+          - title
+          - type
+          type: object
+          properties:
+            createdAt:
+              type: string
+              description: 알림 시각
+            read:
+              type: boolean
+              description: 읽었는지
+            id:
+              type: number
+              description: 알림 ID (읽음 처리에 사용)
+            readAt:
+              type: string
+              description: 처음 읽은 시각 (안 읽었으면 null)
+              nullable: true
+            applicationId:
+              type: number
+              description: 연결된 신청 ID — 누르면 신청 상세로 이동
+            body:
+              type: string
+              description: 본문
+            title:
+              type: string
+              description: 제목
+            type:
+              type: string
+              description: PRICE_OFFER_RECEIVED 상대의 가격 제안 · 역제안 도착 (수락 · 거절 · 역제안할
+                차례) | PRICE_OFFER_ACCEPTED 내 제안이 수락됨 | PRICE_OFFER_REJECTED 내 제안이
+                거절됨 (다시 제안 가능). 푸시 data 의 type 과 같습니다
+        success:
+          type: boolean
+          description: 요청 성공 여부 (true)
     api-v1-admin-privacy-purge-logs658980988:
       required:
       - success
@@ -10250,7 +10565,7 @@ components:
         success:
           type: boolean
           description: 요청 성공 여부 (true)
-    api-v1-admin-faqs-faqId-622886557:
+    api-v1-admin-faqs-622886557:
       required:
       - success
       type: object
@@ -10295,7 +10610,7 @@ components:
         success:
           type: boolean
           description: 요청 성공 여부 (true)
-    api-v1-admin-faqs-faqId1691331599:
+    api-v1-admin-faqs1691331599:
       required:
       - answer
       - category
@@ -10442,6 +10757,30 @@ components:
         success:
           type: boolean
           description: 요청 성공 여부 (true)
+    api-v1-auth-signup-1218437977:
+      required:
+      - email
+      - name
+      - password
+      - phone
+      - role
+      type: object
+      properties:
+        password:
+          type: string
+          description: 비밀번호 (영문·숫자 포함 8~64자)
+        role:
+          type: string
+          description: "역할: USER(이용자) | PROVIDER(공간 제공자)"
+        phone:
+          type: string
+          description: 휴대폰 번호 (하이픈 선택)
+        name:
+          type: string
+          description: 이름 (최대 30자)
+        email:
+          type: string
+          description: "이메일 (로그인 아이디, 최대 254자)"
     api-v1-members-me-notification-settings957192010:
       required:
       - activity
@@ -10478,30 +10817,6 @@ components:
         push:
           type: boolean
           description: 푸시 알림 전체. false 면 아래 분류와 관계없이 보내지 않음
-    api-v1-auth-signup-1218437977:
-      required:
-      - email
-      - name
-      - password
-      - phone
-      - role
-      type: object
-      properties:
-        password:
-          type: string
-          description: 비밀번호 (영문·숫자 포함 8~64자)
-        role:
-          type: string
-          description: "역할: USER(이용자) | PROVIDER(공간 제공자)"
-        phone:
-          type: string
-          description: 휴대폰 번호 (하이픈 선택)
-        name:
-          type: string
-          description: 이름 (최대 30자)
-        email:
-          type: string
-          description: "이메일 (로그인 아이디, 최대 254자)"
     api-v1-provider-spaces-spaceId-proofs833204462:
       required:
       - success
@@ -11030,6 +11345,189 @@ components:
         content:
           type: string
           description: 본문 (최대 5000자)
+    api-v1-applications-applicationId-offers-reject-1135237885:
+      required:
+      - success
+      type: object
+      properties:
+        data:
+          required:
+          - activityTitle
+          - activityType
+          - createdAt
+          - days
+          - endDate
+          - headcount
+          - id
+          - listDailyPrice
+          - listTotalPrice
+          - negotiationStatus
+          - offerableSides
+          - offers
+          - plan
+          - startDate
+          - status
+          - totalPrice
+          type: object
+          properties:
+            offers:
+              type: array
+              description: 가격 협의 이력 (오래된 순)
+              items:
+                type: object
+                properties:
+                  createdAt:
+                    type: string
+                    description: 제안 시각
+                    nullable: true
+                  amount:
+                    type: number
+                    description: "제안 금액(원, 기간 합계)"
+                    nullable: true
+                  proposerName:
+                    type: string
+                    description: 제안한 회원 이름
+                    nullable: true
+                  proposerSide:
+                    type: string
+                    description: APPLICANT 신청자 | PROVIDER 공간 제공자
+                    nullable: true
+                  rejectedAt:
+                    type: string
+                    description: 상대가 거절한 시각 (거절 전이면 null)
+                    nullable: true
+                  id:
+                    type: number
+                    description: 제안 ID
+                    nullable: true
+                  message:
+                    type: string
+                    description: 한마디
+                    nullable: true
+                  rejectionMessage:
+                    type: string
+                    description: 거절 한마디 (없으면 null)
+                    nullable: true
+                  acceptedAt:
+                    type: string
+                    description: 상대가 수락한 시각 (수락 전이면 null)
+                    nullable: true
+            headcount:
+              type: number
+              description: 예상 운영 인원
+            totalPrice:
+              type: number
+              description: 현재 합의 금액(원) — 협의 전에는 정가 합계
+            endDate:
+              type: string
+              description: 이용 종료일
+            conversationId:
+              type: number
+              description: "신청자 ↔ 공간 제공자 1:1 대화 ID (아직 없으면 null — POST /api/v1/applications/{id}/conversation\
+                \ 으로 열기)"
+              nullable: true
+            negotiationStatus:
+              type: string
+              description: "NONE 정가 신청 | WAITING_PROVIDER 제공자 답변 대기 | WAITING_APPLICANT\
+                \ 신청자 답변 대기 | AGREED 가격 합의 | OFFER_REJECTED 받은 제안 거절 (합의 금액 그대로, 양\
+                쪽 모두 재제안 가능)"
+            listTotalPrice:
+              type: number
+              description: 정가 합계(원)
+            listDailyPrice:
+              type: number
+              description: 신청 시점 1일 이용료(원)
+            space:
+              required:
+              - address
+              - id
+              - region
+              - title
+              type: object
+              properties:
+                address:
+                  type: string
+                  description: 도로명 주소
+                id:
+                  type: number
+                  description: 공간 ID
+                region:
+                  type: string
+                  description: 서비스 지역
+                title:
+                  type: string
+                  description: 공간 이름
+                thumbnailUrl:
+                  type: string
+                  description: 대표 사진 주소
+                  nullable: true
+            applicant:
+              required:
+              - id
+              - name
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: 신청자 이름
+                id:
+                  type: number
+                  description: 신청자 회원 ID
+            createdAt:
+              type: string
+              description: 신청 시각
+            offerableSides:
+              type: array
+              description: "지금 새 제안 · 재제안을 보낼 수 있는 쪽 목록 (검토 중 · 협의 가능 공간 · 내 제안의 답\
+                을 기다리는 중이 아닐 때). 내 쪽은 applicant.id 가 내 회원 ID 면 APPLICANT, 아니면 PROVIDER"
+              items:
+                oneOf:
+                - type: object
+                - type: boolean
+                - type: string
+                - type: number
+            pendingOfferAmount:
+              type: number
+              description: 답변을 기다리는 제안 금액
+              nullable: true
+            statusReason:
+              type: string
+              description: 거절 · 취소 · 마감 사유
+              nullable: true
+            activityTitle:
+              type: string
+              description: 활동 이름
+            decidedAt:
+              type: string
+              description: 확정 · 거절 · 취소 · 마감 시각
+              nullable: true
+            respondingSide:
+              type: string
+              description: 받은 제안에 답(수락 · 거절 · 역제안)할 차례인 쪽 APPLICANT | PROVIDER (답할
+                제안이 없으면 null)
+              nullable: true
+            days:
+              type: number
+              description: 이용 일수
+            id:
+              type: number
+              description: 신청 ID
+            activityType:
+              type: string
+              description: 활동 종류
+            plan:
+              type: string
+              description: 활동 계획
+            startDate:
+              type: string
+              description: 이용 시작일
+            status:
+              type: string
+              description: PENDING 검토 중 | APPROVED 예약 확정 | REJECTED 거절 | CANCELLED
+                취소 | CLOSED 마감(다른 신청 확정)
+        success:
+          type: boolean
+          description: 요청 성공 여부 (true)
     api-v1-members-me-profile-image-380493052:
       required:
       - success
@@ -11233,6 +11731,29 @@ components:
               type: string
               description: 마지막 저장 시각 (KST). 저장한 적이 없으면 null — 기본값
               nullable: true
+        success:
+          type: boolean
+          description: 요청 성공 여부 (true)
+    api-v1-applications-applicationId-offers-reject1662806852:
+      type: object
+      properties:
+        message:
+          type: string
+          description: "거절 한마디 (선택, 최대 300자) — 제안 이력에서 상대에게 보입니다"
+          nullable: true
+    api-v1-notifications-unread-count-1715688474:
+      required:
+      - success
+      type: object
+      properties:
+        data:
+          required:
+          - count
+          type: object
+          properties:
+            count:
+              type: number
+              description: 안 읽은 알림 수
         success:
           type: boolean
           description: 요청 성공 여부 (true)
