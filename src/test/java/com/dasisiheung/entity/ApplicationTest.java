@@ -404,6 +404,37 @@ class ApplicationTest {
         }
 
         @Test
+        @DisplayName("답할 차례 · 제안 가능 쪽: 제안을 보낸 쪽은 기다리고, 받은 쪽만 답하거나 역제안할 수 있다")
+        void negotiationTurns() {
+            Application application = submit(TODAY.plusDays(1), TODAY.plusDays(2));
+            assertThat(application.respondingSide()).isEmpty();
+            assertThat(application.canOffer(OfferSide.APPLICANT)).isTrue();
+            assertThat(application.canOffer(OfferSide.PROVIDER)).isTrue();
+
+            application.offer(provider, 95_000, null, NOW);
+
+            assertThat(application.respondingSide()).contains(OfferSide.APPLICANT);
+            assertThat(application.canOffer(OfferSide.APPLICANT)).isTrue();
+            assertThat(application.canOffer(OfferSide.PROVIDER)).isFalse();
+            assertThat(application.memberOf(OfferSide.APPLICANT)).isSameAs(applicant);
+            assertThat(application.memberOf(OfferSide.PROVIDER).getId()).isEqualTo(2L);
+        }
+
+        @Test
+        @DisplayName("끝난 신청 · 협의를 받지 않는 공간은 어느 쪽도 제안할 수 없다")
+        void cannotOffer() {
+            Application application = submit(TODAY.plusDays(1), TODAY.plusDays(2));
+            application.cancel(APPLICANT_ID, null, TODAY, NOW);
+            assertThat(application.canOffer(OfferSide.APPLICANT)).isFalse();
+            assertThat(application.canOffer(OfferSide.PROVIDER)).isFalse();
+
+            ReflectionTestUtils.setField(space, "priceNegotiable", false);
+            Application notNegotiable = submit(TODAY.plusDays(1), TODAY.plusDays(2));
+            assertThat(notNegotiable.canOffer(OfferSide.APPLICANT)).isFalse();
+            assertThat(notNegotiable.canOffer(OfferSide.PROVIDER)).isFalse();
+        }
+
+        @Test
         @DisplayName("답을 기다리는 제안이 있는 채로 취소하면 대기 제안은 사라지고 합의 금액은 그대로다")
         void cancelClearsPendingOffer() {
             Application application = submit(TODAY.plusDays(1), TODAY.plusDays(2));
