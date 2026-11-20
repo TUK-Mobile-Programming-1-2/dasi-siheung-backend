@@ -6,16 +6,19 @@ import static com.dasisiheung.support.ApiDocumentation.error;
 import static com.dasisiheung.support.ApiDocumentation.page;
 import static com.dasisiheung.support.ApiDocumentation.resource;
 import static com.dasisiheung.support.ApiDocumentation.success;
+import static com.dasisiheung.support.ApiDocumentation.validationError;
 import static com.dasisiheung.support.MultipartDocumentation.filePart;
 import static com.dasisiheung.support.MultipartDocumentation.filesPart;
 import static com.dasisiheung.support.MultipartDocumentation.requestParts;
 import static com.dasisiheung.support.MultipartDocumentation.textPart;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.never;
 import static org.springframework.restdocs.headers.HeaderDocumentation.requestHeaders;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.delete;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.get;
@@ -38,6 +41,7 @@ import com.dasisiheung.dto.space.ProviderSpaceSummaryResponse;
 import com.dasisiheung.dto.space.SpacePhotoResponse;
 import com.dasisiheung.dto.space.SpaceProofResponse;
 import com.dasisiheung.dto.space.SpaceRequest;
+import com.dasisiheung.entity.space.BuildingUse;
 import com.dasisiheung.entity.space.ProofType;
 import com.dasisiheung.entity.space.Region;
 import com.dasisiheung.entity.space.SpaceStatus;
@@ -96,6 +100,56 @@ class ProviderSpaceControllerTest extends ApiDocsTestSupport {
                         requestHeaders(authorization()),
                         requestFields(SpaceDocumentation.spaceRequestFields()),
                         responseFields(success(providerSpaceFields()))));
+    }
+
+    @Test
+    @DisplayName("공간 등록: 기타(ETC) 용도는 직접 입력한 용도(buildingUseEtc)와 함께 보낸다")
+    void registerEtcBuildingUse() throws Exception {
+        SpaceRequest request = SpaceFixtures.withBuildingUse(SpaceFixtures.request(Set.of(TOMORROW)), BuildingUse.ETC,
+                "복합 문화 공간");
+        given(spaceService.register(eq(PROVIDER_ID), any(SpaceRequest.class))).willReturn(providerSpace());
+
+        mockMvc.perform(post("/api/v1/provider/spaces")
+                        .header(HttpHeaders.AUTHORIZATION, providerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(request)))
+                .andExpect(status().isCreated());
+
+        then(spaceService).should().register(eq(PROVIDER_ID),
+                argThat(sent -> sent.buildingUse() == BuildingUse.ETC && "복합 문화 공간".equals(sent.buildingUseEtc())));
+    }
+
+    @Test
+    @DisplayName("공간 등록: 기타(ETC) 용도인데 직접 입력이 비었으면 400 INVALID_INPUT (buildingUseEtcFilled)")
+    void registerEtcWithoutText() throws Exception {
+        SpaceRequest request = SpaceFixtures.withBuildingUse(SpaceFixtures.request(Set.of(TOMORROW)), BuildingUse.ETC, " ");
+
+        mockMvc.perform(post("/api/v1/provider/spaces")
+                        .header(HttpHeaders.AUTHORIZATION, providerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_INPUT"))
+                .andExpect(jsonPath("$.error.fieldErrors[0].field").value("buildingUseEtcFilled"))
+                .andDo(document("provider-space-register-building-use-etc-required",
+                        resource(TAG, "공간 등록", "건축물 용도가 기타(ETC)인데 직접 입력(buildingUseEtc)이 빈 예시. "
+                                + "수정(PUT)도 같습니다."),
+                        responseFields(validationError())));
+        then(spaceService).should(never()).register(any(), any());
+    }
+
+    @Test
+    @DisplayName("공간 등록: 기타 용도 직접 입력이 50자를 넘으면 400 INVALID_INPUT")
+    void registerEtcTooLong() throws Exception {
+        SpaceRequest request = SpaceFixtures.withBuildingUse(SpaceFixtures.request(Set.of(TOMORROW)), BuildingUse.ETC,
+                "가".repeat(51));
+
+        mockMvc.perform(post("/api/v1/provider/spaces")
+                        .header(HttpHeaders.AUTHORIZATION, providerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.fieldErrors[0].field").value("buildingUseEtc"));
     }
 
     @Test
